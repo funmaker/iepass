@@ -1,4 +1,5 @@
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
+use std::time::Instant;
 use embedded_graphics_core::pixelcolor::raw::RawU16;
 use embedded_graphics_core::prelude::*;
 use embedded_graphics_core::pixelcolor::Rgb565;
@@ -12,10 +13,12 @@ use thiserror::Error;
 
 mod debounce;
 mod rle;
+mod frames;
 
-use crate::debounce::Debounce;
+use debounce::Debounce;
+use frames::FRAMES;
 
-static BAD_APPLE: &[u8] = include_bytes!("../assets/BadApple.smol");
+static VIDEO: &[u8] = include_bytes!("../assets/BadApple.smol");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -59,26 +62,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     display.init(&mut FreeRtos).map_err(|_| DisplayError::InitError)?;
     display.set_orientation(&Orientation::Landscape).map_err(|_| DisplayError::SetOrientationError)?;
+    display.set_offset(1, 2); // No idea why its needed
     display.clear(Rgb565::MAGENTA).map_err(|_| DisplayError::ClearError)?;
-    // display.fill_contiguous(
-    //     &Rectangle::new(Point::new(32, 32), Size::new(94, 64)),
-    //     (0_u32..).map(|n| {
-    //         let x = n % 94;
-    //         let y = n / 94;
-    //
-    //         Rgb565::new(
-    //             (x * (1 << 5) / 94) as u8,
-    //             0,
-    //             (y * (1 << 5) / 64) as u8,
-    //         )
-    //     }),
-    // ).map_err(|_| DisplayError::FillContinuousError)?;
 
     log::info!("Hello, world!");
     
-    let mut video_reader = None;
-    let mut frame = Vec::with_capacity(160 * 128);
-    frame.resize(160 * 128, 0_u8);
+    let mut video_reader = None::<()>;
+    let mut framebuffer = Vec::with_capacity(160 * 128);
+    framebuffer.resize(160 * 128, 0_u16);
     
     loop {
         FreeRtos::delay_ms(10);
@@ -89,64 +80,90 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             display.fill_solid(
                 &Rectangle::new(Point::new(0, 0), Size::new(160, 128)),
                 Rgb565::MAGENTA,
-            ).map_err(|_| DisplayError::FillError)?;
+            ).map_err(|_| DisplayError::DrawError)?;
             video_reader = None;
         }
         if start_btn.falling_edge() {
-            log::info!("start");
-            video_reader = Some(rle::Decoder::new(BAD_APPLE));
-            display.set_offset(0, 0);
+            let mut decoder = rle::Decoder::new(VIDEO);
+            let mut row = [0; 160];
             display.set_address_window(0, 0, 159, 127).map_err(|_| DisplayError::SetOrientationError)?;
-            log::info!("start2");
+            
+            'outer: for f in 0.. {
+                for y in 0..128 {
+                    if start_btn.falling_edge() {
+                        break 'outer;
+                    }
+                    
+                    match decoder.read_exact(&mut row) {
+                        Err(err) if err.kind() == ErrorKind::UnexpectedEof => break 'outer,
+                        result => result?,
+                    }
+                    
+                    for x in 0..160 {
+                        let color = row[x];
+                        framebuffer[x + y * 160] = RawU16::from(Rgb565::new(
+                            ((color as u16) * (1 << 5) / 256) as u8,
+                            ((color as u16) * (1 << 6) / 256) as u8,
+                            ((color as u16) * (1 << 5) / 256) as u8,
+                        )).into_inner();
+                    }
+                }
+                
+                display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+                
+                FreeRtos::delay_ms(10);
+            }
+            
+            log::info!("start done");
         }
         if a_btn.falling_edge() {
             log::info!("a");
             display.fill_solid(
                 &Rectangle::new(Point::new(16, 128 - 48), Size::new(32, 32)),
                 Rgb565::BLUE,
-            ).map_err(|_| DisplayError::FillError)?;
+            ).map_err(|_| DisplayError::DrawError)?;
         }
         if b_btn.falling_edge() {
             log::info!("b");
             display.fill_solid(
                 &Rectangle::new(Point::new(160 - 48, 128 - 48), Size::new(32, 32)),
                 Rgb565::BLUE,
-            ).map_err(|_| DisplayError::FillError)?;
+            ).map_err(|_| DisplayError::DrawError)?;
         }
         if x_btn.falling_edge() {
             log::info!("x");
             display.fill_solid(
                 &Rectangle::new(Point::new(16, 16), Size::new(32, 32)),
                 Rgb565::BLUE,
-            ).map_err(|_| DisplayError::FillError)?;
+            ).map_err(|_| DisplayError::DrawError)?;
         }
         if y_btn.falling_edge() {
             log::info!("y");
             display.fill_solid(
                 &Rectangle::new(Point::new(160 - 48, 16), Size::new(32, 32)),
                 Rgb565::BLUE,
-            ).map_err(|_| DisplayError::FillError)?;
+            ).map_err(|_| DisplayError::DrawError)?;
         }
         
-        if let Some(video) = video_reader.as_mut() {
-            match video.read_exact(&mut frame) {
-                Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    video_reader = None;
-                    continue;
-                },
-                result => result?,
-            }
-        
-            display.write_pixels_buffered(
-                frame.iter()
-                     .copied()
-                     .map(|byte| RawU16::from(Rgb565::new(
-                         ((byte as u16) * (1 << 5) / 256) as u8,
-                         ((byte as u16) * (1 << 6) / 256) as u8,
-                         ((byte as u16) * (1 << 5) / 256) as u8,
-                     )).into_inner()),
-            ).map_err(|_| DisplayError::FillError)?;
-        }
+        // if let Some(video) = video_reader.as_mut() {
+        //     match video.read_exact(&mut frame) {
+        //         Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+        //             video_reader = None;
+        //             continue;
+        //         },
+        //         result => result?,
+        //     }
+        //
+        //     display.write_pixels_buffered(
+        //         frame.iter()
+        //              .copied()
+        //              .map(|byte| RawU16::from(Rgb565::new(
+        //                  ((byte as u16) * (1 << 5) / 256) as u8,
+        //                  ((byte as u16) * (1 << 6) / 256) as u8,
+        //                  ((byte as u16) * (1 << 5) / 256) as u8,
+        //              )).into_inner()),
+        //     ).map_err(|_| DisplayError::FillError)?;
+        // }
     }
 }
 
@@ -159,5 +176,5 @@ pub enum DisplayError {
     #[error("Failed to set orientation")]
     SetOrientationError,
     #[error("Failed to draw a rectangle")]
-    FillError,
+    DrawError,
 }
