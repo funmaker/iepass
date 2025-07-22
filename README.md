@@ -1,6 +1,11 @@
 # IE Pass
 IE Pass - The Console The Pass
 
+<p align="center">
+   <img src=".github/logo.svg" width="256"><br/><br/>
+   <a href="https://github.com/funmaker/iepass"><img src="https://github.com/funmaker/iepass/actions/workflows/test.yml/badge.svg"></a>
+</p>
+
 ## Usage
 
 Install binary dependencies:

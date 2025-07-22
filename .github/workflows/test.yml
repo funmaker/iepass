@@ -1,0 +1,37 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "../../README.md"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  rust-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install Dependencies
+        run: |
+          cargo install cargo-make espup ldproxy
+          espup install --targets=esp32,esp32s2,esp32s3
+      - name: Run tests
+        run: cargo make test
+      - name: Build binaries
+        run: cargo make build
