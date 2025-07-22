@@ -1,0 +1,36 @@
+[config]
+skip_core_tasks = true
+
+
+# Clean
+[tasks.clean]
+script_runner = "@shell"
+script = '''
+rm *.smol
+echo "Removed all .smol images"
+'''
+
+
+# Build
+[tasks.build]
+dependencies = [
+    "build-BadApple",
+    "build-XD",
+]
+
+[tasks.build-BadApple]
+extend = "rle"
+env.ASSET_NAME = "BadApple"
+condition = { files_modified = { input = ["assets/BadApple.raw"], output = ["assets/BadApple.smol"] } }
+
+[tasks.build-XD]
+extend = "rle"
+env.ASSET_NAME = "XD"
+condition = { files_modified = { input = ["assets/XD.raw"], output = ["assets/XD.smol"] } }
+
+
+# Abstract
+[tasks.rle]
+cwd = ".."
+command = "cargo"
+args = ["make", "rle-encode", "assets/${ASSET_NAME}.raw", "assets/${ASSET_NAME}.smol"]

@@ -1,0 +1,16 @@
+[package]
+name = "iepass-core"
+version = "0.1.0"
+authors = ["Fun Maker <funmaker95@gmail.com>"]
+edition = "2024"
+resolver = "3"
+rust-version = "1.88.0"
+
+[features]
+std = ["embedded-io/std"]
+
+[dependencies]
+embedded-io = { workspace = true }
+
+[dev-dependencies]
+embedded-io = { workspace = true, features = ["std"] }

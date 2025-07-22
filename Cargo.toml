@@ -1,34 +1,14 @@
-[package]
-name = "iepass"
-version = "0.1.0"
-authors = ["Fun Maker <funmaker95@gmail.com>"]
-edition = "2021"
-resolver = "2"
-rust-version = "1.77"
-
-[[bin]]
-name = "iepass"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+[workspace]
+resolver = "3"
+members = [".", "iepass", "iepass-core"]
 
 [profile.release]
 opt-level = "s"
 
 [profile.dev]
-debug = true    # Symbols are nice and they don't increase the size on Flash
+debug = true    # Symbols are nice, and they don't increase the size on Flash
 opt-level = "z"
 
-[features]
-default = []
-
-experimental = ["esp-idf-svc/experimental"]
-
-[dependencies]
-log = "0.4"
-esp-idf-svc = "0.51"
-st7735-lcd = "0.10.0"
-embedded-graphics-core = "0.4.0"
-thiserror = "2.0.12"
-
-[build-dependencies]
-embuild = "0.33"
-embedded-graphics-core = "0.4.0"
+[workspace.dependencies]
+embedded-io = "0.6.1"
+iepass-core = { path = "./iepass-core" }

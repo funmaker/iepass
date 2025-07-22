@@ -1,0 +1,30 @@
+cargo-features = ["per-package-target"]
+
+[package]
+name = "iepass"
+version = "0.1.0"
+authors = ["Fun Maker <funmaker95@gmail.com>"]
+edition = "2024"
+resolver = "3"
+rust-version = "1.88.0"
+default-target = "xtensa-esp32s3-espidf"
+
+[[bin]]
+name = "iepass"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[features]
+bad-apple = []
+
+[dependencies]
+log = "0.4"
+esp-idf-svc = "0.51"
+st7735-lcd = "0.10.0"
+embedded-graphics-core = "0.4.0"
+thiserror = "2.0.12"
+iepass-core = { workspace = true }
+embedded-io = { workspace = true }
+
+[build-dependencies]
+embuild = "0.33"
+embedded-graphics-core = "0.4.0"

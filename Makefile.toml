@@ -1,0 +1,54 @@
+[config]
+skip_core_tasks = true
+default_to_workspace = false
+
+
+# Scripts
+[tasks.rle-encode]
+extend = "script-base"
+script = { file = "./scripts/rle_encode.rs" }
+
+
+# Testing
+[tasks.test]
+command = "cargo"
+args = ["test", "--workspace", "--exclude", "iepass", "${@}"]
+
+
+# Running
+[tasks.flash]
+dependencies = ["build-assets"]
+cwd = "./iepass"
+env.RUSTUP_TOOLCHAIN = "esp"
+command = "cargo"
+args = ["run", "${@}"]
+
+
+# Build
+[tasks.build]
+dependencies = ["build-assets"]
+command = "cargo"
+args = ["build", "--workspace", "--exclude", "iepass", "${@}"]
+
+[tasks.build-assets]
+cwd = "./assets"
+command = "cargo"
+args = ["make", "build", "${@}"]
+
+
+# Clean Up
+[tasks.clean]
+dependencies = ["clean-assets"]
+command = "cargo"
+args = ["clean", "${@}"]
+
+[tasks.clean-assets]
+cwd = "./assets"
+command = "cargo"
+args = ["make", "clean", "${@}"]
+
+
+# Abstract
+[tasks.script-base]
+script_runner = "@rust"
+script_runner_args = ["--base-path", "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts"]
