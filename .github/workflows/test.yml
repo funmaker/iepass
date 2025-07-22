@@ -30,6 +30,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Dependencies
         run: |
+          rustup override set nightly
           cargo install cargo-make
           # cargo install espup ldproxy
           # espup install --targets=esp32,esp32s2,esp32s3
