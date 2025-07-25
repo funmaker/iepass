@@ -1,3 +1,6 @@
+#![feature(try_blocks)]
+
+use std::time::Instant;
 use iepass_core::rle;
 use thiserror::Error;
 use embedded_io::{Read, ReadExactError};
@@ -9,7 +12,8 @@ use embedded_graphics_core::primitives::Rectangle;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{Gpio0, PinDriver, Pull};
-use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver};
+use esp_idf_svc::hal::spi::{config, Dma, SpiConfig, SpiDeviceDriver};
+use esp_idf_svc::hal::spi::config::DriverConfig;
 
 mod debounce;
 
@@ -35,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut y_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio11)?).with_pull(Pull::Up)?;
     
     let mut display = {
-        let rgb = false;
+        let rgb = true;
         let inverted = false;
         let width = 160;
         let height = 128;
@@ -51,7 +55,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             sda,
             None::<Gpio0>,
             None::<Gpio0>,
-            &Default::default(),
+            &DriverConfig {
+                dma: Dma::Auto(128 * 160 * 2),
+                intr_flags: Default::default(),
+            },
             &SpiConfig::new().baudrate(30.MHz().into())
         )?;
         
@@ -65,8 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("Hello, world!");
     
-    let mut framebuffer = Vec::with_capacity(160 * 128);
-    framebuffer.resize(160 * 128, 0_u16);
+    let mut framebuffer = vec![0; 128 * 160];
     
     loop {
         FreeRtos::delay_ms(10);
@@ -82,11 +88,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if start_btn.falling_edge() {
             log::info!("start");
             
+            let start = Instant::now();
+            let mut frames = 0;
+            let mut parts = (0.0, 0.0, 0.0);
             let mut decoder = rle::Decoder::new(VIDEO);
             let mut row = [0; 160];
             display.set_address_window(0, 0, 159, 127).map_err(|_| DisplayError::SetOrientationError)?;
             
             'outer: for _ in 0.. {
+                frames += 1;
+                
+                let now = Instant::now();
                 for y in 0..128 {
                     if start_btn.falling_edge() {
                         break 'outer;
@@ -107,10 +119,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 
+                parts.0 += now.elapsed().as_secs_f32();
+                let now = Instant::now();
+                
                 display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
                 
-                FreeRtos::delay_ms(10);
+                parts.1 += now.elapsed().as_secs_f32();
+                let now = Instant::now();
+                
+                FreeRtos::delay_ms(1);
+                
+                parts.2 += now.elapsed().as_secs_f32();
             }
+            
+            log::info!("{:.2} FPS (~{} ms)",
+                       frames as f32 / start.elapsed().as_secs_f32(),
+                       start.elapsed().as_millis() as u32 / frames);
+            
+            log::info!("{:.2} ms | {:.2} ms | {:.2} ms",
+                       parts.0 * 1000.0 / frames as f32,
+                       parts.1 * 1000.0 / frames as f32,
+                       parts.2 * 1000.0 / frames as f32);
             
             log::info!("start done");
         }
