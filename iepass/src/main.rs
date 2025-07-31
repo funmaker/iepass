@@ -9,15 +9,52 @@ use embedded_graphics_core::pixelcolor::raw::RawU16;
 use embedded_graphics_core::prelude::*;
 use embedded_graphics_core::pixelcolor::Rgb565;
 use embedded_graphics_core::primitives::Rectangle;
+use esp_idf_svc::hal::adc::attenuation::DB_11;
+use esp_idf_svc::hal::adc::oneshot::{AdcChannelDriver, AdcDriver};
+use esp_idf_svc::hal::adc::oneshot::config::AdcChannelConfig;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::delay::FreeRtos;
-use esp_idf_svc::hal::gpio::{Gpio0, PinDriver, Pull};
-use esp_idf_svc::hal::spi::{config, Dma, SpiConfig, SpiDeviceDriver};
+use esp_idf_svc::hal::gpio::{AnyIOPin, PinDriver, Pull};
+use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver};
 use esp_idf_svc::hal::spi::config::DriverConfig;
 
 mod debounce;
+mod analog;
 
 use debounce::Debounce;
+use crate::analog::Analog;
+// == Sound ==
+//    LRC:  5
+//   RCLK:  6
+//    DIN:  7
+// == Screen ==
+//    RST: 10
+//    SDA: 11
+//    CLK: 12
+//    A0:  13
+// == Buttons ==
+//  Start:  4
+// Select: 14
+//      X: 15
+//      Y: 16
+//      A: 17
+//      B: 18
+// == Analog ==
+//      X: 19
+//      Y: 20
+//    BTN: 21
+// == SD Card ==
+//   MOSI: 35
+//    CLK: 36
+//   MISO: 37
+//     CS: 38
+// == Touch ==
+//   MOSI: 35
+//    CLK: 36
+//   MISO: 37
+//    IQR: 39
+//     CS: 40
+
 
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");
@@ -31,12 +68,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let peripherals = Peripherals::take().unwrap();
     
-    let mut select_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio1)?).with_pull(Pull::Up)?;
-    let mut start_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio19)?).with_pull(Pull::Up)?;
-    let mut a_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio14)?).with_pull(Pull::Up)?;
-    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio13)?).with_pull(Pull::Up)?;
-    let mut x_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio12)?).with_pull(Pull::Up)?;
-    let mut y_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio11)?).with_pull(Pull::Up)?;
+    let mut select_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio14)?).with_pull(Pull::Up)?;
+    let mut start_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio4)?).with_pull(Pull::Up)?;
+    let mut x_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio15)?).with_pull(Pull::Up)?;
+    let mut y_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio16)?).with_pull(Pull::Up)?;
+    let mut a_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio17)?).with_pull(Pull::Up)?;
+    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up)?;
+    
+    let analog_adc = AdcDriver::new(peripherals.adc2)?;
+    let mut analog_x = Analog::new(&analog_adc, peripherals.pins.gpio19)?;
+    let mut analog_y = Analog::new(&analog_adc, peripherals.pins.gpio20)?;
+    let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio21)?).with_pull(Pull::Up)?;
     
     let mut display = {
         let rgb = true;
@@ -44,17 +86,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let width = 160;
         let height = 128;
         
-        let rst = PinDriver::output(peripherals.pins.gpio42)?;
-        let a0 = PinDriver::output(peripherals.pins.gpio41)?;
-        let sda = peripherals.pins.gpio40;
-        let sck = peripherals.pins.gpio39;
+        let rst = PinDriver::output(peripherals.pins.gpio10)?;
+        let sda = peripherals.pins.gpio11;
+        let sck = peripherals.pins.gpio12;
+        let a0 = PinDriver::output(peripherals.pins.gpio13)?;
         
         let spi = SpiDeviceDriver::new_single(
             peripherals.spi2,
             sck,
             sda,
-            None::<Gpio0>,
-            None::<Gpio0>,
+            AnyIOPin::none(),
+            AnyIOPin::none(),
             &DriverConfig {
                 dma: Dma::Auto(128 * 160 * 2),
                 intr_flags: Default::default(),
@@ -145,31 +187,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         if a_btn.falling_edge() {
             log::info!("a");
-            display.fill_solid(
-                &Rectangle::new(Point::new(16, 128 - 48), Size::new(32, 32)),
-                Rgb565::BLUE,
-            ).map_err(|_| DisplayError::DrawError)?;
         }
         if b_btn.falling_edge() {
             log::info!("b");
-            display.fill_solid(
-                &Rectangle::new(Point::new(160 - 48, 128 - 48), Size::new(32, 32)),
-                Rgb565::BLUE,
-            ).map_err(|_| DisplayError::DrawError)?;
         }
         if x_btn.falling_edge() {
             log::info!("x");
-            display.fill_solid(
-                &Rectangle::new(Point::new(16, 16), Size::new(32, 32)),
-                Rgb565::BLUE,
-            ).map_err(|_| DisplayError::DrawError)?;
         }
         if y_btn.falling_edge() {
             log::info!("y");
-            display.fill_solid(
-                &Rectangle::new(Point::new(160 - 48, 16), Size::new(32, 32)),
-                Rgb565::BLUE,
-            ).map_err(|_| DisplayError::DrawError)?;
+        }
+        if analog_btn.falling_edge() {
+            log::info!("analog");
         }
     }
 }
