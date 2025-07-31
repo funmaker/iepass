@@ -1,0 +1,28 @@
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct Color(u16);
+
+impl Color {
+	pub const BLACK: Color = Color::new(0, 0, 0);
+	pub const RED: Color = Color::new(255, 0, 0);
+	pub const YELLOW: Color = Color::new(255, 255, 0);
+	pub const GREEN: Color = Color::new(0, 255, 0);
+	pub const TEAL: Color = Color::new(0, 255, 255);
+	pub const BLUE: Color = Color::new(0, 0, 255);
+	pub const MAGENTA: Color = Color::new(255, 0, 255);
+	pub const WHITE: Color = Color::new(255, 255, 255);
+	
+	pub const fn new(r: u8, g: u8, b: u8) -> Self {
+		Self(
+			((r & 0b1111_1000) as u16) << 8 |
+			((g & 0b1111_1100) as u16) << 3 |
+			((b & 0b1111_1000) as u16) >> 3
+		)
+	}
+}
+
+impl Into<u16> for Color {
+	fn into(self) -> u16 {
+		self.0
+	}
+}

@@ -5,13 +5,7 @@ use iepass_core::rle;
 use thiserror::Error;
 use embedded_io::{Read, ReadExactError};
 use st7735_lcd::{Orientation, ST7735};
-use embedded_graphics_core::pixelcolor::raw::RawU16;
-use embedded_graphics_core::prelude::*;
-use embedded_graphics_core::pixelcolor::Rgb565;
-use embedded_graphics_core::primitives::Rectangle;
-use esp_idf_svc::hal::adc::attenuation::DB_11;
-use esp_idf_svc::hal::adc::oneshot::{AdcChannelDriver, AdcDriver};
-use esp_idf_svc::hal::adc::oneshot::config::AdcChannelConfig;
+use esp_idf_svc::hal::adc::oneshot::AdcDriver;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{AnyIOPin, PinDriver, Pull};
@@ -20,9 +14,12 @@ use esp_idf_svc::hal::spi::config::DriverConfig;
 
 mod debounce;
 mod analog;
+mod colors;
 
 use debounce::Debounce;
-use crate::analog::Analog;
+use analog::Analog;
+use colors::Color;
+
 // == Sound ==
 //    LRC:  5
 //   RCLK:  6
@@ -59,6 +56,9 @@ use crate::analog::Analog;
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");
 
+const SCR_WIDTH: usize = 160;
+const SCR_HEIGHT: usize = 128;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -83,8 +83,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut display = {
         let rgb = true;
         let inverted = false;
-        let width = 160;
-        let height = 128;
         
         let rst = PinDriver::output(peripherals.pins.gpio10)?;
         let sda = peripherals.pins.gpio11;
@@ -104,29 +102,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &SpiConfig::new().baudrate(30.MHz().into())
         )?;
         
-        ST7735::new(spi, a0, rst, rgb, inverted, width, height)
+        ST7735::new(spi, a0, rst, rgb, inverted, SCR_WIDTH as u32, SCR_HEIGHT as u32)
     };
     
     display.init(&mut FreeRtos).map_err(|_| DisplayError::InitError)?;
     display.set_orientation(&Orientation::Landscape).map_err(|_| DisplayError::SetOrientationError)?;
     display.set_offset(1, 2); // No idea why its needed
-    display.clear(Rgb565::MAGENTA).map_err(|_| DisplayError::ClearError)?;
+    display.set_address_window(0, 0, 159, 127).map_err(|_| DisplayError::SetOrientationError)?;
 
     log::info!("Hello, world!");
     
     let mut framebuffer = vec![0; 128 * 160];
     
     loop {
+        display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+        
         FreeRtos::delay_ms(10);
         
-        if select_btn.falling_edge() {
-            log::info!("select");
-            display.clear(Rgb565::MAGENTA).map_err(|_| DisplayError::ClearError)?;
-            display.fill_solid(
-                &Rectangle::new(Point::new(0, 0), Size::new(160, 128)),
-                Rgb565::MAGENTA,
-            ).map_err(|_| DisplayError::DrawError)?;
-        }
         if start_btn.falling_edge() {
             log::info!("start");
             
@@ -135,7 +127,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut parts = (0.0, 0.0, 0.0);
             let mut decoder = rle::Decoder::new(VIDEO);
             let mut row = [0; 160];
-            display.set_address_window(0, 0, 159, 127).map_err(|_| DisplayError::SetOrientationError)?;
             
             'outer: for _ in 0.. {
                 frames += 1;
@@ -153,11 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     for x in 0..160 {
                         let color = row[x];
-                        framebuffer[x + y * 160] = RawU16::from(Rgb565::new(
-                            ((color as u16) * (1 << 5) / 256) as u8,
-                            ((color as u16) * (1 << 6) / 256) as u8,
-                            ((color as u16) * (1 << 5) / 256) as u8,
-                        )).into_inner();
+                        framebuffer[x + y * 160] = Color::new(color, color, color).into();
                     }
                 }
                 
@@ -185,21 +172,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             log::info!("start done");
         }
-        if a_btn.falling_edge() {
-            log::info!("a");
-        }
-        if b_btn.falling_edge() {
-            log::info!("b");
-        }
-        if x_btn.falling_edge() {
-            log::info!("x");
-        }
-        if y_btn.falling_edge() {
-            log::info!("y");
-        }
-        if analog_btn.falling_edge() {
-            log::info!("analog");
-        }
+        
+        framebuffer.fill(Color::WHITE.into());
+        
+        let mut draw_rect = |filled: bool, x: usize, y: usize, w: usize, h: usize, color: Color| {
+            for row in y..(y + h) {
+                if filled || (row == y) || (row == y + h - 1) {
+                    framebuffer[row * SCR_WIDTH + x .. row * SCR_WIDTH + x + w].fill(color.into());
+                } else {
+                    framebuffer[row * SCR_WIDTH + x] = color.into();
+                    framebuffer[row * SCR_WIDTH + x + w - 1] = color.into();
+                }
+            }
+        };
+        
+        draw_rect(analog_btn.is_low(), 10, 15, 60, 60, Color::BLACK);
+        draw_rect(true, (40 + analog_x.read(27)? - 2) as usize, (45 + analog_y.read(27)? - 2) as usize, 4, 4, if analog_btn.is_low() { Color::WHITE } else { Color::BLACK });
+        
+        draw_rect(x_btn.is_low(), 80, 10, 30, 30, Color::BLUE);
+        draw_rect(y_btn.is_low(), 120, 10, 30, 30, Color::YELLOW);
+        draw_rect(a_btn.is_low(), 80, 50, 30, 30, Color::GREEN);
+        draw_rect(b_btn.is_low(), 120, 50, 30, 30, Color::RED);
+        
+        draw_rect(select_btn.is_low(), 20, 90, 40, 20, Color::TEAL);
+        draw_rect(start_btn.is_low(), 100, 90, 40, 20, Color::MAGENTA);
     }
 }
 
