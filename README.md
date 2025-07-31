@@ -10,8 +10,9 @@ IE Pass - The Console The Pass
 
 Install binary dependencies:
 ```bash
-$ cargo install cargo-make espup ldproxy
-$ espup install --targets=esp32,esp32s2,esp32s3
+$ cargo install cargo-make ldproxy espflash
+$ cargo install espup --locked
+$ espup install --targets=esp32s3
 ```
 Also check ESP-IDF [platform specific dependencies](https://docs.espressif.com/projects/rust/book/installation/std-requirements.html). 
 
