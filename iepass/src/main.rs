@@ -6,19 +6,22 @@ use thiserror::Error;
 use embedded_io::{Read, ReadExactError};
 use st7735_lcd::{Orientation, ST7735};
 use esp_idf_svc::hal::adc::oneshot::AdcDriver;
-use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{AnyIOPin, PinDriver, Pull};
-use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver};
+use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver, SpiDriver};
 use esp_idf_svc::hal::spi::config::DriverConfig;
+use esp_idf_svc::hal::units::MegaHertz;
 
 mod debounce;
 mod analog;
 mod colors;
+mod touch;
 
 use debounce::Debounce;
 use analog::Analog;
 use colors::Color;
+use touch::Touch;
 
 // == Sound ==
 //    LRC:  5
@@ -83,6 +86,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio21)?).with_pull(Pull::Up)?;
     
+    let mut sd_cs = PinDriver::output(peripherals.pins.gpio38)?;
+    sd_cs.set_high()?;
+    
+    let touch_sd_spi = SpiDriver::new(
+        peripherals.spi3,
+        peripherals.pins.gpio36,
+        peripherals.pins.gpio35,
+        Some(peripherals.pins.gpio37),
+        &Default::default(),
+    )?;
+    
+    let mut touch = Touch::new(
+        &touch_sd_spi,
+        Some(peripherals.pins.gpio40),
+        peripherals.pins.gpio39,
+    )?;
+    
     let mut display = {
         let rgb = true;
         let inverted = false;
@@ -100,9 +120,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             AnyIOPin::none(),
             &DriverConfig {
                 dma: Dma::Auto(128 * 160 * 2),
-                intr_flags: Default::default(),
+                ..Default::default()
             },
-            &SpiConfig::new().baudrate(30.MHz().into())
+            &SpiConfig {
+                baudrate: MegaHertz(30).into(),
+                ..Default::default()
+            }
         )?;
         
         ST7735::new(spi, a0, rst, rgb, inverted, SCR_WIDTH as u32, SCR_HEIGHT as u32)
@@ -200,6 +223,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         draw_rect(select_btn.is_low(), 20, 90, 40, 20, Color::TEAL);
         draw_rect(start_btn.is_low(), 100, 90, 40, 20, Color::MAGENTA);
+        
+        if let Some((x, y)) = touch.read()? {
+            // log::info!("{x} {y}");
+        }
     }
 }
 
