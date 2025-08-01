@@ -73,11 +73,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut x_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio15)?).with_pull(Pull::Up)?;
     let mut y_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio16)?).with_pull(Pull::Up)?;
     let mut a_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio17)?).with_pull(Pull::Up)?;
-    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up)?;
+    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up) ?;
     
     let analog_adc = AdcDriver::new(peripherals.adc2)?;
-    let mut analog_x = Analog::new(&analog_adc, peripherals.pins.gpio19)?;
-    let mut analog_y = Analog::new(&analog_adc, peripherals.pins.gpio20)?;
+    let mut analog = Analog::new(
+        &analog_adc,
+        peripherals.pins.gpio19,
+        peripherals.pins.gpio20,
+    )?;
     let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio21)?).with_pull(Pull::Up)?;
     
     let mut display = {
@@ -186,8 +189,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
         
+        let (analog_x, analog_y) = analog.read(27)?;
         draw_rect(analog_btn.is_low(), 10, 15, 60, 60, Color::BLACK);
-        draw_rect(true, (40 + analog_x.read(27)? - 2) as usize, (45 + analog_y.read(27)? - 2) as usize, 4, 4, if analog_btn.is_low() { Color::WHITE } else { Color::BLACK });
+        draw_rect(true, (40 + analog_x - 2) as usize, (45 + analog_y - 2) as usize, 4, 4, if analog_btn.is_low() { Color::WHITE } else { Color::BLACK });
         
         draw_rect(x_btn.is_low(), 80, 10, 30, 30, Color::BLUE);
         draw_rect(y_btn.is_low(), 120, 10, 30, 30, Color::YELLOW);
