@@ -17,11 +17,15 @@ mod debounce;
 mod analog;
 mod colors;
 mod touch;
+mod calib;
+mod utils;
 
 use debounce::Debounce;
 use analog::Analog;
 use colors::Color;
+use calib::Calib;
 use touch::Touch;
+use utils::draw_rect;
 
 // == Sound ==
 //    LRC:  5
@@ -59,8 +63,8 @@ use touch::Touch;
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");
 
-const SCR_WIDTH: usize = 160;
-const SCR_HEIGHT: usize = 128;
+const SCR_WIDTH: u16 = 160;
+const SCR_HEIGHT: u16 = 128;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
@@ -69,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
     
+    let calib = Calib::default();
     let peripherals = Peripherals::take().unwrap();
     
     let mut select_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio14)?).with_pull(Pull::Up)?;
@@ -83,6 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &analog_adc,
         peripherals.pins.gpio19,
         peripherals.pins.gpio20,
+        calib.analog_deadzone,
+        calib.analog,
     )?;
     let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio21)?).with_pull(Pull::Up)?;
     
@@ -101,6 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &touch_sd_spi,
         Some(peripherals.pins.gpio40),
         peripherals.pins.gpio39,
+        calib.touch,
     )?;
     
     let mut display = {
@@ -119,7 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             AnyIOPin::none(),
             AnyIOPin::none(),
             &DriverConfig {
-                dma: Dma::Auto(128 * 160 * 2),
+                dma: Dma::Auto(SCR_WIDTH as usize * SCR_HEIGHT as usize * 2),
                 ..Default::default()
             },
             &SpiConfig {
@@ -133,12 +141,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     display.init(&mut FreeRtos).map_err(|_| DisplayError::InitError)?;
     display.set_orientation(&Orientation::Landscape).map_err(|_| DisplayError::SetOrientationError)?;
-    display.set_offset(1, 2); // No idea why its needed
-    display.set_address_window(0, 0, 159, 127).map_err(|_| DisplayError::SetOrientationError)?;
+    display.set_offset(calib.screen_offset.x, calib.screen_offset.y); // No idea why its needed
+    display.set_address_window(0, 0, SCR_WIDTH - 1, SCR_HEIGHT - 1).map_err(|_| DisplayError::SetOrientationError)?;
 
     log::info!("Hello, world!");
     
-    let mut framebuffer = vec![0; 128 * 160];
+    let mut framebuffer = vec![0; SCR_WIDTH as usize * SCR_HEIGHT as usize];
     
     loop {
         display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
@@ -158,7 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 frames += 1;
                 
                 let now = Instant::now();
-                for y in 0..128 {
+                for y in 0..SCR_HEIGHT as usize {
                     if start_btn.falling_edge() {
                         break 'outer;
                     }
@@ -170,7 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     for x in 0..160 {
                         let color = row[x];
-                        framebuffer[x + y * 160] = Color::new(color, color, color).into();
+                        framebuffer[x + y * SCR_WIDTH as usize] = Color::new(color, color, color).into();
                     }
                 }
                 
@@ -201,31 +209,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         framebuffer.fill(Color::WHITE.into());
         
-        let mut draw_rect = |filled: bool, x: usize, y: usize, w: usize, h: usize, color: Color| {
-            for row in y..(y + h) {
-                if filled || (row == y) || (row == y + h - 1) {
-                    framebuffer[row * SCR_WIDTH + x .. row * SCR_WIDTH + x + w].fill(color.into());
-                } else {
-                    framebuffer[row * SCR_WIDTH + x] = color.into();
-                    framebuffer[row * SCR_WIDTH + x + w - 1] = color.into();
-                }
-            }
-        };
-        
         let (analog_x, analog_y) = analog.read(27)?;
-        draw_rect(analog_btn.is_low(), 10, 15, 60, 60, Color::BLACK);
-        draw_rect(true, (40 + analog_x - 2) as usize, (45 + analog_y - 2) as usize, 4, 4, if analog_btn.is_low() { Color::WHITE } else { Color::BLACK });
+        draw_rect(&mut framebuffer, analog_btn.is_low(), 10, 15, 60, 60, Color::BLACK);
+        draw_rect(&mut framebuffer, true, (40 + analog_x - 2) as u16, (45 + analog_y - 2) as u16, 4, 4, if analog_btn.is_low() { Color::WHITE } else { Color::BLACK });
         
-        draw_rect(x_btn.is_low(), 80, 10, 30, 30, Color::BLUE);
-        draw_rect(y_btn.is_low(), 120, 10, 30, 30, Color::YELLOW);
-        draw_rect(a_btn.is_low(), 80, 50, 30, 30, Color::GREEN);
-        draw_rect(b_btn.is_low(), 120, 50, 30, 30, Color::RED);
+        draw_rect(&mut framebuffer, x_btn.is_low(), 80, 10, 30, 30, Color::BLUE);
+        draw_rect(&mut framebuffer, y_btn.is_low(), 120, 10, 30, 30, Color::YELLOW);
+        draw_rect(&mut framebuffer, a_btn.is_low(), 80, 50, 30, 30, Color::GREEN);
+        draw_rect(&mut framebuffer, b_btn.is_low(), 120, 50, 30, 30, Color::RED);
         
-        draw_rect(select_btn.is_low(), 20, 90, 40, 20, Color::TEAL);
-        draw_rect(start_btn.is_low(), 100, 90, 40, 20, Color::MAGENTA);
+        draw_rect(&mut framebuffer, select_btn.is_low(), 20, 90, 40, 20, Color::TEAL);
+        draw_rect(&mut framebuffer, start_btn.is_low(), 100, 90, 40, 20, Color::MAGENTA);
         
-        if let Some((x, y)) = touch.read()? {
-            // log::info!("{x} {y}");
+        if let Some((x, y)) = touch.read(SCR_WIDTH, SCR_HEIGHT)? {
+            draw_rect(&mut framebuffer, true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
         }
     }
 }

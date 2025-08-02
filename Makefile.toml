@@ -23,6 +23,13 @@ env.RUSTUP_TOOLCHAIN = "esp"
 command = "cargo"
 args = ["run", "${@}"]
 
+[tasks.flash-calib]
+dependencies = ["build-assets"]
+cwd = "./iepass-calib"
+env.RUSTUP_TOOLCHAIN = "esp"
+command = "cargo"
+args = ["run", "${@}"]
+
 
 # Build
 [tasks.build]

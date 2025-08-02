@@ -8,25 +8,28 @@ IE Pass - The Console The Pass
 
 ## Usage
 
-Install binary dependencies:
-```bash
-$ cargo install cargo-make ldproxy espflash
-$ cargo install espup --locked
-$ espup install --targets=esp32s3
-```
-Also check ESP-IDF [platform specific dependencies](https://docs.espressif.com/projects/rust/book/installation/std-requirements.html). 
+### Setup
 
-Build:
+1) Install [FFmpeg](https://ffmpeg.org/download.html).
+2) Install cargo dependencies:
+    ```bash
+    $ cargo install cargo-make ldproxy espflash
+    $ cargo install espup --locked
+    $ espup install --targets=esp32s3
+    ```
+3) Check ESP-IDF [platform specific dependencies](https://docs.espressif.com/projects/rust/book/installation/std-requirements.html). 
+
+### Build:
 ```bash
 $ cargo make build
 ```
 
-Run Tests:
+### Run Tests:
 ```bash
 $ cargo make test
 ```
 
-Build and flash:
+### Build and flash:
 ```bash
 $ cargo make flash
 ```

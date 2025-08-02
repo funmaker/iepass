@@ -1,20 +1,14 @@
 [package]
-name = "iepass"
+name = "iepass-calib"
 version = "0.1.0"
 authors = ["Fun Maker <funmaker95@gmail.com>"]
 edition = "2024"
 resolver = "3"
 rust-version = "1.88.0"
 
-[lib]
-name = "iepass"
-
 [[bin]]
-name = "iepass"
+name = "iepass-calib"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
-
-[features]
-bad-apple = []
 
 [dependencies]
 log = "0.4"
@@ -22,8 +16,8 @@ esp-idf-svc = "0.51"
 st7735-lcd = "0.10.0"
 thiserror = "2.0.12"
 iepass-core = { workspace = true }
+iepass = { workspace = true }
 embedded-io = { workspace = true }
-bitflags = "1.3.2"
 
 [build-dependencies]
 embuild = "0.33"

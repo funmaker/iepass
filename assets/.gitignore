@@ -1,4 +1,6 @@
 *
 !.gitignore
-!*.raw
 !Makefile.toml
+!*.png
+!BadApple.raw
+!XD.raw

@@ -816,6 +816,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "iepass-calib"
+version = "0.1.0"
+dependencies = [
+ "embedded-io",
+ "embuild",
+ "esp-idf-svc",
+ "iepass",
+ "iepass-core",
+ "log",
+ "st7735-lcd",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "iepass-core"
 version = "0.1.0"
 dependencies = [
