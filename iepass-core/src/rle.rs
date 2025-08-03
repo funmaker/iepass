@@ -8,28 +8,30 @@ enum WriteState {
     Literal { len: u8, bytes: [u8; 130] },
 }
 
-pub struct Encoder<W> {
-    writer: W,
+pub struct Encoder<W: Write> {
+    writer: Option<W>,
     state: Option<WriteState>,
 }
 
 impl<W: Write> Encoder<W> {
     pub fn new(writer: W) -> Encoder<W> {
         Encoder {
-            writer,
+            writer: Some(writer),
             state: None,
         }
     }
 
     fn write_state(&mut self) -> Result<(), W::Error> {
+        let writer = self.writer.as_mut().unwrap();
+        
         match self.state.take() {
             None => {}
             Some(WriteState::Repeat { byte, len }) => {
-                self.writer.write_all(&[0x80 | len - 1, byte])?
+                writer.write_all(&[0x80 | len - 1, byte])?
             }
             Some(WriteState::Literal { bytes, len, .. }) => {
-                self.writer.write_all(&[len - 2])?;
-                self.writer.write_all(&bytes[0..len as usize])?;
+                writer.write_all(&[len - 2])?;
+                writer.write_all(&bytes[0..len as usize])?;
             }
         }
         Ok(())
@@ -37,7 +39,7 @@ impl<W: Write> Encoder<W> {
 
     pub fn finalize(mut self) -> Result<W, W::Error> {
         self.flush()?;
-        Ok(self.writer)
+        Ok(self.writer.take().unwrap())
     }
 }
 
@@ -112,8 +114,16 @@ impl<W: Write> Write for Encoder<W> {
 
     fn flush(&mut self) -> Result<(), W::Error> {
         self.write_state()?;
-        self.writer.flush()?;
+        self.writer.as_mut().unwrap().flush()?;
         Ok(())
+    }
+}
+
+impl<W: Write> Drop for Encoder<W> {
+    fn drop(&mut self) {
+        if self.writer.is_some() {
+            let _ = self.flush();
+        }
     }
 }
 
@@ -229,7 +239,7 @@ mod std_impls {
     use super::*;
     use std::io::{self, Read, Write};
     
-    impl<W> Write for Encoder<W>
+    impl<W: embedded_io::Write> Write for Encoder<W>
         where Self: embedded_io::Write + ErrorType<Error = io::Error> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             embedded_io::Write::write(self, buf)
@@ -240,7 +250,7 @@ mod std_impls {
         }
     }
     
-    impl<W> Read for Decoder<W>
+    impl<W: embedded_io::Read> Read for Decoder<W>
     where Self: embedded_io::Read + ErrorType<Error = io::Error> {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
             embedded_io::Read::read(self, buf)
@@ -279,15 +289,21 @@ mod std_impls {
 mod tests {
     use super::*;
     use std::vec::Vec;
-
+    
     #[test]
-    fn test_rle() {
+    fn test_encode_decode() {
         let cases = [
             &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16][..],
             &[10; 300][..],
             &[1, 1, 1, 1, 1, 1, 10, 2, 2, 2, 2, 10, 11, 12, 3, 3, 3, 4, 4, 3, 3, 3][..],
             &include_bytes!("../../assets/XD.raw")[..],
             &include_bytes!("../../assets/BadApple.raw")[..],
+            &include_bytes!("../../assets/calib1.raw")[..],
+            &include_bytes!("../../assets/calib2.raw")[..],
+            &include_bytes!("../../assets/calib3.raw")[..],
+            &include_bytes!("../../assets/calib4.raw")[..],
+            &include_bytes!("../../assets/calib5.raw")[..],
+            &include_bytes!("../../assets/calib-target.raw")[..],
         ];
 
         for case in cases {
@@ -315,5 +331,35 @@ mod tests {
 
             assert_eq!(&decoded[..], case);
         }
+    }
+    
+    #[test]
+    fn test_encoded() {
+        static RAW: &[u8] = include_bytes!("../../assets/calib1.raw");
+        static SMOL: &[u8] = include_bytes!("../../assets/calib1.smol");
+        
+        let mut enc = Encoder::new(Vec::new());
+        enc.write_all(RAW).unwrap();
+        let encoded = enc.finalize().unwrap();
+        
+        assert_eq!(encoded, SMOL);
+        
+        fn pixels(smol: &[u8]) -> impl Iterator<Item = u16> {
+            let mut decoder = Decoder::new(smol);
+            
+            std::iter::from_fn(move || {
+                let mut value = [0, 0];
+                decoder.read_exact(&mut value)
+                       .ok()
+                       .map(|_| u16::from_le_bytes(value))
+            })
+        }
+        
+        let mut framebuffer = vec![0, 128*160];
+        
+        framebuffer.clear();
+        framebuffer.extend(pixels(SMOL));
+        
+        assert_eq!(framebuffer.len(), 128*160);
     }
 }

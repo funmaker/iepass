@@ -1,7 +1,7 @@
 use crate::colors::Color;
 
-const SCR_WIDTH: u16 = 160;
-const SCR_HEIGHT: u16 = 128;
+pub const SCR_WIDTH: u16 = 160;
+pub const SCR_HEIGHT: u16 = 128;
 
 pub fn draw_rect(framebuffer: &mut [u16], filled: bool, x: u16, y: u16, w: u16, h: u16, color: Color) {
 	let x = x.min(SCR_WIDTH);

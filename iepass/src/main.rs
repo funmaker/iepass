@@ -2,16 +2,12 @@
 
 use std::time::Instant;
 use iepass_core::rle;
-use thiserror::Error;
 use embedded_io::{Read, ReadExactError};
-use st7735_lcd::{Orientation, ST7735};
 use esp_idf_svc::hal::adc::oneshot::AdcDriver;
 use esp_idf_svc::hal::delay::FreeRtos;
-use esp_idf_svc::hal::gpio::{AnyIOPin, PinDriver, Pull};
+use esp_idf_svc::hal::gpio::{PinDriver, Pull};
 use esp_idf_svc::hal::peripherals::Peripherals;
-use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver, SpiDriver};
-use esp_idf_svc::hal::spi::config::DriverConfig;
-use esp_idf_svc::hal::units::MegaHertz;
+use esp_idf_svc::hal::spi::SpiDriver;
 
 mod debounce;
 mod analog;
@@ -19,13 +15,15 @@ mod colors;
 mod touch;
 mod calib;
 mod utils;
+mod display;
 
 use debounce::Debounce;
 use analog::Analog;
 use colors::Color;
 use calib::Calib;
 use touch::Touch;
-use utils::draw_rect;
+use display::Display;
+use utils::{draw_rect, SCR_HEIGHT, SCR_WIDTH};
 
 // == Sound ==
 //    LRC:  5
@@ -62,9 +60,6 @@ use utils::draw_rect;
 
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");
-
-const SCR_WIDTH: u16 = 160;
-const SCR_HEIGHT: u16 = 128;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
@@ -111,45 +106,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         calib.touch,
     )?;
     
-    let mut display = {
-        let rgb = true;
-        let inverted = false;
-        
-        let rst = PinDriver::output(peripherals.pins.gpio10)?;
-        let sda = peripherals.pins.gpio11;
-        let sck = peripherals.pins.gpio12;
-        let a0 = PinDriver::output(peripherals.pins.gpio13)?;
-        
-        let spi = SpiDeviceDriver::new_single(
-            peripherals.spi2,
-            sck,
-            sda,
-            AnyIOPin::none(),
-            AnyIOPin::none(),
-            &DriverConfig {
-                dma: Dma::Auto(SCR_WIDTH as usize * SCR_HEIGHT as usize * 2),
-                ..Default::default()
-            },
-            &SpiConfig {
-                baudrate: MegaHertz(30).into(),
-                ..Default::default()
-            }
-        )?;
-        
-        ST7735::new(spi, a0, rst, rgb, inverted, SCR_WIDTH as u32, SCR_HEIGHT as u32)
-    };
-    
-    display.init(&mut FreeRtos).map_err(|_| DisplayError::InitError)?;
-    display.set_orientation(&Orientation::Landscape).map_err(|_| DisplayError::SetOrientationError)?;
-    display.set_offset(calib.screen_offset.x, calib.screen_offset.y); // No idea why its needed
-    display.set_address_window(0, 0, SCR_WIDTH - 1, SCR_HEIGHT - 1).map_err(|_| DisplayError::SetOrientationError)?;
+    let mut display = Display::new(
+        peripherals.spi2,
+        peripherals.pins.gpio12,
+        peripherals.pins.gpio11,
+        peripherals.pins.gpio13,
+        peripherals.pins.gpio10,
+        calib.screen_offset,
+    )?;
 
     log::info!("Hello, world!");
     
     let mut framebuffer = vec![0; SCR_WIDTH as usize * SCR_HEIGHT as usize];
     
     loop {
-        display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+        display.update(&framebuffer)?;
         
         FreeRtos::delay_ms(10);
         
@@ -185,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 parts.0 += now.elapsed().as_secs_f32();
                 let now = Instant::now();
                 
-                display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+                display.update(&framebuffer)?;
                 
                 parts.1 += now.elapsed().as_secs_f32();
                 let now = Instant::now();
@@ -225,16 +196,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             draw_rect(&mut framebuffer, true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
         }
     }
-}
-
-#[derive(Error, Debug)]
-pub enum DisplayError {
-    #[error("Failed to initialize display")]
-    InitError,
-    #[error("Failed to clear display")]
-    ClearError,
-    #[error("Failed to set orientation")]
-    SetOrientationError,
-    #[error("Failed to draw a rectangle")]
-    DrawError,
 }

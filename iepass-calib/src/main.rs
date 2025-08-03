@@ -1,15 +1,13 @@
 use embedded_io::Read;
 use iepass_core::rle;
 use thiserror::Error;
-use st7735_lcd::{Orientation, ST7735};
 use esp_idf_svc::hal::adc::oneshot::AdcDriver;
 use esp_idf_svc::hal::delay::FreeRtos;
-use esp_idf_svc::hal::gpio::{AnyIOPin, PinDriver, Pull};
+use esp_idf_svc::hal::gpio::{PinDriver, Pull};
 use esp_idf_svc::hal::peripherals::Peripherals;
-use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver, SpiDriver};
-use esp_idf_svc::hal::spi::config::DriverConfig;
-use esp_idf_svc::hal::units::MegaHertz;
+use esp_idf_svc::hal::spi::SpiDriver;
 use iepass::{Debounce, Touch, Analog, Calib, Color};
+use iepass::display::Display;
 use iepass::utils::draw_rect;
 
 static CALIB_BG1: &[u8] = include_bytes!("../../assets/calib1.smol");
@@ -65,41 +63,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         peripherals.pins.gpio39,
         calib.touch,
     )?;
-    
-    let mut display = {
-        let rgb = true;
-        let inverted = false;
-        
-        let rst = PinDriver::output(peripherals.pins.gpio10)?;
-        let sda = peripherals.pins.gpio11;
-        let sck = peripherals.pins.gpio12;
-        let a0 = PinDriver::output(peripherals.pins.gpio13)?;
-        
-        let spi = SpiDeviceDriver::new_single(
-            peripherals.spi2,
-            sck,
-            sda,
-            AnyIOPin::none(),
-            AnyIOPin::none(),
-            &DriverConfig {
-                dma: Dma::Auto(128 * 160 * 2),
-                ..Default::default()
-            },
-            &SpiConfig {
-                baudrate: MegaHertz(30).into(),
-                ..Default::default()
-            }
-        )?;
-        
-        ST7735::new(spi, a0, rst, rgb, inverted, SCR_WIDTH as u32, SCR_HEIGHT as u32)
-    };
+	
+	let mut display = Display::new(
+		peripherals.spi2,
+		peripherals.pins.gpio12,
+		peripherals.pins.gpio11,
+		peripherals.pins.gpio13,
+		peripherals.pins.gpio10,
+		calib.screen_offset,
+	)?;
     
     let mut framebuffer = vec![Color::WHITE.into(), SCR_WIDTH * SCR_HEIGHT];
-    
-    display.init(&mut FreeRtos).map_err(|_| DisplayError::InitError)?;
-    display.set_orientation(&Orientation::Landscape).map_err(|_| DisplayError::SetOrientationError)?;
-    display.set_offset(0, 0);
-    display.set_address_window(0, 0, SCR_WIDTH - 1, SCR_HEIGHT - 1).map_err(|_| DisplayError::SetOrientationError)?;
     
     framebuffer.clear();
     framebuffer.extend(pixels(CALIB_BG1));
@@ -114,9 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if x_btn.falling_edge() { calib.screen_offset.x = calib.screen_offset.x.saturating_sub(1); }
         if y_btn.falling_edge() { calib.screen_offset.y = calib.screen_offset.y.saturating_sub(1); }
     
-        display.set_offset(calib.screen_offset.x, calib.screen_offset.y);
-        display.set_address_window(0, 0, SCR_WIDTH - 1, SCR_HEIGHT - 1).map_err(|_| DisplayError::SetOrientationError)?;
-        display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+        display.set_calib(calib.screen_offset)?;
+	    display.update(&framebuffer)?;
     
         if start_btn.falling_edge() {
             log::info!("Screen offset: x = {}, y = {}", calib.screen_offset.x, calib.screen_offset.y);
@@ -127,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Calibrating analog center. Please wait...");
     framebuffer.clear();
     framebuffer.extend(pixels(CALIB_BG2));
-    display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+	display.update(&framebuffer)?;
     FreeRtos::delay_ms(1000);
     
     let center = measure(64, || analog.read_raw())?;
@@ -172,7 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		    4,
 		    Color::RED
 	    );
-	    display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+	    display.update(&framebuffer)?;
 	
 	    if select_btn.falling_edge() {
 		    calib.analog.x.min = calib.analog.x.mid.saturating_sub(calib.analog_deadzone);
@@ -203,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		    framebuffer.clear();
 		    framebuffer.extend(pixels(CALIB_BG4));
 		    draw_rect(&mut framebuffer, true, x - 4, y - 4, 8, 8, Color::BLACK);
-		    display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+		    display.update(&framebuffer)?;
 		    
 		    loop {
 			    FreeRtos::delay_ms(10);
@@ -244,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			    draw_rect(&mut framebuffer, true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
 		    }
 		    
-		    display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+		    display.update(&framebuffer)?;
 		    
 		    if select_btn.falling_edge() {
 			    continue 'outer;
@@ -261,7 +234,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	
 	framebuffer.clear();
 	framebuffer.extend(pixels(CALIB_BG5));
-	display.write_pixels_buffered(framebuffer.iter().copied()).map_err(|_| DisplayError::DrawError)?;
+	display.update(&framebuffer)?;
     
     loop {
         FreeRtos::delay_ms(10);

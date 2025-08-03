@@ -8,9 +8,14 @@ default_to_workspace = false
 extend = "script-base"
 script = { file = "./scripts/rle_encode.rs" }
 
+[tasks.rle-decode]
+extend = "script-base"
+script = { file = "./scripts/rle_decode.rs" }
+
 
 # Testing
 [tasks.test]
+dependencies = ["build-assets"]
 command = "cargo"
 args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
