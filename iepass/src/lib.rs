@@ -6,6 +6,7 @@ pub mod touch;
 pub mod calib;
 pub mod utils;
 pub mod display;
+pub mod sound;
 
 pub use debounce::Debounce;
 pub use analog::Analog;

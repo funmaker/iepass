@@ -19,6 +19,7 @@ dependencies = [
     "build-calib4",
     "build-calib5",
     "build-calib-target",
+    "build-kutasan",
 ]
 
 [tasks.build-BadApple]
@@ -97,6 +98,11 @@ extend = "png-rgb565"
 env.ASSET_NAME = "calib-target"
 condition = { files_modified = { input = ["calib-target.png"], output = ["calib-target.raw"] } }
 
+[tasks.build-kutasan]
+extend = "wav-pcm"
+env.ASSET_NAME = "kutasan"
+condition = { files_modified = { input = ["kutasan.wav"], output = ["kutasan.pcm"] } }
+
 
 # Abstract
 [tasks.rle]
@@ -107,3 +113,7 @@ args = ["make", "rle-encode", "assets/${ASSET_NAME}.raw", "assets/${ASSET_NAME}.
 [tasks.png-rgb565]
 command = "ffmpeg"
 args = ["-i", "${ASSET_NAME}.png", "-vcodec", "rawvideo", "-f", "rawvideo", "-pix_fmt", "rgb565", "${ASSET_NAME}.raw", "-y"]
+
+[tasks.wav-pcm]
+command = "ffmpeg"
+args = ["-i", "${ASSET_NAME}.wav", "-ar", "44100", "-ac", "1", "-af", "volume=0.1", "-f", "s16le", "-acodec", "pcm_s16le", "${ASSET_NAME}.pcm", "-y"]

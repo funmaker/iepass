@@ -1,4 +1,5 @@
 #![feature(try_blocks)]
+#![feature(iter_array_chunks)]
 
 use std::time::Instant;
 use iepass_core::rle;
@@ -9,21 +10,23 @@ use esp_idf_svc::hal::gpio::{PinDriver, Pull};
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::spi::SpiDriver;
 
+mod utils;
 mod debounce;
 mod analog;
 mod colors;
 mod touch;
 mod calib;
-mod utils;
 mod display;
+mod sound;
 
+use utils::{draw_rect, SCR_HEIGHT, SCR_WIDTH};
 use debounce::Debounce;
 use analog::Analog;
 use colors::Color;
 use calib::Calib;
 use touch::Touch;
 use display::Display;
-use utils::{draw_rect, SCR_HEIGHT, SCR_WIDTH};
+use sound::Sound;
 
 // == Sound ==
 //    LRC:  5
@@ -57,9 +60,11 @@ use utils::{draw_rect, SCR_HEIGHT, SCR_WIDTH};
 //    IQR: 39
 //     CS: 40
 
+const TAU: f32 = 6.283185307179586;
 
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");
+static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
@@ -71,16 +76,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let calib = Calib::default();
     let peripherals = Peripherals::take().unwrap();
     
+    let adc2_driver = AdcDriver::new(peripherals.adc2)?;
+    
     let mut select_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio14)?).with_pull(Pull::Up)?;
     let mut start_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio4)?).with_pull(Pull::Up)?;
     let mut x_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio15)?).with_pull(Pull::Up)?;
     let mut y_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio16)?).with_pull(Pull::Up)?;
     let mut a_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio17)?).with_pull(Pull::Up)?;
-    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up) ?;
+    let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up)?;
     
-    let analog_adc = AdcDriver::new(peripherals.adc2)?;
     let mut analog = Analog::new(
-        &analog_adc,
+        &adc2_driver,
         peripherals.pins.gpio19,
         peripherals.pins.gpio20,
         calib.analog_deadzone,
@@ -114,6 +120,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         peripherals.pins.gpio10,
         calib.screen_offset,
     )?;
+    
+    let mut sound = Sound::new(
+        peripherals.i2s0,
+        peripherals.pins.gpio6,
+        peripherals.pins.gpio7,
+        peripherals.pins.gpio5,
+    )?;
 
     log::info!("Hello, world!");
     
@@ -123,6 +136,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         display.update(&framebuffer)?;
         
         FreeRtos::delay_ms(10);
+        
+        if select_btn.falling_edge() {
+            log::info!("select");
+            sound.play(&KUTASAN)?;
+            log::info!("select done");
+        }
         
         if start_btn.falling_edge() {
             log::info!("start");

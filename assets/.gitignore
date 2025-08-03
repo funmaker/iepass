@@ -2,5 +2,6 @@
 !.gitignore
 !Makefile.toml
 !*.png
+!*.wav
 !BadApple.raw
 !XD.raw
