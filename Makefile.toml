@@ -33,21 +33,33 @@ args = ["run", "${@}"]
 
 # Build
 [tasks.build]
-dependencies = ["build-assets"]
+dependencies = ["build-assets", "build-iepass", "build-calib"]
 command = "cargo"
-args = ["build", "--workspace", "--exclude", "iepass", "${@}"]
+args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
 [tasks.build-assets]
 cwd = "./assets"
 command = "cargo"
 args = ["make", "build", "${@}"]
 
+[tasks.build-iepass]
+cwd = "./iepass"
+env.RUSTUP_TOOLCHAIN = "esp"
+command = "cargo"
+args = ["build", "${@}"]
+
+[tasks.build-calib]
+cwd = "./iepass-calib"
+env.RUSTUP_TOOLCHAIN = "esp"
+command = "cargo"
+args = ["build", "${@}"]
+
 
 # Clean Up
 [tasks.clean]
 dependencies = ["clean-assets"]
-command = "cargo"
-args = ["clean", "${@}"]
+command = "git"
+args = ["clean", "-Xdff", "${@}"]
 
 [tasks.clean-assets]
 cwd = "./assets"

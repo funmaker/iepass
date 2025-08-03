@@ -18,9 +18,9 @@ jobs:
     name: Rust Checks
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: ⬇️ Checkout
         uses: actions/checkout@v4
-      - name: Cache
+      - name: 🛢 Cache
         uses: actions/cache@v4
         with:
           path: |
@@ -28,13 +28,15 @@ jobs:
             ~/.rustup
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Dependencies
+      - name: 🎥 FFmpeg Setup
+        uses: FedericoCarboni/setup-ffmpeg@v3
+      - name: 📥 Install Dependencies
         run: |
           rustup override set nightly
-          cargo install cargo-make rust-script
-          # cargo install espup ldproxy
-          # espup install --targets=esp32,esp32s2,esp32s3
-      - name: Build project
+          cargo install cargo-make ldproxy espflash
+          cargo install espup --locked
+          espup install --targets=esp32s3
+      - name: 🔨 Build project
         run: cargo make build
-      - name: Run tests
+      - name: 🧪 Run tests
         run: cargo make test

@@ -9,8 +9,7 @@ use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::spi::{Dma, SpiConfig, SpiDeviceDriver, SpiDriver};
 use esp_idf_svc::hal::spi::config::DriverConfig;
 use esp_idf_svc::hal::units::MegaHertz;
-use esp_idf_svc::sys::EspError;
-use iepass::{Debounce, Touch, Analog, Calib, Color, analog};
+use iepass::{Debounce, Touch, Analog, Calib, Color};
 use iepass::utils::draw_rect;
 
 static CALIB_BG1: &[u8] = include_bytes!("../../assets/calib1.smol");

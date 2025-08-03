@@ -4,11 +4,8 @@ skip_core_tasks = true
 
 # Clean
 [tasks.clean]
-script_runner = "@shell"
-script = '''
-rm *.smol
-echo "Removed all .smol images"
-'''
+command = "git"
+args = ["clean", "-Xdff", "${@}"]
 
 
 # Build
