@@ -12,7 +12,7 @@ script = { file = "./scripts/rle_encode.rs" }
 # Testing
 [tasks.test]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
 
 # Running
