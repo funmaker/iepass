@@ -11,6 +11,7 @@ std = ["embedded-io/std"]
 
 [dependencies]
 embedded-io = { workspace = true }
+piccolo = "0.3.3"
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }
