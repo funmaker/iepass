@@ -3,8 +3,8 @@ use esp_idf_svc::hal::gpio::{InputMode, InputPin, OutputPin, Pin, PinDriver, Pul
 use esp_idf_svc::sys::EspError;
 
 pub struct Debounce<'d, T, Mode>
-	where T: Pin,
-	      Mode: InputMode {
+where T: Pin,
+      Mode: InputMode {
 	pub inner: PinDriver<'d, T, Mode>,
 	debounce_time: Duration,
 	last_change: Instant,

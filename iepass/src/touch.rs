@@ -24,7 +24,7 @@ where Spi: Borrow<SpiDriver<'d>> + 'd,
 	           cs: Option<impl Peripheral<P = impl OutputPin> + 'd>,
 	           iqr: IQR,
 	           calib: Axes<Range<u16>>)
-		       -> Result<Self, EspError> {
+	           -> Result<Self, EspError> {
 		Ok(Self {
 			spi: SpiDeviceDriver::new(
 				spi,
@@ -90,25 +90,25 @@ fn scale_axis(value: u16, min: u16, max: u16, scale: u16) -> u16 {
 }
 
 bitflags! {
-    struct Command: u8 {
-        const ADDR_TEMP  = 0b1000_0000;
-        const ADDR_X     = 0b1001_0000;
-        const ADDR_BAT   = 0b1010_0000;
-        const ADDR_Z1_X  = 0b1011_0000;
-        const ADDR_Z2_Y  = 0b1100_0000;
-        const ADDR_Y     = 0b1101_0000;
-        const ADDR_AUX   = 0b1110_0000;
-        const ADDR_TEMP2 = 0b1111_0000;
+	struct Command: u8 {
+		const ADDR_TEMP  = 0b1000_0000;
+		const ADDR_X     = 0b1001_0000;
+		const ADDR_BAT   = 0b1010_0000;
+		const ADDR_Z1_X  = 0b1011_0000;
+		const ADDR_Z2_Y  = 0b1100_0000;
+		const ADDR_Y     = 0b1101_0000;
+		const ADDR_AUX   = 0b1110_0000;
+		const ADDR_TEMP2 = 0b1111_0000;
 		
-        const BIT_12 = 0b1000_0000;
-        const BIT_8  = 0b1000_1000;
+		const BIT_12 = 0b1000_0000;
+		const BIT_8  = 0b1000_1000;
 		
-        const REF_DIFF   = 0b1000_0000;
-        const REF_SINGLE = 0b1000_0100;
+		const REF_DIFF   = 0b1000_0000;
+		const REF_SINGLE = 0b1000_0100;
 		
 		const POW_DOWN = 0b1000_0000;
 		const POW_ADC  = 0b1000_0001;
 		const POW_REF  = 0b1000_0010;
 		const POW_ALL  = 0b1000_0011;
-    }
+	}
 }

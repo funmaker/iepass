@@ -87,7 +87,7 @@ mod test {
 			printh(\"test from lua!\")
 			printh(\"\" .. mid(5, 10, 15), \"mid\")
 			return sgn(0)
-        ";
+		";
 		
 		let mut vm = Pico8VM::new();
 		

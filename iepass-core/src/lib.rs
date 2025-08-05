@@ -1,4 +1,4 @@
-#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
+// #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
 pub mod rle;
 mod pico8;
