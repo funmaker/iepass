@@ -1,0 +1,9 @@
+[package]
+name = "iepass-emu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.32.0"
+egui = "0.32.0"
+rodio = "0.21.1"
