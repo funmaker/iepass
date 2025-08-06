@@ -33,8 +33,9 @@ fn main() -> eframe::Result {
 struct EmulatorApp {
 	fb_pool: FramebufferPool,
 	fb_tex: TextureHandle,
-	frame: usize,
+	frame: f32,
 	last_frames: [Instant; 10],
+	mask: [u8; 207],
 }
 
 impl EmulatorApp {
@@ -45,7 +46,8 @@ impl EmulatorApp {
 		Self {
 			fb_pool,
 			fb_tex,
-			frame: 0,
+			frame: 0.0,
+			mask: MASK,
 			last_frames: [Instant::now(); 10],
 		}
 	}
@@ -58,11 +60,11 @@ impl eframe::App for EmulatorApp {
 			
 			let delay = (0..5).find_map(|d| {
 				let x = (x as isize) / 5 - 1;
-				let y = (y as f32 + (x as f32 / 4.0 - (self.frame as f32 - d as f32 * 10.0) / 15.0).sin() * 6.0) as isize / 5 - 8;
+				let y = (y as f32 + (x as f32 / 4.0 - (self.frame - d as f32 * 10.0) / 15.0).sin() * 6.0) as isize / 5 - 8;
 				if x < 0 || x >= 23 || y < 0 || y >= 9 {
 					return None;
 				}
-				let value = MASK[(x as usize + y as usize * 23) % MASK.len()];
+				let value = self.mask[(x as usize + y as usize * 23) % self.mask.len()];
 				if value == 0 { None } else { Some((d, value)) }
 			});
 			
@@ -73,13 +75,13 @@ impl eframe::App for EmulatorApp {
 					let x = x as f32 + 0.1;
 					let y = y as f32 + 0.1;
 					if (
-						b2i((x + self.frame as f32 * 0.8 + 100.0) % 16.0 > 8.0)
+						b2i((x + self.frame * 0.8 + 100.0) % 16.0 > 8.0)
 							+ b2i((
-							y + (self.frame as f32 / 60.0).sin() * 30.0 / 3.0
-								+ (x / 10.0 + self.frame as f32 / 30.0).sin() * 5.0 + 100.0
+							y + (self.frame / 60.0).sin() * 30.0 / 3.0
+								+ (x / 10.0 + self.frame / 30.0).sin() * 5.0 + 100.0
 						) % 16.0 > 8.0)
 					) % 2 == 0 {
-						Color32::MAGENTA.gamma_multiply((x / 10.0 + self.frame as f32 / 30.0).sin() * 0.4 + 0.6)
+						Color32::MAGENTA.gamma_multiply((x / 10.0 + self.frame / 30.0).sin() * 0.4 + 0.6)
 					} else {
 						Color32::BLACK
 					}
@@ -101,13 +103,19 @@ impl eframe::App for EmulatorApp {
 			.show(ctx, |ui| {
 				ui.heading("IE Pass: The Console The Pass The Emulator");
 				ui.separator();
-				ui.label(format!("FPS: {:>4.0}", self.last_frames.len() as f32 / self.last_frames.last().unwrap().elapsed().as_secs_f32()));
+				ui.label(format!("Frame {:.1}, FPS: {:>4.0}", self.frame, self.last_frames.len() as f32 / self.last_frames.last().unwrap().elapsed().as_secs_f32()));
+				if ui.button("XD").clicked() {
+					self.mask.chunks_exact_mut(23).for_each(|row| row.rotate_left(1));
+				}
 			});
 		
 		ctx.request_repaint();
-		self.frame += 1;
+		
+		let now = Instant::now();
+		let dt = now - self.last_frames[0];
+		self.frame += 60.0 * dt.as_secs_f32();
 		self.last_frames.rotate_right(1);
-		self.last_frames[0] = Instant::now();
+		self.last_frames[0] = now;
 	}
 }
 
