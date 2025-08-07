@@ -19,6 +19,14 @@ impl Color {
 			((b & 0b1111_1000) as u16) >> 3
 		)
 	}
+	
+	pub fn rgb(&self) -> (u8, u8, u8) {
+		(
+			(self.0 >> 8) as u8 & 0b1111_1000,
+			(self.0 >> 3) as u8 & 0b1111_1100,
+			(self.0 << 3) as u8 & 0b1111_1000,
+		)
+	}
 }
 
 impl Into<u16> for Color {

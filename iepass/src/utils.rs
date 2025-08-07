@@ -1,4 +1,4 @@
-use crate::colors::Color;
+use iepass_core::colors::Color;
 
 pub const SCR_WIDTH: u16 = 160;
 pub const SCR_HEIGHT: u16 = 128;

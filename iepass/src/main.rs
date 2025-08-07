@@ -3,6 +3,7 @@
 
 use std::time::Instant;
 use iepass_core::rle;
+use iepass_core::colors::Color;
 use embedded_io::{Read, ReadExactError};
 use esp_idf_svc::hal::adc::oneshot::AdcDriver;
 use esp_idf_svc::hal::delay::FreeRtos;
@@ -13,7 +14,6 @@ use esp_idf_svc::hal::spi::SpiDriver;
 mod utils;
 mod debounce;
 mod analog;
-mod colors;
 mod touch;
 mod calib;
 mod display;
@@ -22,7 +22,6 @@ mod sound;
 use utils::{draw_rect, SCR_HEIGHT, SCR_WIDTH};
 use debounce::Debounce;
 use analog::Analog;
-use colors::Color;
 use calib::Calib;
 use touch::Touch;
 use display::Display;
@@ -59,8 +58,6 @@ use sound::Sound;
 //   MISO: 37
 //    IQR: 39
 //     CS: 40
-
-const TAU: f32 = 6.283185307179586;
 
 #[cfg(feature = "bad-apple")] static VIDEO: &[u8] = include_bytes!("../../assets/BadApple.smol");
 #[cfg(not(feature = "bad-apple"))] static VIDEO: &[u8] = include_bytes!("../../assets/XD.smol");

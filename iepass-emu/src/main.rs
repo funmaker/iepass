@@ -1,25 +1,23 @@
 #![feature(arc_is_unique)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod framebuffer_pool;
-
-use std::io::{Cursor};
 use std::time::Instant;
 use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
-use egui::{Color32, ColorImage, Frame, ImageSource};
+use egui::{Color32, Event, Frame, ImageSource, RawInput};
 use egui::load::SizedTexture;
-use crate::framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
+use iepass_core::pico8::Pico8VM;
+
+mod framebuffer_pool;
+
+use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
+use iepass_core::pico8::palette::PALETTE;
 
 fn main() -> eframe::Result {
 	let options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default().with_inner_size([1024.0, 512.0]),
 		..Default::default()
 	};
-	
-	let stream_handle = rodio::OutputStreamBuilder::open_default_stream().unwrap();
-	let source = rodio::Decoder::new(Cursor::new(include_bytes!("../../assets/pszczoly.wav"))).unwrap();
-	stream_handle.mixer().add(source);
 	
 	eframe::run_native(
 		"IEPass Emulator",
@@ -33,61 +31,53 @@ fn main() -> eframe::Result {
 struct EmulatorApp {
 	fb_pool: FramebufferPool,
 	fb_tex: TextureHandle,
-	frame: f32,
+	frame: usize,
 	last_frames: [Instant; 10],
-	mask: [u8; 207],
+	pico8: Pico8VM,
 }
 
 impl EmulatorApp {
-	pub fn new(cc: &CreationContext) -> Self {
+	pub fn new(cc: &CreationContext) -> EmulatorApp {
 		let mut fb_pool = FramebufferPool::new(128, 128);
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
+		
+		let mut pico8 = Pico8VM::new().unwrap();
+		pico8.load(b"
+			printh(\"Filling\")
+			for off = 0,64*128 do
+			  poke(0x6000 + off, off % 256)
+			  if off % 256 == 255 then
+			    flip()
+			  end
+			end
+			printh(\"Done!\")
+		");
 		
 		Self {
 			fb_pool,
 			fb_tex,
-			frame: 0.0,
-			mask: MASK,
+			frame: 0,
 			last_frames: [Instant::now(); 10],
+			pico8,
 		}
 	}
 }
 
 impl eframe::App for EmulatorApp {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-		self.fb_tex.set(self.fb_pool.from_map(|x, y| {
-			fn b2i (b: bool) -> usize { if b { 1 } else { 0 } }
-			
-			let delay = (0..5).find_map(|d| {
-				let x = (x as isize) / 5 - 1;
-				let y = (y as f32 + (x as f32 / 4.0 - (self.frame - d as f32 * 10.0) / 15.0).sin() * 6.0) as isize / 5 - 8;
-				if x < 0 || x >= 23 || y < 0 || y >= 9 {
-					return None;
-				}
-				let value = self.mask[(x as usize + y as usize * 23) % self.mask.len()];
-				if value == 0 { None } else { Some((d, value)) }
-			});
-			
-			match delay {
-				Some((d, 1)) => Color32::GRAY.linear_multiply(1.0 / (d + 1) as f32),
-				Some((d, 2)) => Color32::BLUE.linear_multiply(1.0 / (d + 1) as f32),
-				_ => {
-					let x = x as f32 + 0.1;
-					let y = y as f32 + 0.1;
-					if (
-						b2i((x + self.frame * 0.8 + 100.0) % 16.0 > 8.0)
-							+ b2i((
-							y + (self.frame / 60.0).sin() * 30.0 / 3.0
-								+ (x / 10.0 + self.frame / 30.0).sin() * 5.0 + 100.0
-						) % 16.0 > 8.0)
-					) % 2 == 0 {
-						Color32::MAGENTA.gamma_multiply((x / 10.0 + self.frame / 30.0).sin() * 0.4 + 0.6)
-					} else {
-						Color32::BLACK
-					}
-				}
-			}
-		}), FRAMEBUFFER_OPTS);
+		self.pico8.run();
+		
+		self.fb_tex.set(self.fb_pool.from_iter(
+			self.pico8.memory()
+			          .screen()
+			          .iter()
+			          .map(|byte| [PALETTE[*byte as usize >> 4], PALETTE[*byte as usize & 0x0F]])
+			          .flatten()
+			          .map(|color| {
+				          let (r, g, b) = color.rgb();
+				          Color32::from_rgb(r, g, b)
+			          })
+		), FRAMEBUFFER_OPTS);
 		
 		egui::SidePanel::left("framebuffer")
 			.frame(Frame::NONE)
@@ -103,30 +93,32 @@ impl eframe::App for EmulatorApp {
 			.show(ctx, |ui| {
 				ui.heading("IE Pass: The Console The Pass The Emulator");
 				ui.separator();
-				ui.label(format!("Frame {:.1}, FPS: {:>4.0}", self.frame, self.last_frames.len() as f32 / self.last_frames.last().unwrap().elapsed().as_secs_f32()));
-				if ui.button("XD").clicked() {
-					self.mask.chunks_exact_mut(23).for_each(|row| row.rotate_left(1));
-				}
+				ui.label(format!("Frame {}", self.frame));
+				ui.label(format!("FPS: {:>4.0}", self.last_frames.len() as f32 / self.last_frames.last().unwrap().elapsed().as_secs_f32()));
 			});
 		
-		ctx.request_repaint();
 		
-		let now = Instant::now();
-		let dt = now - self.last_frames[0];
-		self.frame += 60.0 * dt.as_secs_f32();
 		self.last_frames.rotate_right(1);
-		self.last_frames[0] = now;
+		self.last_frames[0] = Instant::now();
+		
+		ctx.request_repaint();
+	}
+	
+	fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut RawInput) {
+		for event in &raw_input.events {
+			match event {
+				Event::Key {
+					pressed,
+					key,
+					modifiers,
+					physical_key,
+					repeat,
+					..
+				} => {
+					println!("{} {:?} {:?} {:?} {}", pressed, key, modifiers, physical_key, repeat);
+				},
+				_ => {},
+			}
+		}
 	}
 }
-
-const MASK: [u8; 23 * 9] = [
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 2, 0, 2, 2, 2, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0,
-	0, 2, 0, 2, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-	0, 2, 0, 2, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0,
-	0, 2, 0, 2, 2, 2, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0,
-	0, 2, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0,
-	0, 2, 0, 2, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0,
-	0, 2, 0, 2, 2, 2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];

@@ -6,9 +6,10 @@ use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{PinDriver, Pull};
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::spi::SpiDriver;
-use iepass::{Debounce, Touch, Analog, Calib, Color};
+use iepass::{Debounce, Touch, Analog, Calib};
 use iepass::display::Display;
 use iepass::utils::draw_rect;
+use iepass_core::colors::Color;
 
 static CALIB_BG1: &[u8] = include_bytes!("../../assets/calib1.smol");
 static CALIB_BG2: &[u8] = include_bytes!("../../assets/calib2.smol");

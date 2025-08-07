@@ -15,7 +15,7 @@ impl<'d> Sound<'d> {
 		dout: impl Peripheral<P = impl OutputPin> + 'd,
 		ws: impl Peripheral<P = impl InputPin + OutputPin> + 'd,
 	) -> Result<Self, EspError> {
-		let mut driver = I2sDriver::new_std_tx(
+		let driver = I2sDriver::new_std_tx(
 			i2s,
 			&StdConfig::new(
 				Config::default().frames_per_buffer(37),

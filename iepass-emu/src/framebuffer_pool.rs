@@ -15,6 +15,7 @@ pub struct FramebufferPool {
 	pool: Vec<Arc<ColorImage>>,
 }
 
+#[allow(dead_code)]
 impl FramebufferPool {
 	pub fn new(width: usize, height: usize) -> Self {
 		Self {
