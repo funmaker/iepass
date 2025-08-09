@@ -34,6 +34,13 @@ env.RUSTUP_TOOLCHAIN = "esp"
 command = "cargo"
 args = ["run", "${@}"]
 
+[tasks.flash-nostd]
+dependencies = ["build-assets"]
+cwd = "./iepass-nostd"
+env.RUSTUP_TOOLCHAIN = "esp"
+command = "cargo"
+args = ["run", "${@}"]
+
 [tasks.flash-calib]
 dependencies = ["build-assets"]
 cwd = "./iepass-calib"

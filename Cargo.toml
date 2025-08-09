@@ -1,13 +1,20 @@
 [workspace]
 resolver = "3"
-members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu"]
-
-[profile.release]
-opt-level = "s"
+members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass-nostd"]
 
 [profile.dev]
-debug = true    # Symbols are nice, and they don't increase the size on Flash
-opt-level = "z"
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
 
 [workspace.dependencies]
 embedded-io = "0.6.1"

@@ -85,15 +85,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	log::info!("Press START to accept.");
 	loop {
 		FreeRtos::delay_ms(10);
-		
+	
 		if a_btn.falling_edge() { calib.screen_offset.y = calib.screen_offset.y.saturating_add(1); }
 		if b_btn.falling_edge() { calib.screen_offset.x = calib.screen_offset.x.saturating_add(1); }
 		if x_btn.falling_edge() { calib.screen_offset.x = calib.screen_offset.x.saturating_sub(1); }
 		if y_btn.falling_edge() { calib.screen_offset.y = calib.screen_offset.y.saturating_sub(1); }
-		
+	
 		display.set_calib(calib.screen_offset)?;
 		display.update(&framebuffer)?;
-		
+	
 		if start_btn.falling_edge() {
 			log::info!("Screen offset: x = {}, y = {}", calib.screen_offset.x, calib.screen_offset.y);
 			break;
@@ -126,17 +126,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	log::info!("Press START to accept.");
 	loop {
 		FreeRtos::delay_ms(10);
-		
+	
 		let (x, y) = analog.read_raw()?;
-		
+	
 		calib.analog.x.min = calib.analog.x.min.min(x.saturating_add(analog.deadzone / 2));
 		calib.analog.x.max = calib.analog.x.max.max(x.saturating_sub(analog.deadzone / 2));
 		calib.analog.y.min = calib.analog.y.min.min(y.saturating_add(analog.deadzone / 2));
 		calib.analog.y.max = calib.analog.y.max.max(y.saturating_sub(analog.deadzone / 2));
 		analog.calib = calib.analog;
-		
+	
 		let (x, y) = analog.rescale(x, y, ANALOG_SIZE - 2);
-		
+	
 		framebuffer.clear();
 		framebuffer.extend(pixels(CALIB_BG3));
 		draw_rect(
@@ -149,14 +149,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			Color::RED
 		);
 		display.update(&framebuffer)?;
-		
+	
 		if select_btn.falling_edge() {
 			calib.analog.x.min = calib.analog.x.mid.saturating_sub(calib.analog_deadzone);
 			calib.analog.x.max = calib.analog.x.mid.saturating_add(calib.analog_deadzone);
 			calib.analog.y.min = calib.analog.y.mid.saturating_sub(calib.analog_deadzone);
 			calib.analog.y.max = calib.analog.y.mid.saturating_add(calib.analog_deadzone);
 		}
-		
+	
 		if start_btn.falling_edge() {
 			log::info!("X axis: min = {}, mid = {}, max = {}", calib.analog.x.min, calib.analog.x.mid, calib.analog.x.max);
 			log::info!("Y axis: min = {}, mid = {}, max = {}", calib.analog.y.min, calib.analog.y.mid, calib.analog.y.max);
@@ -174,58 +174,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	'outer: loop {
 		log::info!("Calibrating touch screen. Press targets using pen.");
 		log::info!("Press SELECT to reset.");
-		
+	
 		for &mut (ref mut measurement, (x, y)) in measurements.iter_mut() {
 			framebuffer.clear();
 			framebuffer.extend(pixels(CALIB_BG4));
 			draw_rect(&mut framebuffer, true, x - 4, y - 4, 8, 8, Color::BLACK);
 			display.update(&framebuffer)?;
-			
+	
 			loop {
 				FreeRtos::delay_ms(10);
-				
+	
 				if let Some(value) = measure_option(64, || touch.read_raw())? {
 					*measurement = value;
 					break;
 				}
-				
+	
 				if select_btn.falling_edge() {
 					continue 'outer;
 				}
 			}
-			
+	
 			while let Some(_) = touch.read_raw()? {
 				FreeRtos::delay_ms(10);
 			}
 		}
-		
-		
+	
+	
 		[calib.touch.x.min, calib.touch.x.max] = fit_map(measurements.iter().map(|(_, (x, _))| *x), measurements.iter().map(|((x, _), _)| *x), [0, SCR_WIDTH]);
 		[calib.touch.y.min, calib.touch.y.max] = fit_map(measurements.iter().map(|(_, (_, y))| *y), measurements.iter().map(|((_, y), _)| *y), [0, SCR_HEIGHT]);
-		
+	
 		touch.calib = calib.touch;
-		
+	
 		log::info!("{:?}", measurements);
 		log::info!("{:?}", [calib.touch.x.min, calib.touch.x.max]);
 		log::info!("{:?}", [calib.touch.y.min, calib.touch.y.max]);
 		log::info!("Press START to accept.");
-		
+	
 		loop {
 			FreeRtos::delay_ms(10);
-			
+	
 			framebuffer.clear();
 			framebuffer.extend(pixels(CALIB_BG4));
-			
+	
 			if let Some((x, y)) = measure_option(16, || touch.read(SCR_WIDTH, SCR_HEIGHT))? {
 				draw_rect(&mut framebuffer, true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
 			}
-			
+	
 			display.update(&framebuffer)?;
-			
+	
 			if select_btn.falling_edge() {
 				continue 'outer;
 			}
-			
+	
 			if start_btn.falling_edge() {
 				break 'outer;
 			}

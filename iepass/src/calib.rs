@@ -36,7 +36,7 @@ impl Default for Calib {
 			analog: Axes {
 				x: BiRange {
 					min: 6,
-					mid: 231,
+					mid: 235,
 					max: 462,
 				},
 				y: BiRange {
@@ -45,7 +45,7 @@ impl Default for Calib {
 					max: 456,
 				},
 			},
-			analog_deadzone: 6,
+			analog_deadzone: 10,
 			touch: Axes {
 				x: Range {
 					min: 3951,

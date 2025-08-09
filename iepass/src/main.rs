@@ -31,6 +31,10 @@ use sound::Sound;
 //    LRC:  5
 //   RCLK:  6
 //    DIN:  7
+// == Analog ==
+//      X:  8
+//      Y:  9
+//    BTN:  3
 // == Screen ==
 //    RST: 10
 //    SDA: 11
@@ -43,10 +47,6 @@ use sound::Sound;
 //      Y: 16
 //      A: 17
 //      B: 18
-// == Analog ==
-//      X: 19
-//      Y: 20
-//    BTN: 21
 // == SD Card ==
 //   MOSI: 35
 //    CLK: 36
@@ -73,8 +73,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let calib = Calib::default();
 	let peripherals = Peripherals::take().unwrap();
 	
-	let adc2_driver = AdcDriver::new(peripherals.adc2)?;
-	
 	let mut select_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio14)?).with_pull(Pull::Up)?;
 	let mut start_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio4)?).with_pull(Pull::Up)?;
 	let mut x_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio15)?).with_pull(Pull::Up)?;
@@ -82,14 +80,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut a_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio17)?).with_pull(Pull::Up)?;
 	let mut b_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio18)?).with_pull(Pull::Up)?;
 	
+	let adc1_driver = AdcDriver::new(peripherals.adc1)?;
 	let mut analog = Analog::new(
-		&adc2_driver,
-		peripherals.pins.gpio19,
-		peripherals.pins.gpio20,
+		&adc1_driver,
+		peripherals.pins.gpio8,
+		peripherals.pins.gpio9,
 		calib.analog_deadzone,
 		calib.analog,
 	)?;
-	let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio21)?).with_pull(Pull::Up)?;
+	let mut analog_btn = Debounce::new(PinDriver::input(peripherals.pins.gpio3)?).with_pull(Pull::Up)?;
 	
 	let mut sd_cs = PinDriver::output(peripherals.pins.gpio38)?;
 	sd_cs.set_high()?;
