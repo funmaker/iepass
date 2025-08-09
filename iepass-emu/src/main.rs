@@ -68,7 +68,8 @@ impl eframe::App for EmulatorApp {
 		self.pico8.run();
 		
 		self.fb_tex.set(self.fb_pool.from_iter(
-			self.pico8.memory()
+			self.pico8.env()
+			          .memory
 			          .screen()
 			          .iter()
 			          .map(|byte| [PALETTE[*byte as usize >> 4], PALETTE[*byte as usize & 0x0F]])
