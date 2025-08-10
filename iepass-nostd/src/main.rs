@@ -15,6 +15,7 @@ use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, InputConfig, Pull};
 use panic_rtt_target as _;
 use anyhow::Result;
+use rtt_target::ChannelMode;
 
 mod calib;
 mod peripherials;
@@ -23,17 +24,28 @@ mod utils;
 
 use peripherials::{Debounce, Display};
 use calib::Calib;
-use utils::{Color, FpsCounter};
-use crate::peripherials::display;
-use crate::peripherials::display::{HEIGHT, WIDTH};
+use utils::{perf, Color, FpsCounter, PerfFutureExt};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    rtt_target::rtt_init_defmt!();
+    let channels = rtt_target::rtt_init! {
+        up: {
+            0: { size: 4096, mode: ChannelMode::BlockIfFull, name: "defmt" }
+            // 1: { size: 4096, name: "perf" }
+        }
+        down: {
+            0: { size: 1024, name: "stdin" }
+        }
+    };
     
-    try_main(spawner).await.expect("Error in the main task");
+    rtt_target::set_defmt_channel(channels.up.0);
+    // perf::set_channel(channels.up.1);
+    
+    try_main(spawner).perf_name("main")
+                     .await
+                     .expect("Error in the main task");
 }
 
 async fn try_main(spawner: Spawner) -> Result<!> {
@@ -56,6 +68,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let calib = Calib::default();
     let up_pull = InputConfig::default().with_pull(Pull::Up);
     
+    let mut dbg_btn = Debounce::new(Input::new(peripherals.GPIO0, up_pull));
     let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));
     let mut start_btn = Debounce::new(Input::new(peripherals.GPIO4, up_pull));
     let mut x_btn = Debounce::new(Input::new(peripherals.GPIO15, up_pull));
@@ -91,6 +104,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         if y_btn.falling_edge() { info!("y_btn"); }
         if a_btn.falling_edge() { info!("a_btn"); }
         if b_btn.falling_edge() { info!("b_btn"); }
+        if dbg_btn.falling_edge() { perf::dump_perf(); }
         
         let mut fb = display.next_frame().await;
         fb.fill(Color::new(frame as u8, frame as u8, frame as u8));

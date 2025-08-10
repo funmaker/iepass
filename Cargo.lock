@@ -2661,8 +2661,9 @@ dependencies = [
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-hal-embassy",
- "libm",
  "panic-rtt-target",
+ "pin-project",
+ "ringbuffer",
  "rtt-target",
 ]
 
@@ -3792,6 +3793,12 @@ name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
+
+[[package]]
+name = "ringbuffer"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57b0b88a509053cbfd535726dcaaceee631313cef981266119527a1d110f6d2b"
 
 [[package]]
 name = "riscv"

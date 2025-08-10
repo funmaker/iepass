@@ -19,7 +19,7 @@ test = false
 [dependencies]
 #iepass-core = { workspace = true }
 anyhow = { version = "1.0.98", default-features = false }
-defmt = "1.0.1"
+defmt = { version = "1.0.1", features = ["alloc"] }
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
 esp-alloc = { version = "0.8.0", features = ["defmt"] }
 esp-hal = { version = "=1.0.0-rc.0", features = ["defmt", "esp32s3", "unstable"] }
@@ -30,7 +30,8 @@ embassy-sync = { version = "0.6.1", features = ["defmt"] }
 embedded-hal-async = "1.0.0"
 rtt-target = { version = "0.6.1", features = ["defmt"] }
 panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
-libm = "0.2.15"
+ringbuffer = { version = "0.16.0", default-features = false }
+pin-project = "1.1.10"
 
 [dev-dependencies]
 embedded-test = { version = "0.6.0", features = [
