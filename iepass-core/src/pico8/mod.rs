@@ -4,19 +4,21 @@ use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue,
 
 pub mod memory;
 pub mod palette;
+pub mod env;
 
 use memory::Memory;
+use env::Env;
 
 pub struct Pico8VM {
-	memory: Rc<RefCell<Memory>>,
 	lua: Lua,
+	env: Rc<RefCell<Env>>,
 	executor: Option<StashedExecutor>,
 }
 
 impl Pico8VM {
 	pub fn new() -> Result<Pico8VM, InvalidTableKey> {
 		let mut vm = Self {
-			memory: Rc::new(RefCell::new(Memory::new())),
+			env: Rc::new(RefCell::new(Env::new())),
 			lua: Lua::empty(),
 			executor: None,
 		};
@@ -70,8 +72,8 @@ impl Pico8VM {
 		}
 	}
 	
-	pub fn memory(&self) -> RefMut<'_, Memory> {
-		self.memory.borrow_mut()
+	pub fn env(&self) -> RefMut<'_, Env> {
+		self.env.borrow_mut()
 	}
 	
 	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
@@ -99,22 +101,22 @@ impl Pico8VM {
 			}))?;
 			
 			// Memory
-			let memory = self.memory.clone();
+			let env = self.env.clone();
 			ctx.set_global("peek", callback("peek", ctx, move |ctx, (addr, n): (u32, Option<u32>)| {
-				let memory = memory.borrow();
+				let env = env.borrow();
 				let table = Table::new(&ctx);
-				for (pos, byte) in memory[addr as usize .. (addr + n.unwrap_or(1)) as usize].iter().enumerate() {
+				for (pos, byte) in env.memory[addr as usize .. (addr + n.unwrap_or(1)) as usize].iter().enumerate() {
 					table.set(ctx, pos as u32 + 1, byte).unwrap();
 				}
 				table
 			}))?;
 			
-			let memory = self.memory.clone();
+			let env = self.env.clone();
 			ctx.set_global("poke", callback("poke", ctx, move |_, (addr, mut bytes): (u32, Variadic<Vec<u8>>)| {
-				let mut memory = memory.borrow_mut();
+				let mut env = env.borrow_mut();
 				if bytes.is_empty() { bytes.push(0) }
 				for (pos, byte) in bytes.into_iter().enumerate() {
-					memory[addr as usize + pos] = byte;
+					env.memory[addr as usize + pos] = byte;
 				}
 			}))?;
 			

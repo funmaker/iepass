@@ -6,13 +6,38 @@ pub struct Memory {
 
 impl Memory {
 	pub fn new() -> Memory {
-		Memory {
-			inner: vec![0; 0x10000].try_into().unwrap(),
-		}
+		let mut mem = Memory {
+			inner: vec![0u8; 0x10000].try_into().unwrap(),
+		};
+		
+		mem.reset();
+		mem
+	}
+	
+	pub fn reset(&mut self) {
+		self.inner[0x5F55] = 0x60; // default screen mapping
+		self.inner[0x5F56] = 0x20; // default map mapping
+		self.inner[0x5F57] = 128; // default map size
 	}
 	
 	pub fn screen(&mut self) -> MemoryScreen<'_> {
-		MemoryScreen((&mut self.inner[0x6000 .. 0x8000]).try_into().unwrap())
+		let mut base = self.base_addr_screen() as usize;
+		if base > self.inner.len() - 0x2000 {
+			base = 0x6000; // default if custom base would cause to wrap memory
+		}
+		MemoryScreen((&mut self.inner[base.. base+0x2000]).try_into().unwrap())
+	}
+	
+	pub fn base_addr_gfx(&self) -> u16 {
+		(self.inner[0x5F54] as u16).wrapping_shl(8)
+	}
+	
+	pub fn base_addr_screen(&self) -> u16 {
+		(self.inner[0x5F55] as u16).wrapping_shl(8)
+	
+	}
+	pub fn base_addr_map(&self) -> u16 {
+		(self.inner[0x5F56] as u16).wrapping_shl(8)
 	}
 }
 
