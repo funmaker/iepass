@@ -2651,18 +2651,19 @@ name = "iepass-nostd"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "critical-section",
  "defmt 1.0.1",
  "embassy-executor",
+ "embassy-sync 0.6.2",
  "embassy-time",
+ "embedded-hal-async",
  "embedded-test",
  "esp-alloc",
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-hal-embassy",
+ "libm",
  "panic-rtt-target",
  "rtt-target",
- "static_cell",
 ]
 
 [[package]]

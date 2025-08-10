@@ -1,11 +1,9 @@
 #![feature(never_type)]
+#![feature(iter_array_chunks)]
+#![feature(array_chunks)]
 #![no_std]
 #![no_main]
-#![deny(
-    clippy::mem_forget,
-    reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
-    holding buffers for the duration of a data transfer."
-)]
+#![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]
 
 extern crate alloc;
 
@@ -18,12 +16,17 @@ use esp_hal::gpio::{Input, InputConfig, Pull};
 use panic_rtt_target as _;
 use anyhow::Result;
 
-mod debounce;
+mod calib;
+mod peripherials;
+mod tasks;
+mod utils;
 
-use crate::debounce::Debounce;
+use peripherials::{Debounce, Display};
+use calib::Calib;
+use utils::{Color, FpsCounter};
+use crate::peripherials::display;
+use crate::peripherials::display::{HEIGHT, WIDTH};
 
-// This creates a default app-descriptor required by the esp-idf bootloader.
-// For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal_embassy::main]
@@ -50,7 +53,9 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Initializing peripherals.");
     
+    let calib = Calib::default();
     let up_pull = InputConfig::default().with_pull(Pull::Up);
+    
     let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));
     let mut start_btn = Debounce::new(Input::new(peripherals.GPIO4, up_pull));
     let mut x_btn = Debounce::new(Input::new(peripherals.GPIO15, up_pull));
@@ -58,13 +63,25 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let mut a_btn = Debounce::new(Input::new(peripherals.GPIO17, up_pull));
     let mut b_btn = Debounce::new(Input::new(peripherals.GPIO18, up_pull));
     
+    let display = Display::new(
+        peripherals.SPI2,
+        peripherals.DMA_CH0,
+        peripherals.GPIO12,
+        peripherals.GPIO11,
+        peripherals.GPIO13,
+        peripherals.GPIO10,
+        calib.screen_offset,
+        embassy_time::Delay,
+    ).await?;
     
     info!("Spawning tasks.");
     
-    let _ = spawner;
+    let display = display.into_task(spawner)?;
     
     info!("Entering main loop.");
     
+    let mut fps = FpsCounter::<10>::new();
+    let mut frame = 0;
     loop {
         Timer::after(Duration::from_millis(1_000 / 60)).await;
         
@@ -74,6 +91,16 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         if y_btn.falling_edge() { info!("y_btn"); }
         if a_btn.falling_edge() { info!("a_btn"); }
         if b_btn.falling_edge() { info!("b_btn"); }
+        
+        let mut fb = display.next_frame().await;
+        fb.fill(Color::new(frame as u8, frame as u8, frame as u8));
+        fb.show().await;
+        
+        frame += 1;
+        fps.tick();
+        
+        if frame % 100 == 11 {
+            info!("FPS: {}", fps.fps());
+        }
     }
 }
-

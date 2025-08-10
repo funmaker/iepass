@@ -17,18 +17,20 @@ name    = "hello_test"
 test = false
 
 [dependencies]
+#iepass-core = { workspace = true }
+anyhow = { version = "1.0.98", default-features = false }
 defmt = "1.0.1"
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
+esp-alloc = { version = "0.8.0", features = ["defmt"] }
 esp-hal = { version = "=1.0.0-rc.0", features = ["defmt", "esp32s3", "unstable"] }
-critical-section = "1.2.0"
+esp-hal-embassy = { version = "0.9.0", features = ["defmt", "esp32s3"] }
 embassy-executor = { version = "0.7.0", features = ["defmt", "task-arena-size-20480", ] }
 embassy-time = { version = "0.4.0", features = ["defmt"] }
-esp-alloc = { version = "0.8.0", features = ["defmt"] }
-esp-hal-embassy = { version = "0.9.0", features = ["defmt", "esp32s3"] }
-panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
+embassy-sync = { version = "0.6.1", features = ["defmt"] }
+embedded-hal-async = "1.0.0"
 rtt-target = { version = "0.6.1", features = ["defmt"] }
-static_cell = "2.1.1"
-anyhow = { version = "1.0.98", default-features = false }
+panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
+libm = "0.2.15"
 
 [dev-dependencies]
 embedded-test = { version = "0.6.0", features = [

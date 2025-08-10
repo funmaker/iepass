@@ -2,6 +2,7 @@
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Color(u16);
 
+#[allow(dead_code)]
 impl Color {
 	pub const BLACK: Color = Color::new(0, 0, 0);
 	pub const RED: Color = Color::new(255, 0, 0);
