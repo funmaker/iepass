@@ -1,23 +1,24 @@
 //! ```cargo
 //! [dependencies]
-//! ipipe = "0.11.7"
 //! colored = "3.0.0"
 //! eframe = "0.32.0"
 //! egui_plot = "0.33.0"
 //! serde_json = "1.0.0"
 //! serde = { version = "1.0", features = ["derive"] }
+//! 
+//! [target.'cfg(linux)'.dependencies]
+//! ipipe = "0.11.7"
 //! ```
 
-use std::ffi::OsStr;
-use std::process::{Command, exit};
+use std::ffi::{OsStr, OsString};
+use std::process::{Child, Command, exit, Stdio};
 use std::io::{BufRead, BufReader};
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::mpsc::{self, Receiver, TryRecvError, Sender};
 use std::thread;
 use std::collections::HashMap;
 use eframe::egui::{self, Color32};
 use egui_plot::{Plot, Legend, BarChart, Bar};
 use serde::Deserialize;
-use ipipe::Pipe;
 use colored::Colorize;
 
 const RUNNER: &'static str = "probe-rs";
@@ -42,17 +43,32 @@ const COLORS: [Color32; 15] = [
 ];
 
 fn main() {
-	let mut args: Vec<_> = std::env::args_os().collect();
-	args.remove(0);
+	let args: Vec<_> = std::env::args_os().skip(1).collect();
 	
+	let (sender, receiver) = mpsc::channel();
+	let mut probe = spawn_probe(args, sender);
+	
+	thread::spawn(move || {
+		let status = probe.wait().unwrap();
+		exit(status.code().unwrap_or(0));
+	});
+	
+	let data = receiver.recv().unwrap();
+	let native_options = eframe::NativeOptions {
+		viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
+		..Default::default()
+	};
+	eframe::run_native("IEPass Perf", native_options, Box::new(|cc| Ok(Box::new(FlameGraph::new(cc, data, receiver))))).unwrap();
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
 	let pipe = Pipe::with_name("iepass_perf").unwrap();
 	args.push("--target-output-file".into());
 	args.push(pipe.path().as_os_str().into());
 	
 	println!("     {} `{} {}`", "Running".green().bold(), RUNNER, args.join(OsStr::new(" ")).to_string_lossy());
-	
-	let mut cp = Command::new("probe-rs").args(args).spawn().unwrap();
-	let (sender, receiver) = mpsc::channel();
+	let mut probe = Command::new("probe-rs").args(args).spawn().unwrap();
 	
 	thread::spawn(move || {
 		for line in BufReader::new(pipe).lines() {
@@ -66,17 +82,30 @@ fn main() {
 		}
 	});
 	
+	probe
+}
+
+#[cfg(not(target_os = "linux"))]
+fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+	println!("     {} `{} {}`", "Running".green().bold(), RUNNER, args.join(OsStr::new(" ")).to_string_lossy());
+	let mut probe = Command::new("probe-rs").args(args).env("CLICOLOR_FORCE", "true").stdout(Stdio::piped()).spawn().unwrap();
+	let probe_out = probe.stdout.take().unwrap();
+	
 	thread::spawn(move || {
-		cp.wait().unwrap();
-		exit(0);
+		for line in BufReader::new(probe_out).lines() {
+			let line = line.unwrap();
+			println!("{}", line);
+			
+			if let Some(line) = line.strip_prefix("[PERF ] ") {
+				match serde_json::from_str(line) {
+					Ok(entries) => sender.send(entries).unwrap(),
+					Err(err) => eprintln!("Can't parse PERF message:\n{}", err),
+				}
+			}
+		}
 	});
 	
-	let data = receiver.recv().unwrap();
-	let native_options = eframe::NativeOptions {
-		viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
-		..Default::default()
-	};
-	eframe::run_native("IEPass Perf", native_options, Box::new(|cc| Ok(Box::new(FlameGraph::new(cc, data, receiver))))).unwrap();
+	probe
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -18,6 +18,7 @@ pub const CHUNKS: usize = MAX_TRANSFER.div_ceil(CHUNK_SIZE);
 pub struct Framebuffer {
 	descs: &'static mut [[DmaDescriptor; CHUNKS]; TRANSFERS],
 	buffer: &'static mut [u8; BUFFER_SIZE],
+	seq: usize,
 }
 
 impl Framebuffer {
@@ -39,7 +40,7 @@ impl Framebuffer {
 			}
 		}
 		
-		Self { descs, buffer }
+		Self { descs, buffer, seq: 0 }
 	}
 	
 	pub fn fill(&mut self, color: Color) {

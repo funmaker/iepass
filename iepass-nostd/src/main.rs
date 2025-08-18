@@ -12,7 +12,7 @@ use esp_hal::timer::systimer::SystemTimer;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{Input, InputConfig, Pull};
+use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
 use panic_rtt_target as _;
 use anyhow::Result;
 use rtt_target::ChannelMode;
@@ -67,6 +67,10 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     let calib = Calib::default();
     let up_pull = InputConfig::default().with_pull(Pull::Up);
+    
+    Output::new(peripherals.GPIO5, Level::High, Default::default());
+    Output::new(peripherals.GPIO6, Level::High, Default::default());
+    Output::new(peripherals.GPIO7, Level::High, Default::default());
     
     let mut dbg_btn = Debounce::new(Input::new(peripherals.GPIO0, up_pull));
     let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));

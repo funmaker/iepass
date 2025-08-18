@@ -17,7 +17,7 @@ script = { file = "./scripts/rle_decode.rs" }
 [tasks.test]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "iepass-nostd", "${@}"]
 
 
 # Running
