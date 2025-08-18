@@ -6,12 +6,12 @@
 //! serde_json = "1.0.0"
 //! serde = { version = "1.0", features = ["derive"] }
 //! 
-//! [target.'cfg(linux)'.dependencies]
+//! [target.'cfg(target_os = "linux")'.dependencies]
 //! ipipe = "0.11.7"
 //! ```
 
 use std::ffi::{OsStr, OsString};
-use std::process::{Child, Command, exit, Stdio};
+use std::process::{Child, Command, exit};
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc::{self, Receiver, TryRecvError, Sender};
 use std::thread;
@@ -62,13 +62,15 @@ fn main() {
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+fn spawn_probe(mut args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+	use ipipe::Pipe;
+	
 	let pipe = Pipe::with_name("iepass_perf").unwrap();
 	args.push("--target-output-file".into());
 	args.push(pipe.path().as_os_str().into());
 	
 	println!("     {} `{} {}`", "Running".green().bold(), RUNNER, args.join(OsStr::new(" ")).to_string_lossy());
-	let mut probe = Command::new("probe-rs").args(args).spawn().unwrap();
+	let probe = Command::new("probe-rs").args(args).spawn().unwrap();
 	
 	thread::spawn(move || {
 		for line in BufReader::new(pipe).lines() {
@@ -87,6 +89,8 @@ fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
 
 #[cfg(not(target_os = "linux"))]
 fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+	use std::process::Stdio;
+	
 	println!("     {} `{} {}`", "Running".green().bold(), RUNNER, args.join(OsStr::new(" ")).to_string_lossy());
 	let mut probe = Command::new("probe-rs").args(args).env("CLICOLOR_FORCE", "true").stdout(Stdio::piped()).spawn().unwrap();
 	let probe_out = probe.stdout.take().unwrap();
