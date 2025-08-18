@@ -33,6 +33,7 @@ panic-rtt-target = { version = "0.2.0", features = ["defmt"] }
 ringbuffer = { version = "0.16.0", default-features = false }
 pin-project = "1.1.10"
 static_cell = "2.1.1"
+micromath = "2.1.0"
 
 [dev-dependencies]
 embedded-test = { version = "0.6.0", features = [

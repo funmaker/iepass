@@ -32,6 +32,15 @@ impl Color {
 	pub fn as_u16(&self) -> u16 {
 		self.0
 	}
+	
+	pub fn linear_mul(self, scale: f32) -> Self {
+		let (r, g, b) = self.rgb();
+		Self::new(
+			(r as f32 * scale) as u8,
+			(g as f32 * scale) as u8,
+			(b as f32 * scale) as u8,
+		)
+	}
 }
 
 impl Into<u16> for Color {

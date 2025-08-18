@@ -56,9 +56,22 @@ impl Framebuffer {
 	
 	pub fn fill(&mut self, color: Color) {
 		self.buffer
-			.as_mut_slice()
-			.array_chunks_mut()
-			.for_each(|chunk| *chunk = color.as_u16().to_be_bytes());
+			.as_chunks_mut()
+			.0
+			.fill(color.as_u16().to_be_bytes());
+	}
+	
+	pub fn fill_line(&mut self, offset: u16, len: u16, color: Color) {
+		self.buffer
+		    .as_chunks_mut()
+		    .0[offset as usize .. offset as usize + len as usize]
+		    .fill(color.as_u16().to_be_bytes());
+	}
+	
+	pub fn set(&mut self, offset: u16, color: Color) {
+		self.buffer
+		    .as_chunks_mut()
+		    .0[offset as usize] = color.as_u16().to_be_bytes();
 	}
 	
 	pub fn transfers(&mut self) -> impl Iterator<Item = FramebufferTransfer<'_>> {
@@ -89,20 +102,6 @@ impl PartialOrd for Framebuffer {
 impl Ord for Framebuffer {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.seq.cmp(&other.seq)
-	}
-}
-
-impl Deref for Framebuffer {
-	type Target = [u8];
-	
-	fn deref(&self) -> &Self::Target {
-		self.buffer
-	}
-}
-
-impl DerefMut for Framebuffer {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.buffer
 	}
 }
 
@@ -182,8 +181,12 @@ impl<'a> FramebufferProducer<'a> {
 	}
 	
 	pub async fn get_empty(&mut self) -> Framebuffer {
-		self.receiver.changed().await;
-		self.manager.empty.receive().await
+		loop {
+			self.receiver.changed().await;
+			if let Ok(fb) = self.manager.empty.try_receive() {
+				return fb;
+			}
+		}
 	}
 	
 	pub async fn put_drawn(&self, fb: Framebuffer) {
