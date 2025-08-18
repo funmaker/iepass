@@ -43,7 +43,7 @@ async fn main(spawner: Spawner) {
     rtt_target::set_defmt_channel(channels.up.0);
     // perf::set_channel(channels.up.1);
     
-    try_main(spawner).perf_name("main")
+    try_main(spawner).perf_trace("Main Task")
                      .await
                      .expect("Error in the main task");
 }

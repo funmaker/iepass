@@ -13,6 +13,8 @@ use embassy_executor::Spawner;
 use crate::calib::Axes;
 use crate::tasks;
 use crate::utils::framebuffer::{Framebuffer, FramebufferSource};
+use crate::utils::perf::sync_perf;
+use crate::utils::PerfFutureExt;
 
 pub const WIDTH: u16 = 160;
 pub const HEIGHT: u16 = 128;
@@ -130,7 +132,7 @@ impl<'d, D: DelayNs> Display<'d, D> {
 	}
 	
 	pub async fn draw_async(&mut self, mut fb: Framebuffer) -> Result<Framebuffer, (anyhow::Error, Framebuffer)> {
-		if let Err(err) = self.write_command(Instruction::RAMWR, &[]) {
+		if let Err(err) = sync_perf("SPI CMD", || self.write_command(Instruction::RAMWR, &[])) {
 			return Err((err, fb));
 		}
 		
@@ -141,7 +143,8 @@ impl<'d, D: DelayNs> Display<'d, D> {
 			let spi = self.spi.take().unwrap();
 			
 			match spi.write(chunk.len(), chunk) {
-				Ok(transfer) => {
+				Ok(mut transfer) => {
+					transfer.wait_for_done().await;
 					let (spi, _) = transfer.wait();
 					self.spi = Some(spi);
 				}

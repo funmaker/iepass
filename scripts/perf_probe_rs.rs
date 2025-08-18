@@ -207,8 +207,8 @@ impl eframe::App for FlameGraph {
 									    .collect()
 								).color(color)
 								 .element_formatter(Box::new(|bar, _| match bar.value {
-									 ..0.0001 => format!("{}\n<1ns", bar.name),
-									 ..1.0 => format!("{}\n{:.0}ns", bar.name, bar.value * 1000.0),
+									 ..0.0001 => format!("{}\n<1us", bar.name),
+									 ..1.0 => format!("{}\n{:.0}us", bar.name, bar.value * 1000.0),
 									 ..10.0 => format!("{}\n{:.3}ms", bar.name, bar.value),
 									 ..100.0 => format!("{}\n{:.2}ms", bar.name, bar.value),
 									 ..1000.0 => format!("{}\n{:.1}ms", bar.name, bar.value),

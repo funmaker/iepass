@@ -37,6 +37,17 @@ pub fn dump_perf() {
 	})
 }
 
+pub fn sync_perf<R>(name: &'static str, func: impl FnOnce() -> R) -> R {
+	let start = Instant::now();
+	
+	let ret = func();
+	
+	let end = Instant::now();
+	PERF_BUF.lock(|buf| buf.borrow_mut().entries.enqueue(Entry { name, start, end }));
+	
+	ret
+}
+
 struct PerfInner {
 	entries: ConstGenericRingBuffer<Entry, PERF_SIZE>,
 	output: Option<UpChannel>,
@@ -88,26 +99,16 @@ impl<F: Future> Future for PerfFuture<F> {
 	type Output = F::Output;
 	
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let name = self.name;
-		let start = Instant::now();
-		
-		let result = self.project().inner.poll(cx);
-		
-		let end = Instant::now();
-		PERF_BUF.lock(|buf|
-			buf.borrow_mut().entries.enqueue(Entry { name, start, end })
-		);
-		
-		result
+		sync_perf(self.name, || self.project().inner.poll(cx))
 	}
 }
 
 pub trait PerfFutureExt: Future + Sized {
-	fn perf_name(self, name: &'static str) -> PerfFuture<Self>;
+	fn perf_trace(self, name: &'static str) -> PerfFuture<Self>;
 }
 
 impl<F: Future> PerfFutureExt for F {
-	fn perf_name(self, name: &'static str) -> PerfFuture<Self> {
+	fn perf_trace(self, name: &'static str) -> PerfFuture<Self> {
 		PerfFuture::new(name, self)
 	}
 }
