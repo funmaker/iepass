@@ -8,13 +8,10 @@ use esp_hal::spi::{Mode};
 use esp_hal::time::Rate;
 use esp_hal::{dma_tx_buffer, Async};
 use anyhow::{anyhow, bail, Result};
-use embassy_executor::Spawner;
 
 use crate::calib::Axes;
-use crate::tasks;
-use crate::utils::framebuffer::{Framebuffer, FramebufferSource};
+use crate::utils::framebuffer::Framebuffer;
 use crate::utils::perf::sync_perf;
-use crate::utils::PerfFutureExt;
 
 pub const WIDTH: u16 = 160;
 pub const HEIGHT: u16 = 128;
@@ -131,14 +128,11 @@ impl<'d, D: DelayNs> Display<'d, D> {
 		}
 	}
 	
-	pub async fn draw_async(&mut self, mut fb: Framebuffer) -> Result<Framebuffer, (anyhow::Error, Framebuffer)> {
-		if let Err(err) = sync_perf("SPI CMD", || self.write_command(Instruction::RAMWR, &[])) {
-			return Err((err, fb));
-		}
+	pub async fn draw_async(&mut self, fb: &mut Framebuffer) -> Result<()> {
+		sync_perf("SPI CMD", || self.write_command(Instruction::RAMWR, &[]))?;
 		
 		self.a0.set_high();
 		
-		let mut error = None::<anyhow::Error>;
 		for chunk in fb.transfers() {
 			let spi = self.spi.take().unwrap();
 			
@@ -151,25 +145,12 @@ impl<'d, D: DelayNs> Display<'d, D> {
 				Err((err, spi, _)) => {
 					self.spi = Some(spi);
 					
-					error = Some(anyhow!("{:?}", err));
-					break;
+					bail!("{:?}", err);
 				}
 			}
 		}
 		
-		if let Some(err) = error {
-			Err((err, fb))
-		} else {
-			Ok(fb)
-		}
-	}
-}
-
-impl Display<'static, embassy_time::Delay> {
-	pub fn into_task(self, spawner: Spawner) -> Result<FramebufferSource> {
-		spawner.spawn(tasks::display(self))?;
-		
-		Ok(FramebufferSource)
+		Ok(())
 	}
 }
 

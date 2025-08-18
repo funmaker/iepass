@@ -8,11 +8,12 @@ use core::task::{Context, Poll};
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex};
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_time::Instant;
+use esp_hal::system::Cpu;
 use ringbuffer::{ConstGenericRingBuffer, RingBuffer};
 use pin_project::pin_project;
 use rtt_target::UpChannel;
 
-const PERF_SIZE: usize = 100;
+const PERF_SIZE: usize = 128;
 static PERF_BUF: Mutex<CriticalSectionRawMutex, RefCell<PerfInner>> = Mutex::new(RefCell::new(PerfInner::new()));
 
 #[allow(dead_code)]
@@ -43,7 +44,7 @@ pub fn sync_perf<R>(name: &'static str, func: impl FnOnce() -> R) -> R {
 	let ret = func();
 	
 	let end = Instant::now();
-	PERF_BUF.lock(|buf| buf.borrow_mut().entries.enqueue(Entry { name, start, end }));
+	PERF_BUF.lock(|buf| buf.borrow_mut().entries.enqueue(Entry { name, start, end, cpu: Cpu::current() }));
 	
 	ret
 }
@@ -70,7 +71,14 @@ impl PerfInner {
 		write!(output, "[").unwrap();
 		for (pos, entry) in entries.iter().enumerate() {
 			if pos != 0 { write!(output, ",").unwrap(); }
-			write!(output, "[\"{}\",{},{}]", entry.name, entry.start.duration_since(time_epoch).as_micros(), entry.end.duration_since(time_epoch).as_micros()).unwrap()
+			write!(
+				output,
+				"[\"{}\",{},{},{}]",
+				entry.name,
+				entry.start.duration_since(time_epoch).as_micros(),
+				entry.end.duration_since(time_epoch).as_micros(),
+				entry.cpu as usize,
+			).unwrap()
 		}
 		write!(output, "]\n").unwrap();
 	}
@@ -81,6 +89,7 @@ struct Entry {
 	name: &'static str,
 	start: Instant,
 	end: Instant,
+	cpu: Cpu,
 }
 
 #[pin_project]

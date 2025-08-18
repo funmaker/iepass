@@ -113,7 +113,7 @@ fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct RawEntry(String, u64, u64);
+struct RawEntry(String, u64, u64, usize);
 
 struct Entry {
 	name: String,
@@ -148,7 +148,7 @@ impl FlameGraph {
 	
 	fn update_data(&mut self, mut data: Vec<RawEntry>) {
 		let mut colors_iter = COLORS.iter().copied().cycle();
-		let mut stack = vec![];
+		let mut stack = HashMap::new();
 		
 		data.sort_by_key(|entry| entry.1);
 		self.legend.clear();
@@ -157,28 +157,29 @@ impl FlameGraph {
 		self.max_y = 0.0;
 		
 		for entry in data {
-			let RawEntry(name, start, end) = entry;
+			let RawEntry(name, start, end, cpu) = entry;
+			let cpu_stack = stack.entry(cpu).or_insert_with(|| vec![]);
 			let start = start as f64 / 1000.0;
 			let end = end as f64 / 1000.0;
 			let color = *self.legend.entry(name.clone())
 			                        .or_insert_with(|| colors_iter.next().unwrap());
 			
-			stack.retain(|&val| val > end);
+			cpu_stack.retain(|&val| val > end);
 			
-			let level = stack.len() as f64;
+			let level = cpu_stack.len() as f64;
 			self.data.push(Entry {
 				name,
 				start,
 				end,
 				level,
-				cpu: 0,
+				cpu,
 				stroke: color,
 				fill: color.gamma_multiply(0.5),
 			});
 			
 			self.max_x = self.max_x.max(end);
 			self.max_y = self.max_y.max(level + 1.0);
-			stack.push(end);
+			cpu_stack.push(end);
 		}
 	}
 }

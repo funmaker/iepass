@@ -13,8 +13,9 @@ use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
+use esp_hal::system::CpuControl;
 use panic_rtt_target as _;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rtt_target::ChannelMode;
 
 mod calib;
@@ -24,7 +25,7 @@ mod utils;
 
 use peripherials::{Debounce, Display};
 use calib::Calib;
-use utils::{perf, Color, FpsCounter, PerfFutureExt};
+use utils::{perf, PerfFutureExt};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -52,6 +53,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     info!("Initializing system.");
     
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let calib = Calib::default();
     let peripherals = esp_hal::init(config);
     
     info!("Initializing allocators.");
@@ -63,9 +65,14 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let timer0 = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(timer0.alarm0);
     
+    info!("Initializing second cpu.");
+    
+    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+    let _guard = cpu_control.start_app_core(tasks::cpu1::STACK.take(), tasks::cpu1)
+                            .map_err(|err| anyhow!("{:?}", err))?;
+    
     info!("Initializing peripherals.");
     
-    let calib = Calib::default();
     let up_pull = InputConfig::default().with_pull(Pull::Up);
     
     Output::new(peripherals.GPIO5, Level::High, Default::default());
@@ -93,14 +100,13 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Spawning tasks.");
     
-    let display = display.into_task(spawner)?;
+    spawner.spawn(tasks::display(display))?;
+    spawner.spawn(tasks::draw(true))?;
     
     info!("Entering main loop.");
     
-    let mut fps = FpsCounter::<10>::new();
-    let mut frame = 0;
     loop {
-        Timer::after(Duration::from_millis(1_000 / 60)).await;
+        Timer::after(Duration::from_millis(10)).await;
         
         if select_btn.falling_edge() { info!("select_btn"); }
         if start_btn.falling_edge() { info!("start_btn"); }
@@ -109,16 +115,5 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         if a_btn.falling_edge() { info!("a_btn"); }
         if b_btn.falling_edge() { info!("b_btn"); }
         if dbg_btn.falling_edge() { perf::dump_perf(); }
-        
-        let mut fb = display.next_frame().await;
-        fb.fill(Color::new(frame as u8, frame as u8, frame as u8));
-        fb.show().await;
-        
-        frame += 1;
-        fps.tick();
-        
-        if frame % 100 == 11 {
-            info!("FPS: {}", fps.fps());
-        }
     }
 }
