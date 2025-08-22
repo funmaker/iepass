@@ -2653,6 +2653,7 @@ dependencies = [
  "anyhow",
  "defmt 1.0.1",
  "embassy-executor",
+ "embassy-futures",
  "embassy-sync 0.6.2",
  "embassy-time",
  "embedded-hal-async",

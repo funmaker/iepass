@@ -11,6 +11,7 @@ impl Color {
 	pub const TEAL: Color = Color::new(0, 255, 255);
 	pub const BLUE: Color = Color::new(0, 0, 255);
 	pub const MAGENTA: Color = Color::new(255, 0, 255);
+	pub const GRAY: Color = Color::new(127, 127, 127);
 	pub const WHITE: Color = Color::new(255, 255, 255);
 	
 	pub const fn new(r: u8, g: u8, b: u8) -> Self {
