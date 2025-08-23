@@ -12,7 +12,7 @@ use esp_hal::timer::systimer::SystemTimer;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
+use esp_hal::gpio::{Input, InputConfig, Pull};
 use esp_hal::system::CpuControl;
 use panic_rtt_target as _;
 use anyhow::{anyhow, Result};
@@ -23,9 +23,11 @@ mod peripherials;
 mod tasks;
 mod utils;
 
-use peripherials::{Debounce, Display};
+use peripherials::{Debounce, Display, Speaker};
 use calib::Calib;
 use utils::{perf, PerfFutureExt};
+
+static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -75,10 +77,6 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     let up_pull = InputConfig::default().with_pull(Pull::Up);
     
-    Output::new(peripherals.GPIO5, Level::High, Default::default());
-    Output::new(peripherals.GPIO6, Level::High, Default::default());
-    Output::new(peripherals.GPIO7, Level::High, Default::default());
-    
     let mut dbg_btn = Debounce::new(Input::new(peripherals.GPIO0, up_pull));
     let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));
     let mut start_btn = Debounce::new(Input::new(peripherals.GPIO4, up_pull));
@@ -86,6 +84,14 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let mut y_btn = Debounce::new(Input::new(peripherals.GPIO16, up_pull));
     let mut a_btn = Debounce::new(Input::new(peripherals.GPIO17, up_pull));
     let mut b_btn = Debounce::new(Input::new(peripherals.GPIO18, up_pull));
+    
+    let mut speaker = Speaker::new(
+        peripherals.I2S0,
+        peripherals.GPIO6,
+        peripherals.GPIO5,
+        peripherals.GPIO7,
+        peripherals.DMA_CH1,
+    )?;
     
     let display = Display::new(
         peripherals.SPI2,
@@ -108,12 +114,17 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     loop {
         Timer::after(Duration::from_millis(10)).await;
         
-        if select_btn.falling_edge() { info!("select_btn"); }
-        if start_btn.falling_edge() { info!("start_btn"); }
+        if dbg_btn.falling_edge() { perf::dump_perf(); }
         if x_btn.falling_edge() { info!("x_btn"); }
         if y_btn.falling_edge() { info!("y_btn"); }
         if a_btn.falling_edge() { info!("a_btn"); }
         if b_btn.falling_edge() { info!("b_btn"); }
-        if dbg_btn.falling_edge() { perf::dump_perf(); }
+        if select_btn.falling_edge() { info!("select_btn"); }
+        if start_btn.falling_edge() {
+            info!("start_btn");
+            
+            speaker.play(&*KUTASAN).await?;
+            speaker.reset().await?;
+        }
     }
 }

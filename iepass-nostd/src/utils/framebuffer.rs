@@ -31,6 +31,7 @@ pub struct Framebuffer {
 	pub seq: usize,
 }
 
+#[allow(dead_code)]
 impl Framebuffer {
 	pub fn new(descs: &'static mut [[DmaDescriptor; CHUNKS]; TRANSFERS],
 	           buffer: &'static mut [u8; BUFFER_SIZE],
