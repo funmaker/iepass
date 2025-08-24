@@ -11,7 +11,7 @@ use esp_hal::{dma_tx_buffer};
 const BUFFER_SIZE: usize = 32736;
 
 pub struct Speaker<'d> {
-	transfer: I2sWriteDmaTransferAsync<'d, &'static mut [u8]>,
+	pub transfer: I2sWriteDmaTransferAsync<'d, &'static mut [u8]>,
 }
 
 impl<'d> Speaker<'d> {

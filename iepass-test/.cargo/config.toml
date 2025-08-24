@@ -1,5 +1,5 @@
 [target.xtensa-esp32s3-none-elf]
-runner = "rust-script ../scripts/perf_probe_rs run --chip=esp32s3 --preverify --always-print-stacktrace --no-location --catch-hardfault"
+runner = "probe-rs run --chip=esp32s3 --preverify --always-print-stacktrace --no-location --catch-hardfault"
 
 [env]
 DEFMT_LOG="info"

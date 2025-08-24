@@ -2605,14 +2605,23 @@ dependencies = [
 name = "iepass"
 version = "0.1.0"
 dependencies = [
- "bitflags 1.3.2",
+ "anyhow",
+ "defmt 1.0.1",
+ "embassy-executor",
+ "embassy-sync 0.6.2",
+ "embassy-time",
+ "embedded-hal-async",
  "embedded-io",
- "embuild",
- "esp-idf-svc",
- "iepass-core",
- "log",
- "st7735-lcd",
- "thiserror 2.0.12",
+ "embedded-test",
+ "esp-alloc",
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-hal-embassy",
+ "panic-rtt-target",
+ "pin-project",
+ "ringbuffer",
+ "rtt-target",
+ "static_cell",
 ]
 
 [[package]]
@@ -2647,28 +2656,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "iepass-nostd"
+name = "iepass-test"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "defmt 1.0.1",
  "embassy-executor",
- "embassy-futures",
- "embassy-sync 0.6.2",
- "embassy-time",
- "embedded-hal-async",
- "embedded-io",
- "embedded-test",
  "esp-alloc",
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-hal-embassy",
- "micromath",
  "panic-rtt-target",
- "pin-project",
- "ringbuffer",
  "rtt-target",
- "static_cell",
 ]
 
 [[package]]
@@ -2928,12 +2926,6 @@ checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
 ]
-
-[[package]]
-name = "micromath"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3c8dda44ff03a2f238717214da50f65d5a53b45cd213a7370424ffdb6fae815"
 
 [[package]]
 name = "minimal-lexical"

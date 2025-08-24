@@ -1,0 +1,22 @@
+[package]
+name          = "iepass-test"
+version       = "0.1.0"
+authors       = ["Fun Maker <funmaker95@gmail.com>"]
+edition       = "2024"
+resolver      = "3"
+rust-version  = "1.88.0"
+
+[[bin]]
+name = "iepass-test"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+defmt = { workspace = true }
+esp-bootloader-esp-idf = { workspace = true }
+esp-alloc = { workspace = true }
+esp-hal = { workspace = true }
+esp-hal-embassy = { workspace = true }
+embassy-executor = { workspace = true }
+rtt-target = { workspace = true }
+panic-rtt-target = { workspace = true }

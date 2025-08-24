@@ -1,14 +1,15 @@
 [package]
-name = "iepass-calib"
-version = "0.1.0"
-authors = ["Fun Maker <funmaker95@gmail.com>"]
-edition = "2024"
-resolver = "3"
-rust-version = "1.88.0"
+name          = "iepass-calib"
+version       = "0.1.0"
+authors       = ["Fun Maker <funmaker95@gmail.com>"]
+edition       = "2024"
+resolver      = "3"
+rust-version  = "1.88.0"
 
 [[bin]]
 name = "iepass-calib"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+path = "src/main.rs"
+test = false
 
 [dependencies]
 log = "0.4"

@@ -13,9 +13,9 @@ IE Pass - The Console The Pass
 1) Install [FFmpeg](https://ffmpeg.org/download.html).
 2) Install cargo dependencies:
     ```bash
-    $ cargo install cargo-make ldproxy espflash
-    $ cargo install espup probe-rs-tools --locked
-    $ espup install --targets=esp32s3
+    cargo install cargo-make ldproxy espflash
+    cargo install espup probe-rs-tools --locked
+    espup install --targets=esp32s3
     ```
 3) Check ESP-IDF [platform specific dependencies](https://docs.espressif.com/projects/rust/book/installation/std-requirements.html). 
 

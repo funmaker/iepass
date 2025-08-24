@@ -1,7 +1,10 @@
 [package]
-name = "iepass-emu"
-version = "0.1.0"
-edition = "2024"
+name          = "iepass-emu"
+version       = "0.1.0"
+authors       = ["Fun Maker <funmaker95@gmail.com>"]
+edition       = "2024"
+resolver      = "3"
+rust-version  = "1.88.0"
 
 [dependencies]
 iepass-core = { workspace = true }

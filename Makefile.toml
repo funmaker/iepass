@@ -17,7 +17,7 @@ script = { file = "./scripts/rle_decode.rs" }
 [tasks.test]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "iepass-nostd", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "flash-test", "${@}"]
 
 
 # Running
@@ -34,16 +34,16 @@ env.RUSTUP_TOOLCHAIN = "esp"
 command = "cargo"
 args = ["run", "${@}"]
 
-[tasks.flash-nostd]
+[tasks.flash-calib]
 dependencies = ["build-assets"]
-cwd = "./iepass-nostd"
+cwd = "./iepass-calib"
 env.RUSTUP_TOOLCHAIN = "esp"
 command = "cargo"
 args = ["run", "${@}"]
 
-[tasks.flash-calib]
+[tasks.flash-test]
 dependencies = ["build-assets"]
-cwd = "./iepass-calib"
+cwd = "./iepass-test"
 env.RUSTUP_TOOLCHAIN = "esp"
 command = "cargo"
 args = ["run", "${@}"]
