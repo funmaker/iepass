@@ -6,7 +6,6 @@ pub mod memory;
 pub mod palette;
 pub mod env;
 
-use memory::Memory;
 use env::Env;
 
 pub struct Pico8VM {
@@ -59,7 +58,7 @@ impl Pico8VM {
 							
 							match executor.mode() {
 								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
-								ExecutorMode::Stopped => println!("{value:?}"),
+								ExecutorMode::Stopped => println!("Execution stopped. {value:?}"),
 								mode => panic!("Unexpected executor mode: {mode:?}"),
 							}
 							
@@ -118,6 +117,72 @@ impl Pico8VM {
 				for (pos, byte) in bytes.into_iter().enumerate() {
 					env.memory[addr as usize + pos] = byte;
 				}
+			}))?;
+			
+			// GFX
+			let env = self.env.clone();
+			ctx.set_global("camera", callback("camera", ctx, move |_, (x, y): (Option<u32>, Option<u32>)| {
+				let mut env = env.borrow_mut();
+				let old = (env.memory.read_u16_le(0x5f28), env.memory.read_u16_le(0x5f2a));
+				env.memory.write_u16_le(0x5f28, x.unwrap_or(0) as u16);
+				env.memory.write_u16_le(0x5f2a, y.unwrap_or(0) as u16);
+				old
+			}))?;
+			
+			let env = self.env.clone();
+			ctx.set_global("color", callback("color", ctx, move |_, val: Option<u32>| {
+				let mut env = env.borrow_mut();
+				let old = env.memory[0x5f25];
+				if let Some(val) = val { env.memory[0x5f25] = val as u8; }
+				old
+			}))?;
+			
+			let env = self.env.clone();
+			ctx.set_global("clip", callback("clip", ctx, move |_, (x, y, w, h, clip_previous): (Option<u8>, Option<u8>, Option<u8>, Option<u8>, Option<bool>)| {
+				let mut env = env.borrow_mut();
+				let [x_begin_old, y_begin_old, x_end_old, y_end_old] = env.memory[0x5f20..=0x5f23] else { panic!("todo") };
+				
+				if let Some(x) = x && let Some(y) = y && let Some(w) = w && let Some(h) = h {
+					let mut x_begin = x;
+					let mut y_begin = y;
+					let mut x_end = x + w;
+					let mut y_end = y + h;
+					
+					if clip_previous.unwrap_or(false) {
+						if x_begin < x_begin_old { x_begin = x_begin_old; }
+						if y_begin < y_begin_old { y_begin = y_begin_old; }
+						if x_end > x_end_old { x_end = x_end_old; }
+						if y_end > y_end_old { y_end = y_end_old; }
+					}
+					
+					if x_end > 128 { x_end = 128; }
+					if y_end > 128 { y_end = 128; }
+					
+					env.memory[0x5f20] = x_begin;
+					env.memory[0x5f21] = y_begin;
+					env.memory[0x5f22] = x_end;
+					env.memory[0x5f23] = y_end;
+				}else{
+					env.memory[0x5f20] = 0;
+					env.memory[0x5f21] = 0;
+					env.memory[0x5f22] = 128;
+					env.memory[0x5f23] = 128;
+				}
+				
+				(x_begin_old, y_begin_old, x_end_old, y_end_old)
+			}))?;
+			
+			let env = self.env.clone();
+			ctx.set_global("pal", callback("pal", ctx, move |_, (c0, c1, p): (u8, u8, Option<u8>)| {
+				let mut env = env.borrow_mut();
+				let p = p.unwrap_or(0);
+				let base_addr = match p {
+					0 => 0x5f00,
+					1 => 0x5f10,
+					_ => panic!("Invalid palette"),
+				};
+				// todo table args
+				
 			}))?;
 			
 			Ok(())

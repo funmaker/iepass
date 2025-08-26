@@ -18,6 +18,8 @@ impl Memory {
 		self.inner[0x5F55] = 0x60; // default screen mapping
 		self.inner[0x5F56] = 0x20; // default map mapping
 		self.inner[0x5F57] = 128; // default map size
+		self.inner[0x5f22] = 128; // default clip x_end
+		self.inner[0x5f23] = 128; // default clip y_end
 	}
 	
 	pub fn screen(&mut self) -> MemoryScreen<'_> {
@@ -38,6 +40,19 @@ impl Memory {
 	}
 	pub fn base_addr_map(&self) -> u16 {
 		(self.inner[0x5F56] as u16).wrapping_shl(8)
+	}
+	
+	pub fn read_u16_le(&self, addr: u16) -> u16 {
+		assert!(addr < 0xffff, "Address out of bounds");
+		let addr = addr as usize;
+		((self.inner[addr] as u16) << 8) | self.inner[addr + 1] as u16
+	}
+	
+	pub fn write_u16_le(&mut self, addr: u16, val: u16) {
+		assert!(addr < 0xffff, "Address out of bounds");
+		let addr = addr as usize;
+		self.inner[addr] = (val >> 8) as u8;
+		self.inner[addr + 1] = val as u8;
 	}
 }
 
