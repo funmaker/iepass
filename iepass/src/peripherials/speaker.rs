@@ -1,7 +1,7 @@
 use core::error::Error;
 use anyhow::{anyhow, Result};
 use esp_hal::i2s::master::asynch::I2sWriteDmaTransferAsync;
-use esp_hal::i2s::master::{DataFormat, I2s, Instance, Standard};
+use esp_hal::i2s::master::{DataFormat, I2s, Instance, Config, Channels};
 use esp_hal::i2s::AnyI2s;
 use esp_hal::time::Rate;
 use esp_hal::gpio::OutputPin;
@@ -26,13 +26,15 @@ impl<'d> Speaker<'d> {
 		
 		let i2s = I2s::new(
 			i2s,
-			Standard::Philips,
-			DataFormat::Data16Channel16,
-			Rate::from_hz(44100 / 2),
 			dma_channel,
+			Config::new_tdm_philips()
+				.with_sample_rate(Rate::from_hz(44100))
+				.with_channels(Channels::MONO)
+				.with_data_format(DataFormat::Data16Channel16)
 		);
 		
 		let transfer = i2s
+			.unwrap()
 			.into_async()
 			.i2s_tx
 			.with_bclk(blck)

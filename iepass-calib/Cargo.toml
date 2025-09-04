@@ -7,18 +7,22 @@ resolver      = "3"
 rust-version  = "1.88.0"
 
 [[bin]]
-name = "iepass-calib"
+name = "iepass-test"
 path = "src/main.rs"
 test = false
 
 [dependencies]
-log = "0.4"
-esp-idf-svc = "0.51"
-st7735-lcd = "0.10.0"
-thiserror = "2.0.12"
-iepass-core = { workspace = true }
-iepass = { workspace = true }
+anyhow = { workspace = true }
+defmt = { workspace = true }
+esp-bootloader-esp-idf = { workspace = true }
+esp-alloc = { workspace = true }
+esp-hal = { workspace = true }
+esp-hal-embassy = { workspace = true }
+embassy-executor = { workspace = true }
+embassy-time = { workspace = true }
 embedded-io = { workspace = true }
-
-[build-dependencies]
-embuild = "0.33"
+embedded-hal-async = { workspace = true }
+rtt-target = { workspace = true }
+panic-rtt-target = { workspace = true }
+iepass = { workspace = true }
+iepass-core = { workspace = true }

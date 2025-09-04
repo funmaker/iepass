@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::ops::{Div, Not};
-use std::rc::Rc;
 use crate::pico8::memory::Memory;
 
 pub struct Env {
@@ -39,6 +37,7 @@ pub struct Buttons {
 	buttons_held_frames: [u8; 8*8],
 }
 
+#[allow(dead_code)]
 impl Buttons {
 	pub fn new() -> Buttons {
 		Self {

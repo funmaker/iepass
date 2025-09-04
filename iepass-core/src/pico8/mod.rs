@@ -173,16 +173,16 @@ impl Pico8VM {
 			}))?;
 			
 			let env = self.env.clone();
-			ctx.set_global("pal", callback("pal", ctx, move |_, (c0, c1, p): (u8, u8, Option<u8>)| {
-				let mut env = env.borrow_mut();
+			ctx.set_global("pal", callback("pal", ctx, move |_, (_c0, _c1, p): (u8, u8, Option<u8>)| -> () {
+				let _env = env.borrow_mut();
 				let p = p.unwrap_or(0);
-				let base_addr = match p {
+				let _base_addr = match p {
 					0 => 0x5f00,
 					1 => 0x5f10,
 					_ => panic!("Invalid palette"),
 				};
 				// todo table args
-				
+				unimplemented!()
 			}))?;
 			
 			Ok(())

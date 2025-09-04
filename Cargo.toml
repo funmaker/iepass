@@ -17,7 +17,7 @@ opt-level        = 's'
 overflow-checks  = false
 
 [workspace.dependencies]
-iepass-core = { path = "./iepass-core" }
+iepass-core = { path = "./iepass-core", default-features = false }
 iepass = { path = "./iepass" }
 
 embedded-io = "0.6.1"
@@ -39,4 +39,14 @@ static_cell = "2.1.1"
 piccolo = "0.3.3"
 
 [patch.crates-io]
-#esp-hal = { path = "../esp-hal/esp-hal" }
+esp-hal                  = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-hal-procmacros       = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-hal-embassy          = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-rom-sys              = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-config               = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-metadata             = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-metadata-generated   = { git = "https://github.com/funmaker/esp-hal.git" }
+esp-riscv-rt             = { git = "https://github.com/funmaker/esp-hal.git" }
+xtensa-lx                = { git = "https://github.com/funmaker/esp-hal.git" }
+xtensa-lx-rt             = { git = "https://github.com/funmaker/esp-hal.git" }
+xtensa-lx-rt-proc-macros = { git = "https://github.com/funmaker/esp-hal.git" }

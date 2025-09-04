@@ -112,7 +112,7 @@ args = ["make", "rle-encode", "assets/${ASSET_NAME}.raw", "assets/${ASSET_NAME}.
 
 [tasks.png-rgb565]
 command = "ffmpeg"
-args = ["-i", "${ASSET_NAME}.png", "-vcodec", "rawvideo", "-f", "rawvideo", "-pix_fmt", "rgb565", "${ASSET_NAME}.raw", "-y"]
+args = ["-i", "${ASSET_NAME}.png", "-vcodec", "rawvideo", "-f", "rawvideo", "-pix_fmt", "rgb565be", "${ASSET_NAME}.raw", "-y"]
 
 [tasks.wav-pcm]
 command = "ffmpeg"
