@@ -1,16 +1,16 @@
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcConfig, AdcPin, Attenuation};
 use esp_hal::Blocking;
 use esp_hal::gpio::AnalogPin;
-use esp_hal::peripherals::ADC2;
+use esp_hal::peripherals::ADC1;
 
 use crate::calib::{Axes, BiRange};
 
 pub struct Analog<'d, PinX, PinY>
 where PinX: AdcChannel,
       PinY: AdcChannel {
-	pub adc: Adc<'d, ADC2<'d>, Blocking>,
-	pub x: AdcPin<PinX, ADC2<'d>>,
-	pub y: AdcPin<PinY, ADC2<'d>>,
+	pub adc: Adc<'d, ADC1<'d>, Blocking>,
+	pub x: AdcPin<PinX, ADC1<'d>>,
+	pub y: AdcPin<PinY, ADC1<'d>>,
 	pub deadzone: u16,
 	pub calib: Axes<BiRange<u16>>,
 }
@@ -19,7 +19,7 @@ impl<'d, PinX, PinY> Analog<'d, PinX, PinY>
 where PinX: AnalogPin + AdcChannel + 'd,
       PinY: AnalogPin + AdcChannel + 'd {
 	pub fn new(
-		adc: ADC2<'d>,
+		adc: ADC1<'d>,
 		x: PinX,
 		y: PinY,
 		deadzone: u16,
@@ -40,8 +40,8 @@ where PinX: AnalogPin + AdcChannel + 'd,
 	}
 	
 	pub fn read_raw(&mut self) -> (u16, u16) {
-		let x = self.adc.read_blocking(&mut self.x);
-		let y = self.adc.read_blocking(&mut self.y);
+		let x = nb::block!(self.adc.read_oneshot(&mut self.x)).unwrap();
+		let y = nb::block!(self.adc.read_oneshot(&mut self.y)).unwrap();
 		
 		(x, y)
 	}

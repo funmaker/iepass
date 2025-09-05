@@ -32,6 +32,38 @@ const SCR_WIDTH: u16 = 160;
 const SCR_HEIGHT: u16 = 128;
 const ANALOG_SIZE: i16 = 50;
 
+// == Sound ==
+//    LRC:  5
+//   RCLK:  6
+//    DIN:  7
+// == Analog ==
+//      X:  8
+//      Y:  9
+//    BTN:  3
+// == Screen ==
+//    RST: 10
+//    SDA: 11
+//    CLK: 12
+//    A0:  13
+// == Buttons ==
+//  Start:  4
+// Select: 14
+//      X: 15
+//      Y: 16
+//      A: 17
+//      B: 18
+// == SD Card ==
+//   MOSI: 35
+//    CLK: 36
+//   MISO: 37
+//     CS: 38
+// == Touch ==
+//   MOSI: 35
+//    CLK: 36
+//   MISO: 37
+//    IQR: 39
+//     CS: 40
+
 extern crate alloc;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -71,12 +103,13 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	let mut b_btn = Debounce::new(Input::new(peripherals.GPIO18, up_pull));
 	
 	let mut analog = Analog::new(
-		peripherals.ADC2,
-		peripherals.GPIO19,
-		peripherals.GPIO20,
+		peripherals.ADC1,
+		peripherals.GPIO8,
+		peripherals.GPIO9,
 		calib.analog_deadzone,
 		calib.analog,
 	);
+	let mut analog_btn = Debounce::new(Input::new(peripherals.GPIO3, up_pull));
 	
 	let mut speaker = Speaker::new(
 		peripherals.I2S0,
