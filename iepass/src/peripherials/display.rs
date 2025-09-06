@@ -58,7 +58,40 @@ impl<'d, D: DelayNs> Display<'d, D> {
 		Ok(display)
 	}
 	
-	pub async fn init(&mut self, calib: Axes<u16>) -> Result<()> {
+	pub fn set_calib(&mut self, calib: Axes<u16>) -> Result<()> {
+		// Frame set up
+		self.write_command(Instruction::CASET, &[calib.x.to_be_bytes(), (calib.x + WIDTH  - 1).to_be_bytes()].as_flattened())?;
+		self.write_command(Instruction::RASET, &[calib.y.to_be_bytes(), (calib.y + HEIGHT - 1).to_be_bytes()].as_flattened())?;
+		
+		Ok(())
+	}
+	
+	pub async fn draw_async(&mut self, fb: &mut Framebuffer) -> Result<()> {
+		sync_perf("SPI CMD", || self.write_command(Instruction::RAMWR, &[]))?;
+		
+		self.a0.set_high();
+		
+		for chunk in fb.transfers() {
+			let spi = self.spi.take().unwrap();
+			
+			match spi.write(chunk.len(), chunk) {
+				Ok(mut transfer) => {
+					transfer.wait_for_done().await;
+					let (spi, _) = transfer.wait();
+					self.spi = Some(spi);
+				}
+				Err((err, spi, _)) => {
+					self.spi = Some(spi);
+					
+					bail!("{:?}", err);
+				}
+			}
+		}
+		
+		Ok(())
+	}
+	
+	async fn init(&mut self, calib: Axes<u16>) -> Result<()> {
 		// Hard reset
 		self.rst.set_high();
 		self.delay.delay_ms(10).await;
@@ -86,10 +119,7 @@ impl<'d, D: DelayNs> Display<'d, D> {
 		self.write_command(Instruction::COLMOD, &[0x05])?;
 		self.write_command(Instruction::DISPON, &[])?;
 		self.delay.delay_ms(200).await;
-		
-		// Frame set up
-		self.write_command(Instruction::CASET, &[calib.x.to_be_bytes(), (calib.x + WIDTH  - 1).to_be_bytes()].as_flattened())?;
-		self.write_command(Instruction::RASET, &[calib.y.to_be_bytes(), (calib.y + HEIGHT - 1).to_be_bytes()].as_flattened())?;
+		self.set_calib(calib)?;
 		
 		Ok(())
 	}
@@ -126,31 +156,6 @@ impl<'d, D: DelayNs> Display<'d, D> {
 				bail!("{:?}", err)
 			}
 		}
-	}
-	
-	pub async fn draw_async(&mut self, fb: &mut Framebuffer) -> Result<()> {
-		sync_perf("SPI CMD", || self.write_command(Instruction::RAMWR, &[]))?;
-		
-		self.a0.set_high();
-		
-		for chunk in fb.transfers() {
-			let spi = self.spi.take().unwrap();
-			
-			match spi.write(chunk.len(), chunk) {
-				Ok(mut transfer) => {
-					transfer.wait_for_done().await;
-					let (spi, _) = transfer.wait();
-					self.spi = Some(spi);
-				}
-				Err((err, spi, _)) => {
-					self.spi = Some(spi);
-					
-					bail!("{:?}", err);
-				}
-			}
-		}
-		
-		Ok(())
 	}
 }
 
@@ -265,53 +270,3 @@ pub enum Instruction {
 	/// VCOM 4 level control
 	VCOM4L    = 0xFF,
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

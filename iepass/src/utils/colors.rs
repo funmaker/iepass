@@ -22,6 +22,10 @@ impl Color {
 		)
 	}
 	
+	pub fn from_raw(inner: u16) -> Self {
+		Self(inner)
+	}
+	
 	pub fn rgb(&self) -> (u8, u8, u8) {
 		(
 			(self.0 >> 8) as u8 & 0b1111_1000,

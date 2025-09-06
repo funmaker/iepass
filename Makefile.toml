@@ -17,7 +17,7 @@ script = { file = "./scripts/rle_decode.rs" }
 [tasks.test]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "flash-test", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "iepass-test", "${@}"]
 
 
 # Running
@@ -53,7 +53,7 @@ args = ["run", "${@}"]
 [tasks.build]
 dependencies = ["build-assets", "build-iepass", "build-calib"]
 command = "cargo"
-args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
+args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "iepass-test", "${@}"]
 
 [tasks.build-assets]
 cwd = "./assets"

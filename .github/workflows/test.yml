@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - "../../README.md"
+      - "**/README.md"
   pull_request:
   workflow_dispatch:
 
@@ -20,23 +20,21 @@ jobs:
     steps:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
-      - name: 🛢 Cache
-        uses: actions/cache@v4
+      - name: 📥 Setup Rust
+        uses: esp-rs/xtensa-toolchain@v1.5
         with:
-          path: |
-            ~/.cargo
-            ~/.rustup
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: 🎥 FFmpeg Setup
-        uses: FedericoCarboni/setup-ffmpeg@v3
+          default: true
+          buildtargets: esp32s3
+          ldproxy: false
       - name: 📥 Install Dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev
           rustup override set nightly
-          cargo install cargo-make ldproxy espflash
-          cargo install espup --locked
-          espup install --targets=esp32s3
+          cargo install cargo-make
+      - name: 🎥 FFmpeg Setup
+        uses: FedericoCarboni/setup-ffmpeg@v3
+      - name: 🛢 Cache
+        uses: Swatinem/rust-cache@v2
       - name: 🔨 Build project
         run: cargo make build
       - name: 🧪 Run tests

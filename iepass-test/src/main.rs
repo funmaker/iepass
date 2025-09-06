@@ -11,7 +11,7 @@ use defmt::info;
 use embassy_executor::Spawner;
 use esp_hal::clock::CpuClock;
 use esp_hal::dma_tx_buffer;
-use esp_hal::i2s::master::{DataFormat, I2s, Standard};
+use esp_hal::i2s::master::{Channels, Config, I2s};
 use esp_hal::time::Rate;
 use esp_hal::timer::systimer::SystemTimer;
 
@@ -41,8 +41,7 @@ async fn main(_spawner: Spawner) {
         0b_0000_0000_0000_0010,
         0b_0000_0000_0000_0100,
         0b_0000_0000_0000_1000,
-        0b_0000_0000_1111_0000,
-        0b_0000_1111_0000_0000,
+        0b_0000_1111_1111_0000,
         0b_0001_0000_0000_0000,
         0b_0011_0000_0000_0000,
         0b_0111_0000_0000_0000,
@@ -60,13 +59,14 @@ async fn main(_spawner: Spawner) {
     
     let i2s = I2s::new(
         peripherals.I2S0,
-        Standard::Philips,
-        DataFormat::Data16Channel16,
-        Rate::from_hz(44100 / 2),
         peripherals.DMA_CH1,
+        Config::new_tdm_philips()
+            .with_sample_rate(Rate::from_hz(44100))
+            .with_channels(Channels::STEREO),
     );
     
     let mut transfer = i2s
+        .unwrap()
         .into_async()
         .i2s_tx
         .with_bclk(peripherals.GPIO6)

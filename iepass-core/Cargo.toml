@@ -8,11 +8,11 @@ rust-version  = "1.88.0"
 
 [features]
 default = ["std"]
-std = ["embedded-io/std"]
+std = ["embedded-io/std", "dep:piccolo"]
 
 [dependencies]
 embedded-io = { workspace = true }
-piccolo = { workspace = true }
+piccolo = { workspace = true, optional = true }
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }

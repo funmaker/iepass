@@ -55,24 +55,48 @@ impl Framebuffer {
 		Self { descs, buffer, seq }
 	}
 	
-	pub fn fill(&mut self, color: Color) {
+	pub fn as_raw_pixels(&mut self) -> &mut [[u8; 2]] {
 		self.buffer
-			.as_chunks_mut()
-			.0
+		    .as_chunks_mut()
+		    .0
+	}
+	
+	pub fn fill(&mut self, color: Color) {
+		self.as_raw_pixels()
 			.fill(color.as_u16().to_be_bytes());
 	}
 	
 	pub fn fill_line(&mut self, offset: u16, len: u16, color: Color) {
-		self.buffer
-		    .as_chunks_mut()
-		    .0[offset as usize .. offset as usize + len as usize]
+		self.as_raw_pixels()[offset as usize .. offset as usize + len as usize]
 		    .fill(color.as_u16().to_be_bytes());
 	}
 	
+	pub fn fill_iter(&mut self, iter: impl Iterator<Item = Color>) {
+		let pixels = self.as_raw_pixels();
+		for (pos, color) in iter.enumerate().take(pixels.len()) {
+			pixels[pos] = color.as_u16().to_be_bytes();
+		}
+	}
+	
 	pub fn set(&mut self, offset: u16, color: Color) {
-		self.buffer
-		    .as_chunks_mut()
-		    .0[offset as usize] = color.as_u16().to_be_bytes();
+		self.as_raw_pixels()[offset as usize] = color.as_u16().to_be_bytes();
+	}
+	
+	pub fn draw_rect(&mut self, filled: bool, x: u16, y: u16, w: u16, h: u16, color: Color) {
+		let pixels = self.as_raw_pixels();
+		let x = x.min(WIDTH);
+		let y = y.min(HEIGHT);
+		let w = w.min(WIDTH - x);
+		let h = h.min(HEIGHT - y);
+		
+		for row in y..(y + h) {
+			if filled || (row == y) || (row == y + h - 1) {
+				pixels[(row * WIDTH + x) as usize..(row * WIDTH + x + w) as usize].fill(color.as_u16().to_be_bytes());
+			} else {
+				pixels[(row * WIDTH + x) as usize] = color.as_u16().to_be_bytes();
+				pixels[(row * WIDTH + x + w - 1) as usize] = color.as_u16().to_be_bytes();
+			}
+		}
 	}
 	
 	pub fn transfers(&mut self) -> impl Iterator<Item = FramebufferTransfer<'_>> {
@@ -119,6 +143,7 @@ impl<'a> FramebufferTransfer<'a> {
 
 unsafe impl<'a> DmaTxBuffer for FramebufferTransfer<'a> {
 	type View = Self;
+	type Final = Self;
 	
 	fn prepare(&mut self) -> Preparation {
 		Preparation {
@@ -195,7 +220,12 @@ impl<'a> FramebufferProducer<'a> {
 	}
 }
 
+#[macro_export]
 macro_rules! static_framebuffer {
+	() => ({
+		let mut _seq = 0;
+		static_framebuffer!(_seq)
+	});
     ($seq:ident) => {{
 	    use esp_hal::dma::DmaDescriptor;
 	    use core::sync::atomic::Ordering;
@@ -216,4 +246,4 @@ macro_rules! static_framebuffer {
     }};
 }
 
-pub(crate) use static_framebuffer;
+pub use static_framebuffer;
