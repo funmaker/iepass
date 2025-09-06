@@ -4,6 +4,7 @@ use std::rc::Rc;
 use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic, MetaMethod, meta_ops, Sequence, Execution, Stack, SequencePoll, Error, BoxSequence};
 use piccolo::meta_ops::MetaResult;
 use piccolo::table::NextValue;
+use gc_arena::Collect;
 
 pub mod memory;
 pub mod palette;
@@ -198,8 +199,129 @@ impl Pico8VM {
 				}
 			}))?;
 			
+			
+			// Table
+			
+			ctx.set_global("pack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let t = Table::new(&ctx);
+				for i in 0..stack.len() {
+					t.set(ctx, i as i64 + 1, stack[i]).unwrap();
+				}
+				t.set(ctx, "n", stack.len() as i64).unwrap();
+				stack.replace(ctx, t);
+				Ok(CallbackReturn::Return)
+			}))?;
+			
+			ctx.set_global("unpack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let (table, start, end): (Table, Option<i64>, Option<i64>) =
+					stack.consume(ctx)?;
+				let start = start.unwrap_or(1);
+				let end = end.unwrap_or_else(|| table.length());
+				
+				if start <= end {
+					stack.resize((end - start + 1) as usize);
+					for i in start..=end {
+						stack[(i - start) as usize] = table.get_value(i.into());
+					}
+				}
+				
+				Ok(CallbackReturn::Return)
+			}))?;
+			
+			fn next<'gc>(
+				ctx: Context<'gc>,
+				table: Table<'gc>,
+				index: Value<'gc>,
+			) -> Result<(Value<'gc>, Value<'gc>), Value<'gc>> {
+				match table.next(index) {
+					NextValue::Found { key, value } => Ok((key, value)),
+					NextValue::Last => Ok((Value::Nil, Value::Nil)),
+					NextValue::NotFound => Err("invalid table key".into_value(ctx)),
+				}
+			}
+			
+			let next = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let (table, index): (Table, Value) = stack.consume(ctx)?;
+				stack.replace(ctx, next(ctx, table, index)?);
+				Ok(CallbackReturn::Return)
+			});
+			
+			ctx.set_global("next", next)?;
+			
+			ctx.set_global(
+				"pairs",
+				Callback::from_fn_with(&ctx, next, move |next, ctx, _, mut stack| {
+					let table = stack.get(0);
+					if let Some(mt) = match table {
+						Value::Table(t) => t.metatable(),
+						Value::UserData(u) => u.metatable(),
+						_ => None,
+					} {
+						let pairs = mt.get(ctx, MetaMethod::Pairs);
+						if !pairs.is_nil() {
+							let function = meta_ops::call(ctx, pairs)?;
+							stack.replace(ctx, (table, Value::Nil));
+							return Ok(CallbackReturn::Call {
+								function,
+								then: None,
+							});
+						}
+					}
+					
+					stack.replace(ctx, (*next, table));
+					Ok(CallbackReturn::Return)
+				}),
+			)?;
+			
+			let inext = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let (table, index): (Value, Option<i64>) = stack.consume(ctx)?;
+				let next_index = index.unwrap_or(0) + 1;
+				Ok(match meta_ops::index(ctx, table, next_index.into())? {
+					MetaResult::Value(v) => {
+						if !v.is_nil() {
+							stack.extend([next_index.into(), v]);
+						}
+						CallbackReturn::Return
+					}
+					MetaResult::Call(call) => {
+						#[derive(Collect)]
+						#[collect(require_static)]
+						struct INext(i64);
+						
+						impl<'gc> Sequence<'gc> for INext {
+							fn poll(
+								&mut self,
+								_ctx: Context<'gc>,
+								_exec: Execution<'gc, '_>,
+								mut stack: Stack<'gc, '_>,
+							) -> Result<SequencePoll<'gc>, Error<'gc>> {
+								if !stack.get(0).is_nil() {
+									stack.push_front(self.0.into());
+								}
+								Ok(SequencePoll::Return)
+							}
+						}
+						
+						stack.extend(call.args);
+						CallbackReturn::Call {
+							function: call.function,
+							then: Some(BoxSequence::new(&ctx, INext(next_index))),
+						}
+					}
+				})
+			});
+			
+			ctx.set_global(
+				"ipairs",
+				Callback::from_fn_with(&ctx, inext, move |inext, ctx, _, mut stack| {
+					stack.into_front(ctx, *inext);
+					Ok(CallbackReturn::Return)
+				}),
+			)?;
+			
 			Ok(())
 		})?;
+		
 		
 		Ok(())
 	}

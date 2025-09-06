@@ -26,3 +26,28 @@ pal({
     [6] = 10,
 }, 1)
 print_data()
+
+function print2(a, b)
+    printh("a: "..a)
+    printh("b: "..b)
+end
+
+x = pack(1, 2)
+printh("#x: "..#x)
+print2(unpack(x))
+
+tbl = {
+    [1] = "test1",
+    [2] = "test2",
+    [4] = "test4",
+    ["A"] = "testA",
+    ["B"] = "testB",
+}
+
+for k, v in ipairs(tbl) do
+    printh("ipairs " .. k .. ": " .. v)
+end
+
+for k, v in pairs(tbl) do
+    printh("pairs "..k..": "..v)
+end

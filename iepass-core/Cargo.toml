@@ -13,6 +13,7 @@ std = ["embedded-io/std", "dep:piccolo"]
 [dependencies]
 embedded-io = { workspace = true }
 piccolo = { workspace = true, optional = true }
+gc-arena = "0.5.3"
 
 [dev-dependencies]
 embedded-io = { workspace = true, features = ["std"] }
