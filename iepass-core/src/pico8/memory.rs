@@ -20,6 +20,17 @@ impl Memory {
 		self.inner[0x5F57] = 128; // default map size
 		self.inner[0x5f22] = 128; // default clip x_end
 		self.inner[0x5f23] = 128; // default clip y_end
+		
+		for i in 0..16 {
+			self.inner[0x5F00 + i] = i as u8;
+			self.inner[0x5F10 + i] = i as u8;
+		}
+		self.inner[0x5F00] = 0x10; // transparent
+	}
+	
+	pub fn palette(&self, p_idx: u8) -> &[u8; 16] {
+		let base = self.base_addr_palette(p_idx) as usize;
+		self.inner[base..base+16].try_into().unwrap()
 	}
 	
 	pub fn screen(&mut self) -> MemoryScreen<'_> {
@@ -28,6 +39,15 @@ impl Memory {
 			base = 0x6000; // default if custom base would cause to wrap memory
 		}
 		MemoryScreen((&mut self.inner[base.. base+0x2000]).try_into().unwrap())
+	}
+	
+	pub fn base_addr_palette(&self, p_idx: u8) -> u16 {
+		match p_idx {
+			0 => 0x5f00,
+			1 => 0x5f10,
+			2 => 0x5f60,
+			_ => panic!("Invalid palette index: {}", p_idx),
+		}
 	}
 	
 	pub fn base_addr_gfx(&self) -> u16 {

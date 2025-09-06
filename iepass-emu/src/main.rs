@@ -11,6 +11,7 @@ use iepass_core::pico8::Pico8VM;
 mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
+use iepass_core::colors::Color;
 use iepass_core::pico8::palette::PALETTE;
 
 fn main() -> eframe::Result {
@@ -42,16 +43,7 @@ impl EmulatorApp {
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
 		
 		let mut pico8 = Pico8VM::new().unwrap();
-		pico8.load(b"
-			printh(\"Filling\")
-			for off = 0,64*128 do
-			  poke(0x6000 + off, off % 256)
-			  if off % 256 == 255 then
-			    flip()
-			  end
-			end
-			printh(\"Done!\")
-		");
+		pico8.load(include_bytes!("../main.lua"));
 		
 		Self {
 			fb_pool,
@@ -67,17 +59,26 @@ impl eframe::App for EmulatorApp {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		self.pico8.run();
 		
+		let mut env = self.pico8.env();
+		
+		let screen_palette = env.memory.palette(1).clone();
+		
+		let map_color = |color: u8| -> Color {
+			assert!(color < 16);
+			PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
+		};
+		
 		self.fb_tex.set(self.fb_pool.from_iter(
-			self.pico8.env()
-			          .memory
-			          .screen()
-			          .iter()
-			          .map(|byte| [PALETTE[*byte as usize >> 4], PALETTE[*byte as usize & 0x0F]])
-			          .flatten()
-			          .map(|color| {
-				          let (r, g, b) = color.rgb();
-				          Color32::from_rgb(r, g, b)
-			          })
+			env
+		       .memory
+		       .screen()
+		       .iter()
+		       .map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
+		       .flatten()
+		       .map(|color| {
+		           let (r, g, b) = color.rgb();
+		           Color32::from_rgb(r, g, b)
+		       })
 		), FRAMEBUFFER_OPTS);
 		
 		egui::SidePanel::left("framebuffer")
