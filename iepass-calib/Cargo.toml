@@ -22,6 +22,7 @@ embassy-executor = { workspace = true }
 embassy-time = { workspace = true }
 embedded-io = { workspace = true }
 embedded-hal-async = { workspace = true }
+embassy-futures = { workspace = true }
 rtt-target = { workspace = true }
 panic-rtt-target = { workspace = true }
 iepass = { workspace = true }

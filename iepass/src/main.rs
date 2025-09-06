@@ -7,16 +7,15 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
 use esp_hal::clock::CpuClock;
 use esp_hal::timer::systimer::SystemTimer;
 use defmt::info;
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{Input, InputConfig, Pull};
+use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
 use esp_hal::system::CpuControl;
 use panic_rtt_target as _;
 use anyhow::{anyhow, Result};
+use esp_hal::gpio;
 use rtt_target::ChannelMode;
 
 mod calib;
@@ -27,6 +26,7 @@ mod utils;
 use peripherials::{Debounce, Display, Speaker};
 use calib::Calib;
 use utils::{perf, PerfFutureExt};
+use crate::peripherials::{Analog, SpiBus, Touch};
 
 static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
@@ -86,6 +86,32 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let mut a_btn = Debounce::new(Input::new(peripherals.GPIO17, up_pull));
     let mut b_btn = Debounce::new(Input::new(peripherals.GPIO18, up_pull));
     
+    let mut analog = Analog::new(
+        peripherals.ADC1,
+        peripherals.GPIO8,
+        peripherals.GPIO9,
+        calib.analog_deadzone,
+        calib.analog,
+    );
+    let _analog_btn = Debounce::new(Input::new(peripherals.GPIO3, up_pull));
+    
+    let _sd_cs = Output::new(peripherals.GPIO38, Level::High, gpio::OutputConfig::default());
+    
+    let spi_bus = SpiBus::new(
+        peripherals.SPI3,
+        peripherals.GPIO35,
+        peripherals.GPIO36,
+        peripherals.GPIO37,
+        peripherals.DMA_CH2,
+    )?;
+    
+    let mut touch = Touch::new(
+        &spi_bus,
+        peripherals.GPIO40,
+        peripherals.GPIO39,
+        calib.touch,
+    );
+    
     let mut speaker = Speaker::new(
         peripherals.I2S0,
         peripherals.GPIO6,
@@ -113,6 +139,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     info!("Entering main loop.");
     
     loop {
+        if let Some((x, y)) = touch.read(100, 100).await? { info!("Touch: {} {}", x, y); }
         if dbg_btn.falling_edge() { perf::dump_perf(); }
         if x_btn.falling_edge() { info!("x_btn"); }
         if y_btn.falling_edge() { info!("y_btn"); }
@@ -121,6 +148,8 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         if select_btn.falling_edge() { info!("select_btn"); }
         if start_btn.falling_edge() {
             info!("start_btn");
+            
+            info!("{}", analog.read(100));
             
             speaker.play(&*KUTASAN).await?;
             speaker.reset().await?;

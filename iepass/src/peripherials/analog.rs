@@ -8,9 +8,9 @@ use crate::calib::{Axes, BiRange};
 pub struct Analog<'d, PinX, PinY>
 where PinX: AdcChannel,
       PinY: AdcChannel {
-	pub adc: Adc<'d, ADC1<'d>, Blocking>,
-	pub x: AdcPin<PinX, ADC1<'d>>,
-	pub y: AdcPin<PinY, ADC1<'d>>,
+	adc: Adc<'d, ADC1<'d>, Blocking>,
+	x: AdcPin<PinX, ADC1<'d>>,
+	y: AdcPin<PinY, ADC1<'d>>,
 	pub deadzone: u16,
 	pub calib: Axes<BiRange<u16>>,
 }
@@ -37,6 +37,12 @@ where PinX: AnalogPin + AdcChannel + 'd,
 			deadzone,
 			calib,
 		}
+	}
+	
+	#[allow(dead_code)]
+	pub fn apply_calib(&mut self, deadzone: u16, calib: Axes<BiRange<u16>>) {
+		self.deadzone = deadzone;
+		self.calib = calib;
 	}
 	
 	pub fn read_raw(&mut self) -> (u16, u16) {

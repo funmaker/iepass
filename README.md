@@ -17,7 +17,6 @@ IE Pass - The Console The Pass
     cargo install espup probe-rs-tools --locked
     espup install --targets=esp32s3
     ```
-3) Check ESP-IDF [platform specific dependencies](https://docs.espressif.com/projects/rust/book/installation/std-requirements.html). 
 
 ### Build:
 ```bash

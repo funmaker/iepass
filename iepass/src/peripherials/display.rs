@@ -58,7 +58,7 @@ impl<'d, D: DelayNs> Display<'d, D> {
 		Ok(display)
 	}
 	
-	pub fn set_calib(&mut self, calib: Axes<u16>) -> Result<()> {
+	pub fn apply_calib(&mut self, calib: Axes<u16>) -> Result<()> {
 		// Frame set up
 		self.write_command(Instruction::CASET, &[calib.x.to_be_bytes(), (calib.x + WIDTH  - 1).to_be_bytes()].as_flattened())?;
 		self.write_command(Instruction::RASET, &[calib.y.to_be_bytes(), (calib.y + HEIGHT - 1).to_be_bytes()].as_flattened())?;
@@ -119,7 +119,7 @@ impl<'d, D: DelayNs> Display<'d, D> {
 		self.write_command(Instruction::COLMOD, &[0x05])?;
 		self.write_command(Instruction::DISPON, &[])?;
 		self.delay.delay_ms(200).await;
-		self.set_calib(calib)?;
+		self.apply_calib(calib)?;
 		
 		Ok(())
 	}

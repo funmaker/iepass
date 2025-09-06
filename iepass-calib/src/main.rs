@@ -2,20 +2,20 @@
 #![no_main]
 #![deny(
 	clippy::mem_forget,
-	reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
-    holding buffers for the duration of a data transfer."
+	reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer."
 )]
 
 use panic_rtt_target as _;
 use defmt::info;
 use anyhow::Result;
 use embassy_executor::Spawner;
+use embassy_futures::block_on;
 use embedded_hal_async::delay::DelayNs;
 use embedded_io::Read;
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Input, InputConfig, Pull};
+use esp_hal::gpio::{self, Input, Level, Output, Pull};
 use esp_hal::timer::systimer::SystemTimer;
-use iepass::peripherials::{Analog, Debounce, Display, Speaker};
+use iepass::peripherials::{Analog, Debounce, Display, Speaker, SpiBus, Touch};
 use iepass::calib::Calib;
 use iepass::utils::Color;
 use iepass::static_framebuffer;
@@ -94,7 +94,7 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	
 	info!("Initializing peripherals.");
 	
-	let up_pull = InputConfig::default().with_pull(Pull::Up);
+	let up_pull = gpio::InputConfig::default().with_pull(Pull::Up);
 	let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));
 	let mut start_btn = Debounce::new(Input::new(peripherals.GPIO4, up_pull));
 	let mut x_btn = Debounce::new(Input::new(peripherals.GPIO15, up_pull));
@@ -109,7 +109,24 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 		calib.analog_deadzone,
 		calib.analog,
 	);
-	let mut analog_btn = Debounce::new(Input::new(peripherals.GPIO3, up_pull));
+	let _analog_btn = Debounce::new(Input::new(peripherals.GPIO3, up_pull));
+	
+	let _sd_cs = Output::new(peripherals.GPIO38, Level::High, gpio::OutputConfig::default());
+	
+	let spi_bus = SpiBus::new(
+		peripherals.SPI3,
+		peripherals.GPIO35,
+		peripherals.GPIO36,
+		peripherals.GPIO37,
+		peripherals.DMA_CH2,
+	)?;
+	
+	let mut touch = Touch::new(
+		&spi_bus,
+		peripherals.GPIO40,
+		peripherals.GPIO39,
+		calib.touch,
+	);
 	
 	let mut speaker = Speaker::new(
 		peripherals.I2S0,
@@ -146,7 +163,7 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 		if x_btn.falling_edge() { calib.screen_offset.x = calib.screen_offset.x.saturating_sub(1); }
 		if y_btn.falling_edge() { calib.screen_offset.y = calib.screen_offset.y.saturating_sub(1); }
 	
-		display.set_calib(calib.screen_offset)?;
+		display.apply_calib(calib.screen_offset)?;
 		display.draw_async(&mut framebuffer).await?;
 	
 		if start_btn.falling_edge() {
@@ -180,17 +197,17 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	info!("Press START to accept.");
 	loop {
 		embassy_time::Delay.delay_ms(10).await;
-	
+		
 		let (x, y) = analog.read_raw();
-	
+		
 		calib.analog.x.min = calib.analog.x.min.min(x.saturating_add(analog.deadzone / 2));
 		calib.analog.x.max = calib.analog.x.max.max(x.saturating_sub(analog.deadzone / 2));
 		calib.analog.y.min = calib.analog.y.min.min(y.saturating_add(analog.deadzone / 2));
 		calib.analog.y.max = calib.analog.y.max.max(y.saturating_sub(analog.deadzone / 2));
 		analog.calib = calib.analog;
-	
+		
 		let (x, y) = analog.rescale(x, y, ANALOG_SIZE - 2);
-	
+		
 		framebuffer.fill_iter(pixels(CALIB_BG3));
 		framebuffer.draw_rect(
 			true,
@@ -201,7 +218,7 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 			Color::RED
 		);
 		display.draw_async(&mut framebuffer).await?;
-	
+		
 		if select_btn.falling_edge() {
 			calib.analog.x.min = calib.analog.x.mid.saturating_sub(calib.analog_deadzone);
 			calib.analog.x.max = calib.analog.x.mid.saturating_add(calib.analog_deadzone);
@@ -215,77 +232,71 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 			break;
 		}
 	}
-	// 
-	// let mut measurements = [
-	// 	((0, 0), (32, 32)),
-	// 	((0, 0), (SCR_WIDTH - 32, 32)),
-	// 	((0, 0), (SCR_WIDTH - 32, SCR_HEIGHT - 32)),
-	// 	((0, 0), (32, SCR_HEIGHT - 32)),
-	// ];
-	// 
-	// 'outer: loop {
-	// 	info!("Calibrating touch screen. Press targets using pen.");
-	// 	info!("Press SELECT to reset.");
-	// 
-	// 	for &mut (ref mut measurement, (x, y)) in measurements.iter_mut() {
-	// 		framebuffer.clear();
-	// 		framebuffer.extend(pixels(CALIB_BG4));
-	// 		draw_rect(&mut framebuffer, true, x - 4, y - 4, 8, 8, Color::BLACK);
-	// 		display.update(&framebuffer)?;
-	// 
-	// 		loop {
-	// 			embassy_time::Delay.delay_ms(10).await;
-	// 
-	// 			if let Some(value) = measure_option(64, || touch.read_raw())? {
-	// 				*measurement = value;
-	// 				break;
-	// 			}
-	// 
-	// 			if select_btn.falling_edge() {
-	// 				continue 'outer;
-	// 			}
-	// 		}
-	// 
-	// 		while let Some(_) = touch.read_raw()? {
-	// 			embassy_time::Delay.delay_ms(10).await;
-	// 		}
-	// 	}
-	// 
-	// 
-	// 	[calib.touch.x.min, calib.touch.x.max] = fit_map(measurements.iter().map(|(_, (x, _))| *x), measurements.iter().map(|((x, _), _)| *x), [0, SCR_WIDTH]);
-	// 	[calib.touch.y.min, calib.touch.y.max] = fit_map(measurements.iter().map(|(_, (_, y))| *y), measurements.iter().map(|((_, y), _)| *y), [0, SCR_HEIGHT]);
-	// 
-	// 	touch.calib = calib.touch;
-	// 
-	// 	info!("{:?}", measurements);
-	// 	info!("{:?}", [calib.touch.x.min, calib.touch.x.max]);
-	// 	info!("{:?}", [calib.touch.y.min, calib.touch.y.max]);
-	// 	info!("Press START to accept.");
-	// 
-	// 	loop {
-	// 		embassy_time::Delay.delay_ms(10).await;
-	// 
-	// 		framebuffer.clear();
-	// 		framebuffer.extend(pixels(CALIB_BG4));
-	// 
-	// 		if let Some((x, y)) = measure_option(16, || touch.read(SCR_WIDTH, SCR_HEIGHT))? {
-	// 			draw_rect(&mut framebuffer, true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
-	// 		}
-	// 
-	// 		display.update(&framebuffer)?;
-	// 
-	// 		if select_btn.falling_edge() {
-	// 			continue 'outer;
-	// 		}
-	// 
-	// 		if start_btn.falling_edge() {
-	// 			break 'outer;
-	// 		}
-	// 	}
-	// }
-	// 
-	// info!("Generated calibration config:");
-	// info!("{:#?}", calib);
+	
+	let mut measurements = [
+		((0, 0), (32, 32)),
+		((0, 0), (SCR_WIDTH - 32, 32)),
+		((0, 0), (SCR_WIDTH - 32, SCR_HEIGHT - 32)),
+		((0, 0), (32, SCR_HEIGHT - 32)),
+	];
+	
+	'outer: loop {
+		info!("Calibrating touch screen. Press targets using pen.");
+		info!("Press SELECT to reset.");
+		
+		for &mut (ref mut measurement, (x, y)) in measurements.iter_mut() {
+			framebuffer.fill_iter(pixels(CALIB_BG4));
+			framebuffer.draw_rect(true, x - 4, y - 4, 8, 8, Color::BLACK);
+			display.draw_async(&mut framebuffer).await?;
+			
+			loop {
+				embassy_time::Delay.delay_ms(10).await;
+				
+				if let Some(value) = measure_option(64, || block_on(touch.read_raw()))? {
+					*measurement = value;
+					break;
+				}
+				
+				if select_btn.falling_edge() {
+					continue 'outer;
+				}
+			}
+			
+			while let Some(_) = touch.read_raw().await? {
+				embassy_time::Delay.delay_ms(10).await;
+			}
+		}
+		
+		[calib.touch.x.min, calib.touch.x.max] = fit_map(measurements.iter().map(|(_, (x, _))| *x), measurements.iter().map(|((x, _), _)| *x), [0, SCR_WIDTH]);
+		[calib.touch.y.min, calib.touch.y.max] = fit_map(measurements.iter().map(|(_, (_, y))| *y), measurements.iter().map(|((_, y), _)| *y), [0, SCR_HEIGHT]);
+		
+		touch.apply_calib(calib.touch);
+		
+		info!("Press START to accept.");
+		
+		loop {
+			embassy_time::Delay.delay_ms(10).await;
+			
+			framebuffer.fill_iter(pixels(CALIB_BG4));
+			
+			if let Some((x, y)) = measure_option(16, || block_on(touch.read(SCR_WIDTH, SCR_HEIGHT)))? {
+				framebuffer.draw_rect(true, x.saturating_sub(4), y.saturating_sub(4), 8, 8, Color::RED);
+			}
+			
+			display.draw_async(&mut framebuffer).await?;
+			
+			if select_btn.falling_edge() {
+				continue 'outer;
+			}
+			
+			if start_btn.falling_edge() {
+				break 'outer;
+			}
+		}
+	}
+	
+	info!("Generated calibration config:");
+	info!("{:#?}", calib);
 	
 	framebuffer.fill_iter(pixels(CALIB_BG5));
 	display.draw_async(&mut framebuffer).await?;
