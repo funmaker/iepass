@@ -1,6 +1,9 @@
+use std::any::{Any, TypeId};
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic};
+use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic, MetaMethod, meta_ops, Sequence, Execution, Stack, SequencePoll, Error, BoxSequence};
+use piccolo::meta_ops::MetaResult;
+use piccolo::table::NextValue;
 
 pub mod memory;
 pub mod palette;
@@ -76,7 +79,7 @@ impl Pico8VM {
 	}
 	
 	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
-		self.lua.enter(|ctx| {
+		self.lua.enter(|ctx: Context| {
 			// General
 			ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })))?;
 			
@@ -103,11 +106,14 @@ impl Pico8VM {
 			let env = self.env.clone();
 			ctx.set_global("peek", callback("peek", ctx, move |ctx, (addr, n): (u32, Option<u32>)| {
 				let env = env.borrow();
+				let n = n.unwrap_or(1);
+				if n == 1 { return Value::Integer(env.memory[addr as usize] as i64); }
+				
 				let table = Table::new(&ctx);
-				for (pos, byte) in env.memory[addr as usize .. (addr + n.unwrap_or(1)) as usize].iter().enumerate() {
+				for (pos, byte) in env.memory[addr as usize .. (addr + n) as usize].iter().enumerate() {
 					table.set(ctx, pos as u32 + 1, byte).unwrap();
 				}
-				table
+				Value::Table(table)
 			}))?;
 			
 			let env = self.env.clone();
@@ -140,7 +146,7 @@ impl Pico8VM {
 			let env = self.env.clone();
 			ctx.set_global("clip", callback("clip", ctx, move |_, (x, y, w, h, clip_previous): (Option<u8>, Option<u8>, Option<u8>, Option<u8>, Option<bool>)| {
 				let mut env = env.borrow_mut();
-				let [x_begin_old, y_begin_old, x_end_old, y_end_old] = env.memory[0x5f20..=0x5f23] else { panic!("todo") };
+				let [x_begin_old, y_begin_old, x_end_old, y_end_old] = env.memory[0x5f20..=0x5f23].try_into().unwrap();
 				
 				if let Some(x) = x && let Some(y) = y && let Some(w) = w && let Some(h) = h {
 					let mut x_begin = x;
@@ -155,13 +161,10 @@ impl Pico8VM {
 						if y_end > y_end_old { y_end = y_end_old; }
 					}
 					
-					if x_end > 128 { x_end = 128; }
-					if y_end > 128 { y_end = 128; }
-					
 					env.memory[0x5f20] = x_begin;
 					env.memory[0x5f21] = y_begin;
-					env.memory[0x5f22] = x_end;
-					env.memory[0x5f23] = y_end;
+					env.memory[0x5f22] = x_end.min(128);
+					env.memory[0x5f23] = y_end.min(128);
 				}else{
 					env.memory[0x5f20] = 0;
 					env.memory[0x5f21] = 0;
@@ -172,17 +175,27 @@ impl Pico8VM {
 				(x_begin_old, y_begin_old, x_end_old, y_end_old)
 			}))?;
 			
+			
 			let env = self.env.clone();
-			ctx.set_global("pal", callback("pal", ctx, move |_, (_c0, _c1, p): (u8, u8, Option<u8>)| -> () {
-				let _env = env.borrow_mut();
-				let p = p.unwrap_or(0);
-				let _base_addr = match p {
-					0 => 0x5f00,
-					1 => 0x5f10,
-					_ => panic!("Invalid palette"),
-				};
-				// todo table args
-				unimplemented!()
+			ctx.set_global("pal", callback("pal", ctx, move |_, args: Variadic<Vec<Value>>| {
+				let argc = args.len();
+				assert!(argc >= 1 && argc <= 3, "Invalid number of arguments");
+				
+				let mut env = env.borrow_mut();
+				
+				if let Value::Table(t) = args[0] {
+					let base = env.memory.base_addr_palette(if argc > 1 && let Value::Integer(p) = args[1] { p as u8 } else { 0 }) as usize;
+					for (k, v) in t {
+						if let Value::Integer(k) = k && let Value::Integer(v) = v {
+							env.memory[base + (k % 16) as usize] = v as u8;
+						}
+					}
+				}else if let Value::Integer(c0) = args[0] && let Value::Integer(c1) = args[1] {
+					let base = env.memory.base_addr_palette(if argc > 2 && let Value::Integer(p) = args[2] { p as u8 } else { 0 }) as usize;
+					env.memory[base + (c0 % 16) as usize] = c1 as u8;
+				}else{
+					panic!("Invalid arguments");
+				}
 			}))?;
 			
 			Ok(())
