@@ -1,6 +1,7 @@
 #![feature(never_type)]
 #![feature(iter_array_chunks)]
 #![feature(array_chunks)]
+#![feature(generic_const_exprs)]
 #![no_std]
 #![no_main]
 #![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]

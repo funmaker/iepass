@@ -1,7 +1,9 @@
 #![no_std]
+#![allow(incomplete_features)]
 #![feature(never_type)]
 #![feature(iter_array_chunks)]
 #![feature(array_chunks)]
+#![feature(generic_const_exprs)]
 
 extern crate alloc;
 

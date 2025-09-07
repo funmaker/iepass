@@ -41,7 +41,7 @@ impl<'d> Touch<'d> {
 		let [x, y, z1] = self.commands([
 			Command::ADDR_X  | Command::BIT_12 | Command::REF_DIFF | Command::POW_ALL,
 			Command::ADDR_Y  | Command::BIT_12 | Command::REF_DIFF | Command::POW_ALL,
-			Command::ADDR_Z1 | Command::BIT_8  | Command::REF_DIFF | Command::POW_ALL,
+			Command::ADDR_Z1 | Command::BIT_12 | Command::REF_DIFF | Command::POW_ALL,
 		]).await?;
 		
 		if z1 < TOUCH_THRESHOLD {
@@ -60,28 +60,33 @@ impl<'d> Touch<'d> {
 			)))
 	}
 	
-	async fn commands<const N: usize>(&mut self, commands: [Command; N]) -> Result<[u16; N]> {
-		let mut results = [[0; 2]; N];
-		let mut operations: [_; N] = array::from_fn(|_| [Operation::DelayNs(0), Operation::DelayNs(0)]);
+	async fn commands<const N: usize>(&mut self, commands: [Command; N]) -> Result<[u16; N]>
+	where [(); N * 3]: {
+		let mut buffer = [0u8; N * 3];
+		let mut offset = 0;
 		
-		for ([write, read], (command, result)) in operations.iter_mut().zip(commands.iter().zip(results.iter_mut())) {
-			*write = Operation::Write(slice::from_ref(&command.bits));
+		for command in commands {
+			buffer[offset] = command.bits;
 			if command.contains(Command::BIT_8) {
-				*read = Operation::Read(&mut result[0..1])
+				offset += 2;
 			} else {
-				*read = Operation::Read(result)
+				offset += 3;
 			}
 		}
 		
-		self.device.transaction(operations.as_flattened_mut())
-		           .await
-		           .map_err(|err| anyhow!("{err:?}"))?;
+		self.device.transaction(&mut [Operation::TransferInPlace(&mut buffer[0..offset])])
+		    .await
+		    .map_err(|err| anyhow!("{err:?}"))?;
+		
+		offset = 0;
 		
 		Ok(array::from_fn(|pos| {
 			if commands[pos].contains(Command::BIT_8) {
-				results[pos][0] as u16
+				offset += 2;
+				buffer[offset - 1] as u16
 			} else {
-				u16::from_be_bytes(results[pos]) >> 3
+				offset += 3;
+				u16::from_be_bytes([buffer[offset - 2], buffer[offset - 1]]) >> 3
 			}
 		}))
 	}
