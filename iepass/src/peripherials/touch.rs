@@ -1,4 +1,4 @@
-use core::{array, slice};
+use core::array;
 use anyhow::{anyhow, Result};
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
