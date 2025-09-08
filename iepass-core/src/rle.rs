@@ -285,10 +285,10 @@ mod std_impls {
 }
 
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(all(test))]
 mod tests {
 	use super::*;
-	use std::vec::Vec;
+	use alloc::vec;
 	
 	#[test]
 	fn test_encode_decode() {
@@ -307,15 +307,11 @@ mod tests {
 		];
 		
 		for case in cases {
-			println!("case: {case:?}");
-			
-			let mut enc = Encoder::new(Vec::new());
+			let mut enc = Encoder::new(vec![]);
 			enc.write_all(case).unwrap();
 			let encoded = enc.finalize().unwrap();
 			
-			println!("encoded: {encoded:?}");
-			
-			let mut decoded = Vec::new();
+			let mut decoded = vec![];
 			let mut buf = [0; 128];
 			let mut dec = Decoder::new(&*encoded);
 			
@@ -327,8 +323,6 @@ mod tests {
 				decoded.extend_from_slice(&buf[..read]);
 			}
 			
-			println!("decoded: {decoded:?}");
-			
 			assert_eq!(&decoded[..], case);
 		}
 	}
@@ -338,7 +332,7 @@ mod tests {
 		static RAW: &[u8] = include_bytes!("../../assets/calib1.raw");
 		static SMOL: &[u8] = include_bytes!("../../assets/calib1.smol");
 		
-		let mut enc = Encoder::new(Vec::new());
+		let mut enc = Encoder::new(vec![]);
 		enc.write_all(RAW).unwrap();
 		let encoded = enc.finalize().unwrap();
 		
@@ -347,7 +341,7 @@ mod tests {
 		fn pixels(smol: &[u8]) -> impl Iterator<Item = u16> {
 			let mut decoder = Decoder::new(smol);
 			
-			std::iter::from_fn(move || {
+			core::iter::from_fn(move || {
 				let mut value = [0, 0];
 				decoder.read_exact(&mut value)
 				       .ok()

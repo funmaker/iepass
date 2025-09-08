@@ -20,7 +20,7 @@ overflow-checks  = false
 iepass-core = { path = "./iepass-core", default-features = false }
 iepass = { path = "./iepass" }
 
-embedded-io = "0.6.1"
+embedded-io = { version = "0.6.1", features = ["alloc"] }
 embedded-hal-async = "1.0.0"
 defmt = { version = "1.0.1", features = ["alloc"] }
 anyhow = { version = "1.0.98", default-features = false }
