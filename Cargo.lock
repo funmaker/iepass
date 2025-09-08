@@ -2229,20 +2229,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iepass-test"
-version = "0.1.0"
-dependencies = [
- "defmt 1.0.1",
- "embassy-executor 0.9.1",
- "esp-alloc",
- "esp-bootloader-esp-idf",
- "esp-hal",
- "esp-hal-embassy",
- "panic-rtt-target",
- "rtt-target",
-]
-
-[[package]]
 name = "image"
 version = "0.25.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
