@@ -7,7 +7,7 @@ resolver      = "3"
 rust-version  = "1.88.0"
 
 [dependencies]
-iepass-core = { workspace = true, features = ["std"] }
 eframe = "0.32.0"
 egui = "0.32.0"
+iepass-core = { workspace = true, features = ["std"] }
     

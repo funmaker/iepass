@@ -1,4 +1,6 @@
-use std::ops::{Deref, DerefMut};
+use alloc::boxed::Box;
+use alloc::vec;
+use core::ops::{Deref, DerefMut};
 
 pub struct Memory {
 	inner: Box<[u8; 0x10000]>,

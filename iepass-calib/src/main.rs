@@ -15,9 +15,9 @@ use embedded_io::Read;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{self, Input, Level, Output, Pull};
 use esp_hal::timer::systimer::SystemTimer;
+use iepass_core::colors::Color;
 use iepass::peripherials::{Analog, Debounce, Display, Speaker, SpiBus, Touch};
 use iepass::calib::Calib;
-use iepass::utils::Color;
 use iepass::static_framebuffer;
 
 static CALIB_BG1: &[u8] = include_bytes!("../../assets/calib1.smol");

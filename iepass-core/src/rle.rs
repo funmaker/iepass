@@ -285,7 +285,7 @@ mod std_impls {
 }
 
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod tests {
 	use super::*;
 	use std::vec::Vec;

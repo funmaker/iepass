@@ -1,6 +1,9 @@
-#![cfg_attr(all(not(test), not(feature = "std")), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate alloc;
 
+// MUST be the first module
+mod fmt;
 pub mod rle;
 #[cfg(feature = "std")]
 pub mod pico8;

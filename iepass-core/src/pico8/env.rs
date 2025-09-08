@@ -1,4 +1,4 @@
-use std::ops::{Div, Not};
+use core::ops::{Div, Not};
 use crate::pico8::memory::Memory;
 
 pub struct Env {

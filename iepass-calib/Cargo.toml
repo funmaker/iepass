@@ -12,6 +12,8 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+iepass-core = { workspace = true, features = ["defmt"] }
+iepass = { workspace = true }
 anyhow = { workspace = true }
 defmt = { workspace = true }
 esp-bootloader-esp-idf = { workspace = true }
@@ -25,5 +27,3 @@ embedded-hal-async = { workspace = true }
 embassy-futures = { workspace = true }
 rtt-target = { workspace = true }
 panic-rtt-target = { workspace = true }
-iepass = { workspace = true }
-iepass-core = { workspace = true }

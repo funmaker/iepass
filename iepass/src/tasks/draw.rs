@@ -1,7 +1,8 @@
 use anyhow::Result;
+use iepass_core::colors::Color;
 
 use crate::tasks::display::FRAMEBUFFER_MANAGER;
-use crate::utils::{Color, PerfFutureExt};
+use crate::utils::PerfFutureExt;
 
 pub const DRAW_TASKS_MAX: usize = 2;
 

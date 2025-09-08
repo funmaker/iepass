@@ -1,9 +1,9 @@
-use std::any::{Any, TypeId};
-use std::cell::{RefCell, RefMut};
-use std::rc::Rc;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic, MetaMethod, meta_ops, Sequence, Execution, Stack, SequencePoll, Error, BoxSequence};
-use piccolo::meta_ops::MetaResult;
-use piccolo::table::NextValue;
+use core::cell::{RefCell, RefMut};
+use alloc::format;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::vec::Vec;
+use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic};
 
 pub mod memory;
 pub mod palette;
@@ -61,13 +61,13 @@ impl Pico8VM {
 							
 							match executor.mode() {
 								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
-								ExecutorMode::Stopped => println!("Execution stopped. {value:?}"),
-								mode => panic!("Unexpected executor mode: {mode:?}"),
+								ExecutorMode::Stopped => info!("Execution stopped. {:?}", value),
+								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
 							
 							break;
 						},
-						mode => panic!("Unexpected executor mode: {mode:?}"),
+						mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 					}
 				}
 			});
@@ -96,9 +96,9 @@ impl Pico8VM {
 			// Debug
 			ctx.set_global("printh", callback("printh", ctx, |_, (text, filename, _overwrite, _save_to_desktop): (String, Option<String>, Option<bool>, Option<bool>)| {
 				if let Some(filename_str) = filename {
-					println!("[printh/{}] {}", filename_str, text);
+					info!("[printh/{}] {}", filename_str, text);
 				} else {
-					println!("[printh] {}", text);
+					info!("[printh] {}", text);
 				}
 			}))?;
 			
@@ -117,7 +117,7 @@ impl Pico8VM {
 			}))?;
 			
 			let env = self.env.clone();
-			ctx.set_global("poke", callback("poke", ctx, move |_, (addr, mut bytes): (u32, Variadic<Vec<u8>>)| {
+			ctx.set_global("poke", callback("poke", ctx, move |_, (addr, mut bytes): (u32, Variadic<alloc::vec::Vec<u8>>)| {
 				let mut env = env.borrow_mut();
 				if bytes.is_empty() { bytes.push(0) }
 				for (pos, byte) in bytes.into_iter().enumerate() {
@@ -220,6 +220,7 @@ where F: Fn(Context<'gc>, A) -> R + 'static,
 
 #[cfg(test)]
 mod test {
+	use alloc::vec::Vec;
 	use piccolo::{Closure, Executor, StaticValue, Value, Variadic};
 	use crate::pico8::Pico8VM;
 	
@@ -265,6 +266,6 @@ mod test {
 			Ok(statics)
 		}).unwrap();
 		
-		println!("XDD {:?}", res);
+		info!("XDD {:?}", res);
 	}
 }
