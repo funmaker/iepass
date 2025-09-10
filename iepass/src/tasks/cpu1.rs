@@ -6,7 +6,6 @@ use esp_hal_embassy::Executor;
 use anyhow::Result;
 use embassy_time::{Duration, Timer};
 
-use crate::tasks;
 use crate::utils::PerfFutureExt;
 
 pub static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
@@ -27,10 +26,8 @@ async fn cpu1_task(spawner: Spawner) {
 		.expect("Error in the cpu1 task");
 }
 
-async fn try_cpu1(spawner: Spawner) -> Result<!> {
+async fn try_cpu1(_spawner: Spawner) -> Result<!> {
 	info!("Spawning secondary tasks.");
-	
-	spawner.spawn(tasks::draw(false))?;
 	
 	loop {
 		Timer::after(Duration::from_millis(10)).await;

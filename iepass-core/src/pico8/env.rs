@@ -1,18 +1,23 @@
+use core::alloc::Allocator;
 use core::ops::{Div, Not};
-use crate::pico8::memory::Memory;
+use alloc::alloc::Global;
+use alloc::boxed::Box;
 
-pub struct Env {
-	pub cart_memory: [u8; 0x8000],
-	pub memory: Memory,
+use crate::pico8::memory::Memory;
+use crate::utils;
+
+pub struct Env<A: Allocator = Global> {
+	pub cart_memory: Box<[u8; 0x8000], A>,
+	pub memory: Memory<A>,
 	pub buttons: Buttons,
 	pub fps: u8,
 }
 
-impl Env {
-	pub fn new() -> Env {
+impl<A: Allocator + Clone> Env<A> {
+	pub fn new(alloc: A) -> Env<A> {
 		Self {
-			cart_memory: [0; 0x8000],
-			memory: Memory::new(),
+			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
+			memory: Memory::new(alloc),
 			buttons: Buttons::new(),
 			fps: 30,
 		}
@@ -28,7 +33,6 @@ impl Env {
 			self.memory[0x5f4c + i] = buttons[i] & 0x3f;
 		}
 	}
-	
 }
 
 pub struct Buttons {

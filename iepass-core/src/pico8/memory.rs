@@ -1,15 +1,18 @@
-use alloc::boxed::Box;
-use alloc::vec;
+use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
+use alloc::alloc::Global;
+use alloc::boxed::Box;
 
-pub struct Memory {
-	inner: Box<[u8; 0x10000]>,
+use crate::utils;
+
+pub struct Memory<A: Allocator = Global> {
+	inner: Box<[u8; 0x10000], A>,
 }
 
-impl Memory {
-	pub fn new() -> Memory {
+impl<A: Allocator + Clone> Memory<A> {
+	pub fn new(alloc: A) -> Memory<A> {
 		let mut mem = Memory {
-			inner: vec![0u8; 0x10000].try_into().unwrap(),
+			inner: utils::new_zeroed_box_in(alloc),
 		};
 		
 		mem.reset();
@@ -30,7 +33,8 @@ impl Memory {
 		self.inner[0x5F00] = 0x10; // transparent
 	}
 	
-	pub fn palette(&self, p_idx: u8) -> &[u8; 16] {
+	// TODO: use enums
+	pub fn palette(&self, p_idx: u8) -> [u8; 16] {
 		let base = self.base_addr_palette(p_idx) as usize;
 		self.inner[base..base+16].try_into().unwrap()
 	}
@@ -78,7 +82,7 @@ impl Memory {
 	}
 }
 
-impl Deref for Memory {
+impl<A: Allocator> Deref for Memory<A> {
 	type Target = [u8; 0x10000];
 	
 	fn deref(&self) -> &Self::Target {
@@ -86,7 +90,7 @@ impl Deref for Memory {
 	}
 }
 
-impl DerefMut for Memory {
+impl<A: Allocator> DerefMut for Memory<A> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut *self.inner
 	}

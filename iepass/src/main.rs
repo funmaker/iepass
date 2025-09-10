@@ -17,20 +17,25 @@ use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
 use esp_hal::system::CpuControl;
 use panic_rtt_target as _;
 use anyhow::{anyhow, Result};
-use esp_hal::gpio;
+use esp_hal::{gpio, psram};
 use rtt_target::ChannelMode;
+use iepass_core::colors::Color;
+use iepass_core::pico8::palette::PALETTE;
+use iepass_core::pico8::Pico8VM;
 
 mod calib;
 mod peripherials;
 mod tasks;
 mod utils;
 
-use peripherials::{Debounce, Display, Speaker};
+use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, display};
+use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
 use utils::{perf, PerfFutureExt};
-use crate::peripherials::{Analog, SpiBus, Touch};
 
-static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
+pub static PSRAM_ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
+
+// static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -57,13 +62,34 @@ async fn main(spawner: Spawner) {
 async fn try_main(spawner: Spawner) -> Result<!> {
     info!("Initializing system.");
     
-    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let config = esp_hal::Config::default()
+        .with_cpu_clock(CpuClock::max())
+        .with_psram(psram::PsramConfig {
+            ram_frequency: psram::SpiRamFreq::Freq40m,
+            core_clock: Some(psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m),
+            size: psram::PsramSize::Size(2097152),
+            ..Default::default()
+        });
     let calib = Calib::default();
     let peripherals = esp_hal::init(config);
     
     info!("Initializing allocators.");
     
-    esp_alloc::heap_allocator!(size: 64 * 1024);
+    // SRAM global allocator
+    esp_alloc::heap_allocator!(size: 150 * 1024);
+    
+    // PSRAM custom allocator
+    {
+        let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
+        info!("PSRAM START: {} SIZE: {}", start, size);
+        unsafe {
+            PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
+                start,
+                size,
+                esp_alloc::MemoryCapability::External.into(),
+            ));
+        }
+    }
     
     info!("Initializing embassy.");
     
@@ -138,7 +164,17 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     spawner.spawn(tasks::display(display))?;
     spawner.spawn(tasks::draw(true))?;
     
+    info!("Creating Pico-8");
+    
+    let mut pico8 = Pico8VM::new_in(&PSRAM_ALLOCATOR)?;
+    
+    info!("Loading hello.lua");
+    
+    pico8.load(include_bytes!("../../lua/hello.lua"));
+    
     info!("Entering main loop.");
+    
+    let mut fbs = FRAMEBUFFER_MANAGER.producer();
     
     loop {
         if let Some((x, y)) = touch.read(100, 100).await? { info!("Touch: {} {}", x, y); }
@@ -153,8 +189,30 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             
             info!("{}", analog.read(100));
             
-            speaker.play(&*KUTASAN).await?;
+            // speaker.play(&*KUTASAN).await?;
             speaker.reset().await?;
         }
+        
+        pico8.run();
+        let mut env = pico8.env();
+        let screen_palette = env.memory.palette(1);
+        let map_color = |color: u8| -> Color {
+            assert!(color < 16);
+            PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
+        };
+        
+        let mut fb = fbs.get_empty().await;
+        let screen = env.memory.screen();
+        let pixels = screen.iter()
+                           .map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
+                           .flatten()
+                           .enumerate();
+        for (id, pixel) in pixels {
+            let x = id % 128;
+            let y = id / 128;
+            
+            fb.as_raw_pixels()[(display::WIDTH as usize - 128) / 2 + x + y * display::WIDTH as usize] = pixel.as_u16().to_be_bytes();
+        }
+        fbs.put_drawn(fb).await;
     }
 }

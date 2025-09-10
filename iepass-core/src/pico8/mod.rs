@@ -1,9 +1,15 @@
+#[allow(unused_imports)]
+use micromath::F32Ext;
+use core::alloc::Allocator;
 use core::cell::{RefCell, RefMut};
+use alloc::alloc::Global;
+use alloc::borrow::ToOwned;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, InvalidTableKey, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic};
+use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic};
+use piccolo::table::InvalidTableKey;
 
 pub mod memory;
 pub mod palette;
@@ -11,16 +17,22 @@ pub mod env;
 
 use env::Env;
 
-pub struct Pico8VM {
+pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
-	env: Rc<RefCell<Env>>,
+	env: Rc<RefCell<Env<A>>>,
 	executor: Option<StashedExecutor>,
 }
 
-impl Pico8VM {
+impl Pico8VM<Global> {
 	pub fn new() -> Result<Pico8VM, InvalidTableKey> {
+		Self::new_in(Global)
+	}
+}
+
+impl<A: Allocator + Clone + 'static> Pico8VM<A> {
+	pub fn new_in(alloc: A) -> Result<Pico8VM<A>, InvalidTableKey> {
 		let mut vm = Self {
-			env: Rc::new(RefCell::new(Env::new())),
+			env: Rc::new(RefCell::new(Env::new(alloc))),
 			lua: Lua::empty(),
 			executor: None,
 		};
@@ -49,7 +61,7 @@ impl Pico8VM {
 				let executor = ctx.fetch(executor);
 				
 				loop {
-					if !executor.step(ctx, &mut fuel) {
+					if !executor.step(ctx, &mut fuel).unwrap() {
 						panic!("Out of fuel!");
 					}
 					
@@ -61,7 +73,7 @@ impl Pico8VM {
 							
 							match executor.mode() {
 								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
-								ExecutorMode::Stopped => info!("Execution stopped. {:?}", value),
+								ExecutorMode::Stopped => info!("Execution stopped. {:?}", format!("{:?}", value)),
 								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
 							
@@ -74,24 +86,44 @@ impl Pico8VM {
 		}
 	}
 	
-	pub fn env(&self) -> RefMut<'_, Env> {
+	pub fn env(&self) -> RefMut<'_, Env<A>> {
 		self.env.borrow_mut()
 	}
 	
 	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
 		self.lua.enter(|ctx: Context| {
 			// General
-			ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })))?;
+			ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
 			
 			// Math
-			ctx.set_global("abs", callback("abs", ctx, |_, v: f32| v.abs()))?;
-			ctx.set_global("atan2", callback("atan2", ctx, |_, (dx, dy): (f32, f32)| dy.atan2(dx)))?;
-			ctx.set_global("ceil", callback("ceil", ctx, |_, v: f32| v.ceil()))?;
-			ctx.set_global("flr", callback("flr", ctx, |_, v: f32| v.floor()))?;
-			ctx.set_global("min", callback("min", ctx, |_, (a, b): (f32, f32)| a.min(b)))?;
-			ctx.set_global("max", callback("max", ctx, |_, (a, b): (f32, f32)| a.max(b)))?;
-			ctx.set_global("mid", callback("mid", ctx, |_, (a, b, c): (f32, f32, f32)| if (a <= b) != (a <= c) { a } else if (b <= a) != (b <= c) { b } else { c }))?;
-			ctx.set_global("sgn", callback("sgn", ctx, |_, v: f32| if v < 0f32 { -1 } else { 1 }))?;
+			ctx.set_global("abs", callback("abs", ctx, |_, v: f32| v.abs()));
+			ctx.set_global("atan2", callback("atan2", ctx, |_, (dx, dy): (f32, f32)| dy.atan2(dx)));
+			ctx.set_global("ceil", callback("ceil", ctx, |_, v: f32| v.ceil()));
+			ctx.set_global("flr", callback("flr", ctx, |_, v: f32| v.floor()));
+			ctx.set_global("min", callback("min", ctx, |_, (a, b): (f32, f32)| a.min(b)));
+			ctx.set_global("max", callback("max", ctx, |_, (a, b): (f32, f32)| a.max(b)));
+			ctx.set_global("mid", callback("mid", ctx, |_, (a, b, c): (f32, f32, f32)| if (a <= b) != (a <= c) { a } else if (b <= a) != (b <= c) { b } else { c }));
+			ctx.set_global("sgn", callback("sgn", ctx, |_, v: f32| if v < 0f32 { -1 } else { 1 }));
+			
+			// Strings
+			ctx.set_global("sub", callback("abs", ctx, |_, (text, start, end): (String, i32, Option<i32>)| {
+				let start = match start {
+					..0 => text.len() - ((-start-1) as usize).min(text.len()),
+					1.. => (start as usize - 1).min(text.len()),
+					0 => 0,
+				};
+				let end = end.unwrap_or(-1);
+				let end = match end {
+					..0 => text.len() - ((-end-1) as usize).min(text.len()),
+					1.. => (end as usize - 1).min(text.len()),
+					0 => 0,
+				};
+				if end <= start {
+					"".to_owned()
+				} else {
+					text[start..end].to_owned()
+				}
+			}));
 			
 			// Debug
 			ctx.set_global("printh", callback("printh", ctx, |_, (text, filename, _overwrite, _save_to_desktop): (String, Option<String>, Option<bool>, Option<bool>)| {
@@ -100,7 +132,7 @@ impl Pico8VM {
 				} else {
 					info!("[printh] {}", text);
 				}
-			}))?;
+			}));
 			
 			// Memory
 			let env = self.env.clone();
@@ -114,7 +146,7 @@ impl Pico8VM {
 					table.set(ctx, pos as u32 + 1, byte).unwrap();
 				}
 				Value::Table(table)
-			}))?;
+			}));
 			
 			let env = self.env.clone();
 			ctx.set_global("poke", callback("poke", ctx, move |_, (addr, mut bytes): (u32, Variadic<alloc::vec::Vec<u8>>)| {
@@ -123,7 +155,7 @@ impl Pico8VM {
 				for (pos, byte) in bytes.into_iter().enumerate() {
 					env.memory[addr as usize + pos] = byte;
 				}
-			}))?;
+			}));
 			
 			// GFX
 			let env = self.env.clone();
@@ -133,7 +165,7 @@ impl Pico8VM {
 				env.memory.write_u16_le(0x5f28, x.unwrap_or(0) as u16);
 				env.memory.write_u16_le(0x5f2a, y.unwrap_or(0) as u16);
 				old
-			}))?;
+			}));
 			
 			let env = self.env.clone();
 			ctx.set_global("color", callback("color", ctx, move |_, val: Option<u32>| {
@@ -141,7 +173,7 @@ impl Pico8VM {
 				let old = env.memory[0x5f25];
 				if let Some(val) = val { env.memory[0x5f25] = val as u8; }
 				old
-			}))?;
+			}));
 			
 			let env = self.env.clone();
 			ctx.set_global("clip", callback("clip", ctx, move |_, (x, y, w, h, clip_previous): (Option<u8>, Option<u8>, Option<u8>, Option<u8>, Option<bool>)| {
@@ -173,7 +205,7 @@ impl Pico8VM {
 				}
 				
 				(x_begin_old, y_begin_old, x_end_old, y_end_old)
-			}))?;
+			}));
 			
 			
 			let env = self.env.clone();
@@ -196,7 +228,7 @@ impl Pico8VM {
 				}else{
 					panic!("Invalid arguments");
 				}
-			}))?;
+			}));
 			
 			Ok(())
 		})?;
@@ -221,7 +253,7 @@ where F: Fn(Context<'gc>, A) -> R + 'static,
 #[cfg(test)]
 mod test {
 	use alloc::vec::Vec;
-	use piccolo::{Closure, Executor, StaticValue, Value, Variadic};
+	use piccolo::{Closure, Executor, Value, Variadic};
 	use crate::pico8::Pico8VM;
 	
 	#[test]
@@ -243,27 +275,30 @@ mod test {
 		}).unwrap();
 		
 		
-		vm.lua.finish(&ex);
+		vm.lua.finish(&ex).unwrap();
 		
 		let res = vm.lua.try_enter(|ctx| {
 			let exec = ctx.fetch(&ex);
-			let vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
+			let _vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
 			
-			let statics = vals.into_iter().map(|x| {
-				match x {
-					Value::Nil => StaticValue::Nil,
-					Value::Boolean(b) => StaticValue::Boolean(b),
-					Value::Integer(i) => StaticValue::Integer(i),
-					Value::Number(n)  => StaticValue::Number(n),
-					Value::String(s)  => StaticValue::from(ctx.stash(s)),
-					Value::Table(t)   => StaticValue::from(ctx.stash(t)),
-					Value::Function(f)=> StaticValue::from(ctx.stash(f)),
-					Value::Thread(_) => StaticValue::Nil,
-					Value::UserData(u)=> StaticValue::from(ctx.stash(u)),
-				}
-			}).collect::<Vec<StaticValue>>();
+			// TODO: co to?
+			// let statics = vals.into_iter().map(|x| {
+			// 	match x {
+			// 		Value::Nil         => StaticValue::Nil,
+			// 		Value::Boolean(b)  => StaticValue::Boolean(b),
+			// 		Value::Integer(i)  => StaticValue::Integer(i),
+			// 		Value::Number(n)   => StaticValue::Number(n),
+			// 		Value::String(s)   => StaticValue::from(ctx.stash(s)),
+			// 		Value::Table(t)    => StaticValue::from(ctx.stash(t)),
+			// 		Value::Function(f) => StaticValue::from(ctx.stash(f)),
+			// 		Value::Thread(_)   => StaticValue::Nil,
+			// 		Value::UserData(u) => StaticValue::from(ctx.stash(u)),
+			// 	}
+			// }).collect::<Vec<StaticValue>>();
+			//
+			// Ok(statics)
 			
-			Ok(statics)
+			Ok(())
 		}).unwrap();
 		
 		info!("XDD {:?}", res);

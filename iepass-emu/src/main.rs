@@ -43,7 +43,7 @@ impl EmulatorApp {
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
 		
 		let mut pico8 = Pico8VM::new().unwrap();
-		pico8.load(include_bytes!("../main.lua"));
+		pico8.load(include_bytes!("../../lua/hello.lua"));
 		
 		Self {
 			fb_pool,
@@ -61,7 +61,7 @@ impl eframe::App for EmulatorApp {
 		
 		let mut env = self.pico8.env();
 		
-		let screen_palette = env.memory.palette(1).clone();
+		let screen_palette = env.memory.palette(1);
 		
 		let map_color = |color: u8| -> Color {
 			assert!(color < 16);

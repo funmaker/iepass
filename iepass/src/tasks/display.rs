@@ -23,8 +23,6 @@ async fn try_display(mut display: Display<'static, Delay>) -> Result<!> {
 	let mut last_seq = 0;
 	
 	FRAMEBUFFER_MANAGER.put_empty(static_framebuffer!(next_seq)).await;
-	FRAMEBUFFER_MANAGER.put_empty(static_framebuffer!(next_seq)).await;
-	FRAMEBUFFER_MANAGER.put_empty(static_framebuffer!(next_seq)).await;
 	
 	loop {
 		let mut frame = FRAMEBUFFER_MANAGER.get_drawn().await;

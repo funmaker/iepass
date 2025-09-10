@@ -7,7 +7,7 @@ resolver      = "3"
 rust-version  = "1.88.0"
 
 [features]
-std = ["embedded-io/std", "dep:piccolo"]
+std = ["embedded-io/std"]
 defmt = ["dep:defmt"]
 log-04 = ["dep:log-04"]
 
@@ -16,7 +16,8 @@ cfg-if = { version = "1.0.3" }
 log-04 = { package = "log", version = "0.4.27", optional = true }
 embedded-io = { workspace = true }
 defmt = { workspace = true, optional = true }
-piccolo = { workspace = true, optional = true }
+piccolo = { workspace = true }
+micromath = { workspace = true }
 
 [dev-dependencies]
 embedded-io = { workspace = true }

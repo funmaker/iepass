@@ -25,8 +25,8 @@ embedded-hal-async = "1.0.0"
 defmt = { version = "1.0.1", features = ["alloc"] }
 anyhow = { version = "1.0.98", default-features = false }
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
-esp-alloc = { version = "0.8.0", features = ["defmt"] }
-esp-hal = { version = "=1.0.0-rc.0", features = ["defmt", "esp32s3", "unstable"] }
+esp-alloc = { version = "0.8.0", features = ["defmt", "nightly"] }
+esp-hal = { version = "=1.0.0-rc.0", features = ["defmt", "esp32s3", "unstable", "psram"] }
 esp-hal-embassy = { version = "0.9.0", features = ["defmt", "esp32s3"] }
 embassy-executor = { version = "0.9.1", features = ["defmt"] }
 embassy-time = { version = "0.4.0", features = ["defmt"] }
@@ -39,7 +39,8 @@ nb = { version = "1.1.0" }
 ringbuffer = { version = "0.16.0", default-features = false }
 pin-project = "1.1.10"
 static_cell = "2.1.1"
-piccolo = "0.3.3"
+micromath = "2.1.0"
+piccolo = { version = "0.3.3", default-features = false }
 
 [patch.crates-io]
 esp-hal                  = { git = "https://github.com/funmaker/esp-hal.git" }
@@ -53,3 +54,4 @@ esp-riscv-rt             = { git = "https://github.com/funmaker/esp-hal.git" }
 xtensa-lx                = { git = "https://github.com/funmaker/esp-hal.git" }
 xtensa-lx-rt             = { git = "https://github.com/funmaker/esp-hal.git" }
 xtensa-lx-rt-proc-macros = { git = "https://github.com/funmaker/esp-hal.git" }
+piccolo                  = { git = "https://github.com/funmaker/piccolo-nostd.git", rev = "437c8ffe7808f0080557ad5e5a718915b60c00ed" }
