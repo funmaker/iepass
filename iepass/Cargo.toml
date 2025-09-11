@@ -19,6 +19,10 @@ harness = false
 name = "iepass"
 test = false
 
+[features]
+default = ["perf"]
+perf = ["esp-alloc/internal-heap-stats"]
+
 [dependencies]
 bitflags = "1.3.2"
 iepass-core = { workspace = true, features = ["defmt"] }

@@ -31,9 +31,7 @@ mod utils;
 use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, display};
 use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
-use utils::{perf, PerfFutureExt};
-
-pub static PSRAM_ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
+use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
 // static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
@@ -81,7 +79,6 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     // PSRAM custom allocator
     {
         let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
-        info!("PSRAM START: {} SIZE: {}", start, size);
         unsafe {
             PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
                 start,
@@ -178,7 +175,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     loop {
         if let Some((x, y)) = touch.read(100, 100).await? { info!("Touch: {} {}", x, y); }
-        if dbg_btn.falling_edge() { perf::dump_perf(); }
+        if dbg_btn.falling_edge() { perf::dump_perf()?; }
         if x_btn.falling_edge() { info!("x_btn"); }
         if y_btn.falling_edge() { info!("y_btn"); }
         if a_btn.falling_edge() { info!("a_btn"); }

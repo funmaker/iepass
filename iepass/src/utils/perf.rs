@@ -13,29 +13,39 @@ use ringbuffer::{ConstGenericRingBuffer, RingBuffer};
 use pin_project::pin_project;
 use rtt_target::UpChannel;
 
-const PERF_SIZE: usize = 128;
+use crate::utils::PSRAM_ALLOCATOR;
+
+const PERF_SIZE: usize = 64;
 static PERF_BUF: Mutex<CriticalSectionRawMutex, RefCell<PerfInner>> = Mutex::new(RefCell::new(PerfInner::new()));
 
 #[allow(dead_code)]
 pub fn set_channel(output: UpChannel) {
+	#[cfg(feature = "perf")]
 	PERF_BUF.lock(|inner| {
 		inner.borrow_mut().output = Some(output);
 	})
 }
 
-pub fn dump_perf() {
+pub fn dump_perf() -> Result<(), core::fmt::Error> {
 	PERF_BUF.lock(|inner| {
 		let PerfInner { ref entries, ref mut output } = *inner.borrow_mut();
 		
 		match output.as_mut() {
-			Some(channel) => PerfInner::write_entries(entries, channel),
+			Some(mut channel) => {
+				PerfInner::write_entries(entries, &mut channel)?;
+				write!(channel, "\n")?;
+			},
 			None => {
-				let mut output = String::new();
-				PerfInner::write_entries(entries, &mut output);
-				defmt::println!("[PERF ] {}", output.trim_end_matches("\n"));
+				let mut output = String::with_capacity(PERF_SIZE * 30);
+				PerfInner::write_entries(entries, &mut output)?;
+				defmt::println!("[PERF ] {}", output);
 			},
 		};
-	})
+		
+		Ok(())
+	})?;
+	
+	Ok(())
 }
 
 pub fn sync_perf<R>(name: &'static str, func: impl FnOnce() -> R) -> R {
@@ -62,15 +72,33 @@ impl PerfInner {
 		}
 	}
 	
-	pub fn write_entries<W: Write>(entries: &ConstGenericRingBuffer<Entry, PERF_SIZE>, mut output: W) {
+	pub fn write_entries<W: Write>(entries: &ConstGenericRingBuffer<Entry, PERF_SIZE>, mut output: W) -> Result<(), core::fmt::Error> {
 		let time_epoch = entries.iter()
 		                        .map(|entry| entry.start)
 		                        .min()
 		                        .unwrap_or(Instant::now());
 		
-		write!(output, "[").unwrap();
+		let sram = esp_alloc::HEAP.stats();
+		let psram = PSRAM_ALLOCATOR.stats();
+		
+		defmt::info!("{}", sram);
+		defmt::info!("{}", psram);
+		
+		let sram_used  = esp_alloc::HEAP.used();
+		let sram_free  = esp_alloc::HEAP.free();
+		let psram_used = PSRAM_ALLOCATOR.used();
+		let psram_free = PSRAM_ALLOCATOR.free();
+		
+		write!(
+			output,
+			"{{\"sram\":[{},{}],\"psram\":[{},{}],\"trace\":[",
+			sram_used,
+			sram_used + sram_free,
+			psram_used,
+			psram_used + psram_free,
+		)?;
 		for (pos, entry) in entries.iter().enumerate() {
-			if pos != 0 { write!(output, ",").unwrap(); }
+			if pos != 0 { write!(output, ",")?; }
 			write!(
 				output,
 				"[\"{}\",{},{},{}]",
@@ -78,9 +106,11 @@ impl PerfInner {
 				entry.start.duration_since(time_epoch).as_micros(),
 				entry.end.duration_since(time_epoch).as_micros(),
 				entry.cpu as usize,
-			).unwrap()
+			)?;
 		}
-		write!(output, "]\n").unwrap();
+		write!(output, "]}}")?;
+		
+		Ok(())
 	}
 }
 

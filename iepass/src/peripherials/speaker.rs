@@ -47,7 +47,7 @@ impl<'d> Speaker<'d> {
 		Ok(Speaker { transfer })
 	}
 	
-	pub async fn play(&mut self, mut reader: impl embedded_io::Read<Error = impl Error + Send + Sync>) -> Result<()> {
+	pub async fn _play(&mut self, mut reader: impl embedded_io::Read<Error = impl Error + Send + Sync>) -> Result<()> {
 		let mut result = Ok(0);
 		
 		loop {

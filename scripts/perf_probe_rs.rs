@@ -17,7 +17,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError, Sender};
 use std::thread;
 use std::collections::HashMap;
 use eframe::egui::{self, Color32};
-use egui_plot::{Plot, Legend, BarChart, Bar};
+use egui_plot::{Plot, Legend, BarChart, Bar, Corner};
 use serde::Deserialize;
 use colored::Colorize;
 
@@ -62,7 +62,7 @@ fn main() {
 }
 
 #[cfg(target_os = "linux")]
-fn spawn_probe(mut args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+fn spawn_probe(mut args: Vec<OsString>, sender: Sender<RawPerfMessage>) -> Child {
 	use ipipe::Pipe;
 	
 	let pipe = Pipe::with_name("iepass_perf").unwrap();
@@ -88,7 +88,7 @@ fn spawn_probe(mut args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child 
 }
 
 #[cfg(not(target_os = "linux"))]
-fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
+fn spawn_probe(args: Vec<OsString>, sender: Sender<RawPerfMessage>) -> Child {
 	use std::process::Stdio;
 	
 	println!("     {} `{} {}`", "Running".green().bold(), RUNNER, args.join(OsStr::new(" ")).to_string_lossy());
@@ -113,7 +113,20 @@ fn spawn_probe(args: Vec<OsString>, sender: Sender<Vec<RawEntry>>) -> Child {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+struct RawPerfMessage {
+	sram: [u64; 2],
+	psram: [u64; 2],
+	trace: Vec<RawEntry>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 struct RawEntry(String, u64, u64, usize);
+
+#[derive(Copy, Clone)]
+struct RamStats {
+	used: u64,
+	total: u64,
+}
 
 struct Entry {
 	name: String,
@@ -126,17 +139,21 @@ struct Entry {
 }
 
 struct FlameGraph {
-	data: Vec<Entry>,
-	receiver: Receiver<Vec<RawEntry>>,
+	sram: RamStats,
+	psram: RamStats,
+	trace: Vec<Entry>,
+	receiver: Receiver<RawPerfMessage>,
 	legend: HashMap<String, Color32>,
 	max_x: f64,
 	max_y: f64,
 }
 
 impl FlameGraph {
-	fn new(_cc: &eframe::CreationContext<'_>, data: Vec<RawEntry>, receiver: Receiver<Vec<RawEntry>>) -> Self {
+	fn new(_cc: &eframe::CreationContext<'_>, data: RawPerfMessage, receiver: Receiver<RawPerfMessage>) -> Self {
 		let mut this = Self {
-			data: vec![],
+			sram: RamStats { used: 0, total: 0 },
+			psram: RamStats { used: 0, total: 0 },
+			trace: Vec::with_capacity(data.trace.len()),
 			receiver,
 			legend: HashMap::new(),
 			max_x: 0.0,
@@ -146,17 +163,20 @@ impl FlameGraph {
 		this
 	}
 	
-	fn update_data(&mut self, mut data: Vec<RawEntry>) {
+	fn update_data(&mut self, mut data: RawPerfMessage) {
+		[self.sram.used,  self.sram.total]  = data.sram;
+		[self.psram.used, self.psram.total] = data.psram;
+		
 		let mut colors_iter = COLORS.iter().copied().cycle();
 		let mut stack = HashMap::new();
 		
-		data.sort_by_key(|entry| entry.1);
+		data.trace.sort_by_key(|entry| entry.1);
 		self.legend.clear();
-		self.data.clear();
+		self.trace.clear();
 		self.max_x = 0.0;
 		self.max_y = 0.0;
 		
-		for entry in data {
+		for entry in data.trace {
 			let RawEntry(name, start, end, cpu) = entry;
 			let cpu_stack = stack.entry(cpu).or_insert_with(|| vec![]);
 			let start = start as f64 / 1000.0;
@@ -167,7 +187,7 @@ impl FlameGraph {
 			cpu_stack.retain(|&val| val > end);
 			
 			let level = cpu_stack.len() as f64;
-			self.data.push(Entry {
+			self.trace.push(Entry {
 				name,
 				start,
 				end,
@@ -197,11 +217,12 @@ impl eframe::App for FlameGraph {
 		}
 		
 		egui::CentralPanel::default().show(ctx, |ui| {
-			let height = ui.available_height() / CPUS as f32;
-			let link_group = ui.id().with("linkaxis");
+			let height = ui.available_height() / (CPUS + 2) as f32;
+			let cpu_group = ui.id().with("cpu_linkaxis");
+			let ram_group = ui.id().with("ram_linkaxis");
 			
 			for cpu in (0..CPUS).rev() {
-				Plot::new("Time Graph")
+				Plot::new(format!("Cpu {}", cpu))
 					.height(height)
 					.include_x(0.0)
 					.include_x(self.max_x)
@@ -216,8 +237,8 @@ impl eframe::App for FlameGraph {
 					.allow_drag([true, false])
 					.allow_axis_zoom_drag([true, false])
 					.allow_boxed_zoom(false)
-					.link_axis(link_group, [true, false])
-					.link_cursor(link_group, [true, false])
+					.link_axis(cpu_group, [true, false])
+					.link_cursor(cpu_group, [true, false])
 					.label_formatter(|_, point| format!("{:.3}ms", point.x))
 					.y_grid_spacer(|_| vec![])
 					.y_axis_label(format!("CPU{}", cpu))
@@ -227,16 +248,17 @@ impl eframe::App for FlameGraph {
 							plot_ui.bar_chart(
 								BarChart::new(
 									name.clone(),
-									self.data.iter()
+									self.trace
+									    .iter()
 									    .filter(|entry| entry.cpu == cpu && &entry.name == name)
 									    .map(|entry|
-									        Bar::new(entry.level + 0.5, entry.end - entry.start)
-										        .name(name.clone())
-										        .horizontal()
-										        .base_offset(entry.start)
-										        .width(1.0)
-										        .stroke((1.0, entry.stroke))
-										        .fill(entry.fill)
+										    Bar::new(entry.level + 0.5, entry.end - entry.start)
+											    .name(name.clone())
+											    .horizontal()
+											    .base_offset(entry.start)
+											    .width(1.0)
+											    .stroke((1.0, entry.stroke))
+											    .fill(entry.fill)
 									    )
 									    .collect()
 								).color(color)
@@ -252,6 +274,83 @@ impl eframe::App for FlameGraph {
 						}
 					});
 			}
+			
+			let mut ram_plot = |name: &str, stats: RamStats, axes: bool| {
+				let used = stats.used as f64 / stats.total as f64 * 100.0;
+				let free = 100.0 - used;
+				let total_bytes = stats.total as f64;
+				
+				Plot::new(name)
+					.height(height)
+					.include_x(0.0)
+					.include_x(100.0)
+					.include_y(-0.6)
+					.include_y(0.6)
+					.legend(Legend::default().position(Corner::RightBottom))
+					.show_y(false)
+					.show_grid([true, false])
+					.allow_drag([true, false])
+					.allow_scroll([true, false])
+					.allow_zoom([true, false])
+					.allow_drag([true, false])
+					.allow_axis_zoom_drag([true, false])
+					.allow_boxed_zoom(false)
+					.link_axis(ram_group, [true, false])
+					.link_cursor(ram_group, [true, false])
+					.label_formatter(|_, point| format!("{:.0}%", point.x))
+					.y_grid_spacer(|_| vec![])
+					.y_axis_label(name.to_string())
+					.show_axes([axes, true])
+					.show(ui, |plot_ui| {
+						plot_ui.bar_chart(
+							BarChart::new(
+								"Used".to_string(),
+								vec![
+									Bar::new(0.0, used)
+										.horizontal()
+										.base_offset(0.0)
+										.width(1.0)
+										.stroke((1.0, Color32::CYAN))
+										.fill(Color32::CYAN.gamma_multiply(0.5)),
+								]
+							).color(Color32::CYAN)
+							 .element_formatter(Box::new(move |bar, _| {
+								 let bytes = bar.value / 100.0 * total_bytes;
+								 match bytes.log2() {
+									 ..10.0 => format!("{} bytes ({:.0}%)", bytes, bar.value),
+									 ..20.0 => format!("{:.1}KB ({:.0}%)", bytes / 1024.0, bar.value),
+									 ..30.0 => format!("{:.1}MB ({:.0}%)", bytes / 1024.0 / 1024.0, bar.value),
+									 _ => format!("{:.1}GB ({:.0}%)", bytes / 1024.0 / 1024.0 / 1024.0, bar.value),
+								 }
+							 }))
+						);
+						plot_ui.bar_chart(
+							BarChart::new(
+								"Free".to_string(),
+								vec![
+									Bar::new(0.0, free)
+										.horizontal()
+										.base_offset(used)
+										.width(1.0)
+										.stroke((1.0, Color32::GRAY))
+										.fill(Color32::GRAY.gamma_multiply(0.5)),
+								]
+							).color(Color32::GRAY)
+							 .element_formatter(Box::new(move |bar, _| {
+								 let bytes = bar.value / 100.0 * total_bytes;
+								 match bytes.log2() {
+									 ..10.0 => format!("{} bytes ({:.0}%)", bytes, bar.value),
+									 ..20.0 => format!("{:.1}KB ({:.0}%)", bytes / 1024.0, bar.value),
+									 ..30.0 => format!("{:.1}MB ({:.0}%)", bytes / 1024.0 / 1024.0, bar.value),
+									 _ => format!("{:.1}GB ({:.0}%)", bytes / 1024.0 / 1024.0 / 1024.0, bar.value),
+								 }
+							 }))
+						);
+					});
+			};
+			
+			ram_plot("SRAM", self.sram, true);
+			ram_plot("PSRAM", self.psram, false);
 		});
 	}
 }
