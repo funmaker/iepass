@@ -14,8 +14,10 @@ use piccolo::table::InvalidTableKey;
 pub mod memory;
 pub mod palette;
 pub mod env;
+mod numeric;
 
 use env::Env;
+use crate::pico8::numeric::{number_from_string, NumberConversionFlags};
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
@@ -92,6 +94,24 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	
 	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
 		self.lua.enter(|ctx: Context| {
+			// implements: assert, type, select, rawget, rawset,
+			//             getmetatable, setmetatable, next, pairs, ipairs
+			// extra functions: tostring, error, pcall, collectgarbage
+			piccolo::stdlib::load_base(ctx);
+			
+			// todo: format flags
+			ctx.set_global("tostr", ctx.get_global::<Value>("tostring").unwrap());
+			
+			ctx.set_global("tonum", callback("tonum", ctx, move |_, (val, opts): (String, Option<u8>)| {
+				let flags: NumberConversionFlags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
+				let conversion = number_from_string(val.as_str(), flags);
+				if conversion.is_ok() {
+					Some(conversion.unwrap())
+				}else{
+					None
+				}
+			}));
+			
 			// General
 			ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
 			
@@ -230,8 +250,38 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 				}
 			}));
 			
+			
+			// Table
+			
+			ctx.set_global("pack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let t = Table::new(&ctx);
+				for i in 0..stack.len() {
+					t.set(ctx, i as i64 + 1, stack[i]).unwrap();
+				}
+				t.set(ctx, "n", stack.len() as i64).unwrap();
+				stack.replace(ctx, t);
+				Ok(CallbackReturn::Return)
+			}));
+			
+			ctx.set_global("unpack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+				let (table, start, end): (Table, Option<i64>, Option<i64>) =
+					stack.consume(ctx)?;
+				let start = start.unwrap_or(1);
+				let end = end.unwrap_or_else(|| table.length());
+				
+				if start <= end {
+					stack.resize((end - start + 1) as usize);
+					for i in start..=end {
+						stack[(i - start) as usize] = table.get_value(ctx, i);
+					}
+				}
+				
+				Ok(CallbackReturn::Return)
+			}));
+			
 			Ok(())
 		})?;
+		
 		
 		Ok(())
 	}
