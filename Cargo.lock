@@ -1819,12 +1819,34 @@ dependencies = [
 [[package]]
 name = "gc-arena"
 version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cd70cf88a32937834aae9614ff2569b5d9467fa0c42c5d7762fd94a8de88266"
+dependencies = [
+ "gc-arena-derive 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sptr",
+]
+
+[[package]]
+name = "gc-arena"
+version = "0.5.3"
 source = "git+https://github.com/kyren/gc-arena?rev=4d526347a9b625c29e16f7165fd998615e51c52a#4d526347a9b625c29e16f7165fd998615e51c52a"
 dependencies = [
  "allocator-api2 0.2.21",
- "gc-arena-derive",
+ "gc-arena-derive 0.5.3 (git+https://github.com/kyren/gc-arena?rev=4d526347a9b625c29e16f7165fd998615e51c52a)",
  "hashbrown 0.14.5",
  "sptr",
+]
+
+[[package]]
+name = "gc-arena-derive"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c612a69f5557a11046b77a7408d2836fe77077f842171cd211c5ef504bd3cddd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "synstructure",
 ]
 
 [[package]]
@@ -2203,9 +2225,11 @@ dependencies = [
 name = "iepass-core"
 version = "0.1.0"
 dependencies = [
+ "bitflags 1.3.2",
  "cfg-if",
  "defmt 1.0.1",
  "embedded-io",
+ "gc-arena 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log",
  "micromath",
  "piccolo",
@@ -2964,7 +2988,7 @@ dependencies = [
  "ahash",
  "allocator-api2 0.2.21",
  "anyhow",
- "gc-arena",
+ "gc-arena 0.5.3 (git+https://github.com/kyren/gc-arena?rev=4d526347a9b625c29e16f7165fd998615e51c52a)",
  "hashbrown 0.14.5",
  "thiserror 2.0.12",
 ]
