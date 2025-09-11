@@ -1,3 +1,4 @@
+use core::num::{IntErrorKind, ParseFloatError, ParseIntError};
 use piccolo::Value;
 use bitflags::bitflags;
 
@@ -19,29 +20,16 @@ bitflags! {
     }
 }
 
-fn parse_hex(s: &str) -> Result<f64, ()> {
-	let parts: Vec<&str> = s.split('.').collect();
-	match parts.len() {
-		1 => i64::from_str_radix(parts[0], 16).map(|x| x as f64).map_err(|_| ()),
-		2 => {
-			let whole = i64::from_str_radix(parts[0], 16).map_err(|_| ())? as f64;
-			let frac = i64::from_str_radix(parts[1], 16).map_err(|_| ())? as f64;
-			Ok(whole + frac / 16f64.powi(parts[1].len() as i32))
+fn parse_float_radix(s: &str, radix: u32) -> Result<f64, ()> {
+	match s.split_once('.') {
+		None => i64::from_str_radix(s, radix).map(|x| x as f64).map_err(|_| ()),
+		Some((whole_s, frac_s)) => {
+			if frac_s.find('.').is_some() { return Err(()); }
+			let whole = i64::from_str_radix(whole_s, radix).map_err(|_| ())? as f64;
+			let frac = i64::from_str_radix(frac_s, radix).map_err(|_| ())? as f64;
+			
+			Ok(whole + frac / (radix.pow(frac_s.len() as u32) as f64))
 		}
-		_ => Err(())
-	}
-}
-
-fn parse_binary(s: &str) -> Result<f64, ()> {
-	let parts: Vec<&str> = s.split('.').collect();
-	match parts.len() {
-		1 => i64::from_str_radix(parts[0], 2).map(|x| x as f64).map_err(|_| ()),
-		2 => {
-			let whole = i64::from_str_radix(parts[0], 2).map_err(|_| ())? as f64;
-			let frac = i64::from_str_radix(parts[1], 2).map_err(|_| ())? as f64;
-			Ok(whole + frac / 2f64.powi(parts[1].len() as i32))
-		}
-		_ => Err(())
 	}
 }
 
@@ -57,11 +45,11 @@ pub fn number_from_string<'gc>(s: &str, flags: NumberConversionFlags) -> Result<
 	let s = s.trim();
 	
 	let result = if flags.contains(NumberConversionFlags::FORCE_HEX) {
-		parse_hex(s)
+		parse_float_radix(s, 16)
 	} else if s.starts_with("0x") {
-		parse_hex(&s[2..])
+		parse_float_radix(&s[2..], 16)
 	} else if s.starts_with("0b") {
-		parse_binary(&s[2..])
+		parse_float_radix(&s[2..], 2)
 	} else {
 		s.parse::<f64>().map_err(|_| ())
 	};
