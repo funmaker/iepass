@@ -40,6 +40,7 @@ ringbuffer = { version = "0.16.0", default-features = false }
 pin-project = "1.1.10"
 static_cell = "2.1.1"
 micromath = "2.1.0"
+bitflags = "2.9.4"
 piccolo = { git = "https://github.com/funmaker/piccolo-nostd.git", rev = "437c8ffe7808f0080557ad5e5a718915b60c00ed", default-features = false }
 
 [patch.crates-io]

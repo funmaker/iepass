@@ -65,8 +65,8 @@ impl<'d> Touch<'d> {
 		let mut buffer = [0u8; N * 3];
 		let mut offset = 0;
 		
-		for command in commands {
-			buffer[offset] = command.bits;
+		for command in &commands {
+			buffer[offset] = command.bits();
 			if command.contains(Command::BIT_8) {
 				offset += 2;
 			} else {

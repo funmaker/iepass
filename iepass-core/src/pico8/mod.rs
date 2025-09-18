@@ -13,6 +13,7 @@ use piccolo::table::InvalidTableKey;
 
 pub mod memory;
 pub mod palette;
+pub mod font;
 pub mod env;
 mod numeric;
 

@@ -20,6 +20,7 @@ dependencies = [
     "build-calib5",
     "build-calib-target",
     "build-kutasan",
+    "build-font",
 ]
 
 [tasks.build-BadApple]
@@ -102,6 +103,12 @@ condition = { files_modified = { input = ["calib-target.png"], output = ["calib-
 extend = "wav-pcm"
 env.ASSET_NAME = "kutasan"
 condition = { files_modified = { input = ["kutasan.wav"], output = ["kutasan.pcm"] } }
+
+[tasks.build-font]
+cwd = ".."
+command = "cargo"
+args = ["make", "font-gen", "assets/font.png", "iepass-core/src/pico8/font/generated.rs"]
+condition = { files_modified = { input = ["font.png"], output = ["../src/pico8/font/generated.rs"] } }
 
 
 # Abstract
