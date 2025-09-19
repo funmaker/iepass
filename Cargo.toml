@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass"]
+members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass", "p8rs-types"]
 
 [profile.dev]
 # Rust debug is too slow.

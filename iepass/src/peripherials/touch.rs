@@ -36,7 +36,6 @@ impl<'d> Touch<'d> {
 	pub fn apply_calib(&mut self, calib: Axes<Range<u16>>) {
 		self.calib = calib;
 	}
-	
 	pub async fn read_raw(&mut self) -> Result<Option<(u16, u16)>> {
 		let [x, y, z1] = self.commands([
 			Command::ADDR_X  | Command::BIT_12 | Command::REF_DIFF | Command::POW_ALL,
