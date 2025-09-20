@@ -1,4 +1,5 @@
-use std::ops::{Deref, DerefMut};
+use alloc::vec::Vec;
+use core::ops::{Deref, DerefMut};
 
 pub const CHAR_MAP: [char; 256] = [
 	// Control codes
