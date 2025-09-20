@@ -1,6 +1,6 @@
 #![no_std]
 #![feature(const_trait_impl)]
-#![feature(const_from)]
+#![feature(const_convert)]
 #![feature(const_ops)]
 #![feature(bigint_helper_methods)]
 #![feature(const_option_ops)]
