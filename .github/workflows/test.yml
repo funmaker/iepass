@@ -26,6 +26,7 @@ jobs:
           default: true
           buildtargets: esp32s3
           ldproxy: false
+          version: '1.90.0'
       - name: 📥 Install Dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev
