@@ -15,7 +15,7 @@ IE Pass - The Console The Pass
     ```bash
     cargo install cargo-make ldproxy espflash
     cargo install espup probe-rs-tools --locked
-    espup install --targets=esp32s3
+    espup install --targets=esp32s3 --toolchain-version 1.90.0.0
     ```
 
 ### Build:

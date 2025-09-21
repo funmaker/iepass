@@ -19,14 +19,19 @@ script = { file = "./scripts/font_gen.rs" }
 
 # Testing
 [tasks.test]
-run_task = [
-    { name = "test-core" },
+dependencies = [
+    "test-core",
+    "test-types",
 ]
 
 [tasks.test-core]
 dependencies = ["build-assets"]
 command = "cargo"
 args = ["test", "--package", "iepass-core", "--features", "std", "${@}"]
+
+[tasks.test-types]
+command = "cargo"
+args = ["test", "--package", "p8rs-types", "${@}"]
 
 
 # Running
