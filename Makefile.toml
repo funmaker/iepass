@@ -58,7 +58,7 @@ args = ["run", "${@}"]
 
 # Build
 [tasks.build]
-dependencies = ["build-assets", "build-iepass", "build-calib"]
+dependencies = ["build-assets"]
 command = "cargo"
 args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 

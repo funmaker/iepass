@@ -36,10 +36,14 @@ impl P8Num {
 	/// use p8rs_types::p8num::P8Num;
 	/// 
 	/// assert_eq!(P8Num::new(1.0), P8Num::from_raw(0x0001_0000));
-	/// assert_eq!(P8Num::new(-1.0), P8Num::from_raw(-0x0001_0000));
 	/// assert_eq!(P8Num::new(0.5), P8Num::from_raw(0x0000_8000));
 	/// assert_eq!(P8Num::new(-0.5), P8Num::from_raw(-0x0000_8000));
 	/// assert_eq!(P8Num::new(4660.337890625), P8Num::from_raw(0x1234_5680));
+	/// assert_eq!(P8Num::new(100_000.0), P8Num::MAX);
+	/// assert_eq!(P8Num::new(f32::INFINITY), P8Num::MAX);
+	/// assert_eq!(P8Num::new(-100_000.0), P8Num::MIN);
+	/// assert_eq!(P8Num::new(f32::NEG_INFINITY), P8Num::MIN);
+	/// assert_eq!(P8Num::new(f32::NAN), P8Num::ZERO);
 	/// ```
 	pub const fn new(value: f32) -> Self {
 		Self((value * (1 << 16) as f32) as i32)
@@ -55,13 +59,78 @@ impl P8Num {
 	/// use p8rs_types::p8num::P8Num;
 	///
 	/// assert_eq!(P8Num::new_f64(1.0), P8Num::from_raw(0x0001_0000));
-	/// assert_eq!(P8Num::new_f64(-1.0), P8Num::from_raw(-0x0001_0000));
 	/// assert_eq!(P8Num::new_f64(0.5), P8Num::from_raw(0x0000_8000));
 	/// assert_eq!(P8Num::new_f64(-0.5), P8Num::from_raw(-0x0000_8000));
 	/// assert_eq!(P8Num::new_f64(4660.3377685546875), P8Num::from_raw(0x1234_5678));
+	/// assert_eq!(P8Num::new_f64(100_000.0), P8Num::MAX);
+	/// assert_eq!(P8Num::new_f64(f64::INFINITY), P8Num::MAX);
+	/// assert_eq!(P8Num::new_f64(-100_000.0), P8Num::MIN);
+	/// assert_eq!(P8Num::new_f64(f64::NEG_INFINITY), P8Num::MIN);
+	/// assert_eq!(P8Num::new_f64(f64::NAN), P8Num::ZERO);
 	/// ```
 	pub const fn new_f64(value: f64) -> Self {
 		Self((value * (1 << 16) as f64) as i32)
+	}
+	
+	/// Parses an integer from an P8SCII slice with decimal digits.
+	///
+	/// The characters are expected to be an optional
+	///  `+` or `-` 
+	/// sign followed by only digits. Leading and trailing non-digit characters (including
+	/// whitespace) represent an error. Underscores (which are accepted in Rust literals)
+	/// also represent an error.
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::from_p8scii(b"+10"), Ok(P8Num::new(10.0)));
+	/// ```
+	/// Trailing space returns error:
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert!(P8Num::from_p8scii(b"1 ").is_err());
+	/// ```
+	#[inline]
+	pub const fn from_p8scii(_src: &[u8]) -> Result<Self, ()> {
+		unimplemented!()
+	}
+	
+	/// Parses an integer from an ASCII-byte slice with digits in a given base.
+	///
+	/// The characters are expected to be an optional
+	///  `+` or `-` 
+	/// sign followed by only digits. Leading and trailing non-digit characters (including
+	/// whitespace) represent an error. Underscores (which are accepted in Rust literals)
+	/// also represent an error.
+	///
+	/// Digits are a subset of these characters, depending on `radix`:
+	/// * `0-9`
+	/// * `a-z`
+	/// * `A-Z`
+	///
+	/// # Panics
+	///
+	/// This function panics if `radix` is not in the range from 2 to 36.
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::from_p8scii_radix(b"A", 16), Ok(P8Num::new(10.0)));
+	/// ```
+	/// Trailing space returns error:
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert!(P8Num::from_p8scii_radix(b"1 ", 10).is_err());
+	/// ```
+	#[inline]
+	pub const fn from_p8scii_radix(_src: &[u8], _radix: u32) -> Result<Self, ()> {
+		unimplemented!()
 	}
 	
 	/// Constructs new value from raw i32 value.
@@ -134,6 +203,191 @@ impl P8Num {
 	/// ```
 	pub const fn fractional(self) -> u16 {
 		(self.0 & 0xFFFF) as u16
+	}
+	
+	/// Computes the absolute value of `self`.
+	///
+	/// # Overflow behavior
+	///
+	/// The absolute value of `P8Num::MIN` cannot be represented as an `i32`, and attempting
+	/// to calculate it will cause an overflow. This means that code in debug mode will trigger
+	/// a panic on this case and optimized code will return `P8Num::MIN` without a panic. If you
+	/// do not want this behavior, consider using [`unsigned_abs`](Self::unsigned_abs) instead.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(10.0).abs(), P8Num::new(10.0));
+	/// assert_eq!(P8Num::new(-10.0).abs(), P8Num::new(10.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn abs(self) -> Self {
+		Self(self.0.abs())
+	}
+	
+	/// Returns a number representing sign of `self`.
+	///
+	///  - `0` if the number is zero
+	///  - `1` if the number is positive
+	///  - `-1` if the number is negative
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(10.0).signum(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.0).signum(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(-10.0).signum(), P8Num::new(-1.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline(always)]
+	pub const fn signum(self) -> Self {
+		Self(self.0.signum() << 16)
+	}
+	
+	/// Returns `true` if `self` is positive and `false` if the number is zero or
+	/// negative.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert!(P8Num::new(10.0).is_positive());
+	/// assert!(!P8Num::new(0.0).is_positive());
+	/// assert!(!P8Num::new(-10.0).is_positive());
+	/// ```
+	#[must_use]
+	#[inline(always)]
+	pub const fn is_positive(self) -> bool {
+		self.0.is_positive()
+	}
+	
+	/// Returns `true` if `self` is negative and `false` if the number is zero or
+	/// positive.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert!(P8Num::new(-10.0).is_negative());
+	/// assert!(!P8Num::new(0.0).is_negative());
+	/// assert!(!P8Num::new(10.0).is_negative());
+	/// ```
+	#[must_use]
+	#[inline(always)]
+	pub const fn is_negative(self) -> bool {
+		self.0.is_negative()
+	}
+	
+	/// Calculates the midpoint (average) between `self` and `rhs`.
+	///
+	/// `midpoint(a, b)` is `(a + b) / 2` as if it were performed in a
+	/// sufficiently-large signed integral type. This implies that the result is
+	/// always rounded towards zero and that no overflow will ever occur.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(1.0).midpoint(P8Num::new(4.0)), P8Num::new(2.5));
+	/// assert_eq!(P8Num::new(-5.5).midpoint(P8Num::new(8.0)), P8Num::new(1.25));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn midpoint(self, rhs: Self) -> Self {
+		Self(self.0.midpoint(rhs.0))
+	}
+	
+	/// Calculates Euclidean division, the matching method for `rem_euclid`.
+	///
+	/// This computes the integer `n` such that
+	/// `self = n * rhs + self.rem_euclid(rhs)`.
+	/// In other words, the result is `self / rhs` rounded to the integer `n`
+	/// such that `self >= n * rhs`.
+	///
+	/// # Precision
+	///
+	/// The result of this operation is guaranteed to be the rounded
+	/// infinite-precision result.
+	///
+	/// # Panics
+	///
+	/// This function will panic if `rhs` is zero or the operation would result in overflow.
+	/// This behavior is not affected by the `overflow-checks` flag.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(7.0).div_euclid(P8Num::new(4.0)), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(-7.0).div_euclid(P8Num::new(4.0)), P8Num::new(-2.0));
+	/// assert_eq!(P8Num::new(7.0).div_euclid(P8Num::new(-4.0)), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-7.0).div_euclid(P8Num::new(-4.0)), P8Num::new(2.0));
+	/// assert_eq!(P8Num::new(10.0).div_euclid(P8Num::new(0.25)), P8Num::new(40.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	#[track_caller]
+	pub const fn div_euclid(self, rhs: Self) -> Self {
+		self.checked_div_euclid(rhs).unwrap()
+	}
+	
+	/// Calculates the least nonnegative remainder of `self (mod rhs)`.
+	///
+	/// This is done as if by the Euclidean division algorithm -- given
+	/// `r = self.rem_euclid(rhs)`, the result satisfies
+	/// `self = rhs * self.div_euclid(rhs) + r` and `0 <= r < abs(rhs)`.
+	///
+	/// # Panics
+	///
+	/// This function will panic if `rhs` is zero or the operation would result in overflow.
+	/// This behavior is not affected by the `overflow-checks` flag.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(7.0).rem_euclid(P8Num::new(4.0)), P8Num::new(3.0));
+	/// assert_eq!(P8Num::new(-7.0).rem_euclid(P8Num::new(4.0)), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(7.0).rem_euclid(P8Num::new(-4.0)), P8Num::new(3.0));
+	/// assert_eq!(P8Num::new(-7.0).rem_euclid(P8Num::new(-4.0)), P8Num::new(1.0));
+	/// ```
+	///
+	/// This will panic:
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// let _ = P8Num::MIN.rem_euclid(-P8Num::EPSILON);
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	#[track_caller]
+	pub const fn rem_euclid(self, rhs: Self) -> Self {
+		self.checked_rem_euclid(rhs).unwrap()
+	}
+	
+	/// Raises self to the power of `exp`, using exponentiation by squaring.
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(3.0).pow(P8Num::new(4.0)), P8Num::new(81.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn pow(self, mut _exp: Self) -> Self {
+		unimplemented!()
 	}
 	
 	/// Returns the number of ones in the binary representation of `self`.
@@ -1252,171 +1506,6 @@ impl P8Num {
 		unimplemented!()
 	}
 	
-	/// Raises self to the power of `exp`, using exponentiation by squaring.
-	///
-	/// # Examples
-	///
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert_eq!(P8Num::new(3.0).pow(P8Num::new(4.0)), P8Num::new(81.0));
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn pow(self, mut _exp: Self) -> Self {
-		unimplemented!()
-	}
-	
-	/// Calculates Euclidean division, the matching method for `rem_euclid`.
-	///
-	/// This computes the integer `n` such that
-	/// `self = n * rhs + self.rem_euclid(rhs)`.
-	/// In other words, the result is `self / rhs` rounded to the integer `n`
-	/// such that `self >= n * rhs`.
-	///
-	/// # Precision
-	///
-	/// The result of this operation is guaranteed to be the rounded
-	/// infinite-precision result.
-	///
-	/// # Panics
-	///
-	/// This function will panic if `rhs` is zero or the operation would result in overflow.
-	/// This behavior is not affected by the `overflow-checks` flag.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	/// 
-	/// assert_eq!(P8Num::new(7.0).div_euclid(P8Num::new(4.0)), P8Num::new(1.0));
-	/// assert_eq!(P8Num::new(-7.0).div_euclid(P8Num::new(4.0)), P8Num::new(-2.0));
-	/// assert_eq!(P8Num::new(7.0).div_euclid(P8Num::new(-4.0)), P8Num::new(-1.0));
-	/// assert_eq!(P8Num::new(-7.0).div_euclid(P8Num::new(-4.0)), P8Num::new(2.0));
-	/// assert_eq!(P8Num::new(10.0).div_euclid(P8Num::new(0.25)), P8Num::new(40.0));
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	#[track_caller]
-	pub const fn div_euclid(self, rhs: Self) -> Self {
-		self.checked_div_euclid(rhs).unwrap()
-	}
-	
-	/// Calculates the least nonnegative remainder of `self (mod rhs)`.
-	///
-	/// This is done as if by the Euclidean division algorithm -- given
-	/// `r = self.rem_euclid(rhs)`, the result satisfies
-	/// `self = rhs * self.div_euclid(rhs) + r` and `0 <= r < abs(rhs)`.
-	///
-	/// # Panics
-	///
-	/// This function will panic if `rhs` is zero or the operation would result in overflow.
-	/// This behavior is not affected by the `overflow-checks` flag.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert_eq!(P8Num::new(7.0).rem_euclid(P8Num::new(4.0)), P8Num::new(3.0));
-	/// assert_eq!(P8Num::new(-7.0).rem_euclid(P8Num::new(4.0)), P8Num::new(1.0));
-	/// assert_eq!(P8Num::new(7.0).rem_euclid(P8Num::new(-4.0)), P8Num::new(3.0));
-	/// assert_eq!(P8Num::new(-7.0).rem_euclid(P8Num::new(-4.0)), P8Num::new(1.0));
-	/// ```
-	///
-	/// This will panic:
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// let _ = P8Num::MIN.rem_euclid(-P8Num::EPSILON);
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	#[track_caller]
-	pub const fn rem_euclid(self, rhs: Self) -> Self {
-		self.checked_rem_euclid(rhs).unwrap()
-	}
-	
-	/// Computes the absolute value of `self`.
-	///
-	/// # Overflow behavior
-	///
-	/// The absolute value of `P8Num::MIN` cannot be represented as an `i32`, and attempting
-	/// to calculate it will cause an overflow. This means that code in debug mode will trigger
-	/// a panic on this case and optimized code will return `P8Num::MIN` without a panic. If you
-	/// do not want this behavior, consider using [`unsigned_abs`](Self::unsigned_abs) instead.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert_eq!(P8Num::new(10.0).abs(), P8Num::new(10.0));
-	/// assert_eq!(P8Num::new(-10.0).abs(), P8Num::new(10.0));
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn abs(self) -> Self {
-		Self(self.0.abs())
-	}
-	
-	/// Returns a number representing sign of `self`.
-	///
-	///  - `0` if the number is zero
-	///  - `1` if the number is positive
-	///  - `-1` if the number is negative
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert_eq!(P8Num::new(10.0).signum(), P8Num::new(1.0));
-	/// assert_eq!(P8Num::new(0.0).signum(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(-10.0).signum(), P8Num::new(-1.0));
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline(always)]
-	pub const fn signum(self) -> Self {
-		Self(self.0.signum() << 16)
-	}
-	
-	/// Returns `true` if `self` is positive and `false` if the number is zero or
-	/// negative.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert!(P8Num::new(10.0).is_positive());
-	/// assert!(!P8Num::new(0.0).is_positive());
-	/// assert!(!P8Num::new(-10.0).is_positive());
-	/// ```
-	#[must_use]
-	#[inline(always)]
-	pub const fn is_positive(self) -> bool {
-		self.0.is_positive()
-	}
-	
-	/// Returns `true` if `self` is negative and `false` if the number is zero or
-	/// positive.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert!(P8Num::new(-10.0).is_negative());
-	/// assert!(!P8Num::new(0.0).is_negative());
-	/// assert!(!P8Num::new(10.0).is_negative());
-	/// ```
-	#[must_use]
-	#[inline(always)]
-	pub const fn is_negative(self) -> bool {
-		self.0.is_negative()
-	}
-	
 	/// Returns the memory representation of this integer as a byte array in
 	/// big-endian (network) byte order.
 	///
@@ -1580,87 +1669,6 @@ impl P8Num {
 	#[inline]
 	pub const fn from_ne_bytes(bytes: [u8; 4]) -> Self {
 		Self(i32::from_ne_bytes(bytes))
-	}
-	
-	/// Calculates the midpoint (average) between `self` and `rhs`.
-	///
-	/// `midpoint(a, b)` is `(a + b) / 2` as if it were performed in a
-	/// sufficiently-large signed integral type. This implies that the result is
-	/// always rounded towards zero and that no overflow will ever occur.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use p8rs_types::p8num::P8Num;
-	///
-	/// assert_eq!(P8Num::new(1.0).midpoint(P8Num::new(4.0)), P8Num::new(2.5));
-	/// assert_eq!(P8Num::new(-5.5).midpoint(P8Num::new(8.0)), P8Num::new(1.25));
-	/// ```
-	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn midpoint(self, rhs: Self) -> Self {
-		Self(self.0.midpoint(rhs.0))
-	}
-	
-	/// Parses an integer from an P8SCII slice with decimal digits.
-	///
-	/// The characters are expected to be an optional
-	///  `+` or `-` 
-	/// sign followed by only digits. Leading and trailing non-digit characters (including
-	/// whitespace) represent an error. Underscores (which are accepted in Rust literals)
-	/// also represent an error.
-	///
-	/// # Examples
-	///
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	/// 
-	/// assert_eq!(P8Num::from_p8scii(b"+10"), Ok(P8Num::new(10.0)));
-	/// ```
-	/// Trailing space returns error:
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	/// 
-	/// assert!(P8Num::from_p8scii(b"1 ").is_err());
-	/// ```
-	#[inline]
-	pub const fn from_p8scii(_src: &[u8]) -> Result<Self, ()> {
-		unimplemented!()
-	}
-	
-	/// Parses an integer from an ASCII-byte slice with digits in a given base.
-	///
-	/// The characters are expected to be an optional
-	///  `+` or `-` 
-	/// sign followed by only digits. Leading and trailing non-digit characters (including
-	/// whitespace) represent an error. Underscores (which are accepted in Rust literals)
-	/// also represent an error.
-	///
-	/// Digits are a subset of these characters, depending on `radix`:
-	/// * `0-9`
-	/// * `a-z`
-	/// * `A-Z`
-	///
-	/// # Panics
-	///
-	/// This function panics if `radix` is not in the range from 2 to 36.
-	///
-	/// # Examples
-	///
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	/// 
-	/// assert_eq!(P8Num::from_p8scii_radix(b"A", 16), Ok(P8Num::new(10.0)));
-	/// ```
-	/// Trailing space returns error:
-	/// ```should_panic
-	/// use p8rs_types::p8num::P8Num;
-	/// 
-	/// assert!(P8Num::from_p8scii_radix(b"1 ", 10).is_err());
-	/// ```
-	#[inline]
-	pub const fn from_p8scii_radix(_src: &[u8], _radix: u32) -> Result<Self, ()> {
-		unimplemented!()
 	}
 }
 
