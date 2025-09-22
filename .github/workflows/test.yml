@@ -23,14 +23,14 @@ jobs:
       - name: 📥 Setup Rust
         uses: esp-rs/xtensa-toolchain@v1.5
         with:
-          default: true
+          default: false
           buildtargets: esp32s3
           ldproxy: false
           version: '1.90.0'
       - name: 📥 Install Dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev
-          rustup override set nightly
+          rustup default nightly-2025-09-01
           cargo install cargo-make
       - name: 🎥 FFmpeg Setup
         uses: FedericoCarboni/setup-ffmpeg@v3

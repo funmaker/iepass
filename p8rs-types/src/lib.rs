@@ -4,7 +4,6 @@
 #![feature(const_ops)]
 #![feature(bigint_helper_methods)]
 #![feature(const_option_ops)]
-#![feature(const_result_trait_fn)]
 
 extern crate alloc;
 

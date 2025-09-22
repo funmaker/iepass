@@ -1,7 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(never_type)]
 #![feature(iter_array_chunks)]
-#![feature(array_chunks)]
 #![feature(generic_const_exprs)]
 #![no_std]
 #![no_main]
@@ -33,7 +32,7 @@ use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
 use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
-// static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
+static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -186,7 +185,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             
             info!("{}", analog.read(100));
             
-            // speaker.play(&*KUTASAN).await?;
+            speaker.play(&*KUTASAN).await?;
             speaker.reset().await?;
         }
         

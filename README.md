@@ -13,6 +13,7 @@ IE Pass - The Console The Pass
 1) Install [FFmpeg](https://ffmpeg.org/download.html).
 2) Install cargo dependencies:
     ```bash
+    rustup default nightly-2025-09-01
     cargo install cargo-make ldproxy espflash
     cargo install espup probe-rs-tools --locked
     espup install --targets=esp32s3 --toolchain-version 1.90.0.0

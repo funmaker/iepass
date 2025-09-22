@@ -62,11 +62,11 @@ impl P8String {
 		P8String(Vec::with_capacity(capacity))
 	}
 	
-	pub fn from_str(value: &str) -> Result<Self, FromStrError> {
+	pub fn from_str(_value: &str) -> Result<Self, FromStrError> {
 		unimplemented!()
 	}
 	
-	pub fn from_str_lossy(value: &str) -> Self {
+	pub fn from_str_lossy(_value: &str) -> Self {
 		unimplemented!()
 	}
 }
@@ -97,6 +97,6 @@ impl DerefMut for P8String {
 	}
 }
 
-enum FromStrError {
+pub enum FromStrError {
 	UnexpectedChar(char, usize),
 }

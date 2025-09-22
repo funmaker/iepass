@@ -2,15 +2,15 @@ use bitflags::bitflags;
 
 mod generated;
 
-struct Font<'a>(&'a [u8; 0x800]);
+pub struct Font<'a>(&'a [u8; 0x800]);
 
 impl<'a> Font<'a> {
-	const SYSTEM: Font<'static> = Font(&generated::SYSTEM_FONT);
+	pub const SYSTEM: Font<'static> = Font(&generated::SYSTEM_FONT);
 	
-	fn width(&self) -> u8 { self.0[0] }
-	fn width_ex(&self) -> u8 { self.0[1] }
-	fn width_tab(&self) -> u8 { self.0[6] }
-	fn width_chr(&self, char: u8) -> u8 {
+	pub fn width(&self) -> u8 { self.0[0] }
+	pub fn width_ex(&self) -> u8 { self.0[1] }
+	pub fn width_tab(&self) -> u8 { self.0[6] }
+	pub fn width_chr(&self, char: u8) -> u8 {
 		let flags = self.flags();
 		let adjust = if flags.contains(FontFlags::SIZE_ADUST_EN) && char > 16 {
 			let byte = self.0[char as usize / 2];
@@ -29,11 +29,11 @@ impl<'a> Font<'a> {
 			128..=255 => self.width_ex().saturating_add_signed(adjust).min(8),
 		}
 	}
-	fn height(&self) -> u8 { self.0[2] }
-	fn offset(&self) -> (u8, u8) { (self.0[3], self.0[4]) }
-	fn flags(&self) -> FontFlags { FontFlags::from_bits_truncate(self.0[5]) }
+	pub fn height(&self) -> u8 { self.0[2] }
+	pub fn offset(&self) -> (u8, u8) { (self.0[3], self.0[4]) }
+	pub fn flags(&self) -> FontFlags { FontFlags::from_bits_truncate(self.0[5]) }
 	
-	fn char(&self, char: u8) -> [u8; 8] {
+	pub fn char(&self, char: u8) -> [u8; 8] {
 		match char {
 			0..16 => [0; 8],
 			16.. => self.0.as_chunks().0[char as usize],

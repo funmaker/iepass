@@ -367,9 +367,7 @@ impl P8Num {
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
 	pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
-		(((self.0 as i64) * (rhs.0 as i64)) >> 16)
-			.try_into()
-			.ok()
+		try_into_some(((self.0 as i64) * (rhs.0 as i64)) >> 16)
 			.map(Self)
 	}
 	
@@ -398,9 +396,7 @@ impl P8Num {
 			return None;
 		}
 		
-		(((self.0 as i64) << 16) / (rhs.0 as i64))
-			.try_into()
-			.ok()
+		try_into_some(((self.0 as i64) << 16) / (rhs.0 as i64))
 			.map(Self)
 	}
 	
@@ -428,9 +424,7 @@ impl P8Num {
 			return None;
 		}
 		
-		((self.0 as i64).div_euclid(rhs.0 as i64) << 16)
-			.try_into()
-			.ok()
+		try_into_some((self.0 as i64).div_euclid(rhs.0 as i64) << 16)
 			.map(Self)
 	}
 	
@@ -577,7 +571,7 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	pub const fn checked_pow(self, mut exp: Self) -> Option<Self> {
+	pub const fn checked_pow(self, mut _exp: Self) -> Option<Self> {
 		unimplemented!()
 	}
 	
@@ -725,7 +719,7 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	pub const fn saturating_pow(self, exp: u32) -> Self {
+	pub const fn saturating_pow(self, _exp: u32) -> Self {
 		unimplemented!()
 	}
 	
@@ -1254,7 +1248,7 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	pub const fn overflowing_pow(self, mut exp: Self) -> (Self, bool) {
+	pub const fn overflowing_pow(self, mut _exp: Self) -> (Self, bool) {
 		unimplemented!()
 	}
 	
@@ -1269,7 +1263,7 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	pub const fn pow(self, mut exp: Self) -> Self {
+	pub const fn pow(self, mut _exp: Self) -> Self {
 		unimplemented!()
 	}
 	
@@ -1630,7 +1624,7 @@ impl P8Num {
 	/// assert!(P8Num::from_p8scii(b"1 ").is_err());
 	/// ```
 	#[inline]
-	pub const fn from_p8scii(src: &[u8]) -> Result<Self, ()> {
+	pub const fn from_p8scii(_src: &[u8]) -> Result<Self, ()> {
 		unimplemented!()
 	}
 	
@@ -1665,7 +1659,7 @@ impl P8Num {
 	/// assert!(P8Num::from_p8scii_radix(b"1 ", 10).is_err());
 	/// ```
 	#[inline]
-	pub const fn from_p8scii_radix(src: &[u8], radix: u32) -> Result<Self, ()> {
+	pub const fn from_p8scii_radix(_src: &[u8], _radix: u32) -> Result<Self, ()> {
 		unimplemented!()
 	}
 }
@@ -1678,7 +1672,7 @@ impl const Add for P8Num {
 	}
 }
 
-impl const AddAssign for P8Num {
+impl AddAssign for P8Num {
 	fn add_assign(&mut self, rhs: Self) {
 		*self = *self + rhs;
 	}
@@ -1692,7 +1686,7 @@ impl const Sub for P8Num {
 	}
 }
 
-impl const SubAssign for P8Num {
+impl SubAssign for P8Num {
 	fn sub_assign(&mut self, rhs: Self) {
 		*self = *self - rhs;
 	}
@@ -1706,7 +1700,7 @@ impl const Mul for P8Num {
 	}
 }
 
-impl const MulAssign for P8Num {
+impl MulAssign for P8Num {
 	fn mul_assign(&mut self, rhs: Self) {
 		*self = *self * rhs;
 	}
@@ -1720,7 +1714,7 @@ impl const Div for P8Num {
 	}
 }
 
-impl const DivAssign for P8Num {
+impl DivAssign for P8Num {
 	fn div_assign(&mut self, rhs: Self) {
 		*self = *self / rhs;
 	}
@@ -1734,13 +1728,13 @@ impl const Rem for P8Num {
 	}
 }
 
-impl const RemAssign for P8Num {
+impl RemAssign for P8Num {
 	fn rem_assign(&mut self, rhs: Self) {
 		*self = *self / rhs;
 	}
 }
 
-impl const BitAnd for P8Num {
+impl BitAnd for P8Num {
 	type Output = P8Num;
 	
 	fn bitand(self, rhs: Self) -> P8Num {
@@ -1748,13 +1742,13 @@ impl const BitAnd for P8Num {
 	}
 }
 
-impl const BitAndAssign for P8Num {
+impl BitAndAssign for P8Num {
 	fn bitand_assign(&mut self, rhs: Self) {
 		*self = *self & rhs;
 	}
 }
 
-impl const BitOr for P8Num {
+impl BitOr for P8Num {
 	type Output = P8Num;
 	
 	fn bitor(self, rhs: Self) -> P8Num {
@@ -1762,13 +1756,13 @@ impl const BitOr for P8Num {
 	}
 }
 
-impl const BitOrAssign for P8Num {
+impl BitOrAssign for P8Num {
 	fn bitor_assign(&mut self, rhs: Self) {
 		*self = *self | rhs;
 	}
 }
 
-impl const BitXor for P8Num {
+impl BitXor for P8Num {
 	type Output = P8Num;
 	
 	fn bitxor(self, rhs: Self) -> P8Num {
@@ -1776,13 +1770,13 @@ impl const BitXor for P8Num {
 	}
 }
 
-impl const BitXorAssign for P8Num {
+impl BitXorAssign for P8Num {
 	fn bitxor_assign(&mut self, rhs: Self) {
 		*self = *self ^ rhs;
 	}
 }
 
-impl const Not for P8Num {
+impl Not for P8Num {
 	type Output = P8Num;
 	
 	fn not(self) -> P8Num {
@@ -1790,7 +1784,7 @@ impl const Not for P8Num {
 	}
 }
 
-impl const Neg for P8Num {
+impl Neg for P8Num {
 	type Output = P8Num;
 	
 	fn neg(self) -> P8Num {
@@ -1881,4 +1875,12 @@ impl const TryFrom<f64> for P8Num {
 pub enum TryFromError {
 	/// The provided value is outside the range of representable values or is NaN.
 	OutOfRange,
+}
+
+//TODO: use feature(const_result_trait_fn)
+const fn try_into_some(value: i64) -> Option<i32> {
+	match value.try_into() {
+		Ok(ok) => Some(ok),
+		Err(_) => None,
+	}
 }
