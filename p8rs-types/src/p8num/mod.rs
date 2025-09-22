@@ -285,6 +285,20 @@ impl P8Num {
 		self.0.is_negative()
 	}
 	
+	/// Takes the reciprocal (inverse) of a number, `1/x`.
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	/// 
+	/// assert_eq!(P8Num::new(0.25).recip(), P8Num::new(4.0));
+	/// assert_eq!(P8Num::new(10.0).recip(), P8Num::new(0.1));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn recip(self) -> Self {
+		P8Num::ONE / self
+	}
+	
 	/// Calculates the midpoint (average) between `self` and `rhs`.
 	///
 	/// `midpoint(a, b)` is `(a + b) / 2` as if it were performed in a
@@ -1396,7 +1410,6 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	#[track_caller]
 	pub const fn overflowing_rem_euclid(self, rhs: Self) -> (Self, bool) {
 		let (res, overflow) = self.0.overflowing_rem_euclid(rhs.0);
 		(Self(res), overflow)
