@@ -1,5 +1,8 @@
+use alloc::string::String;
 use core::fmt::{Debug, Display, Formatter};
-use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign, Neg, Not, Rem, RemAssign, Sub, SubAssign};
+use core::num::FpCategory;
+use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
+use tinyvec::ArrayVec;
 
 pub mod consts;
 
@@ -18,17 +21,17 @@ impl P8Num {
 	pub const MAX: Self = Self(i32::MAX);
 	
 	/// The additive identity of [P8Num], commonly called zero (0.0 or 0x0000.0000).
-	pub const ZERO: Self = Self::new(0.0);
+	pub const ZERO: Self = Self(0);
 	
 	/// The multiplicative identity of [P8Num], commonly called one (1.0 or 0x0001.0000).
-	pub const ONE: Self = Self::new(1.0);
+	pub const ONE: Self = Self(1 << 16);
 	
 	/// The smallest positive value of [P8Num] (0.00001525878 or 0x0000.0001).
 	pub const EPSILON: Self = Self(1);
 	
 	/// Creates new value from `f32`.
 	/// 
-	/// Overflow is handled in a saturating manner. NaN becomes 0.
+	/// Overflow is handled in a wrapping manner. Infinities become MIN/MAX and NaN becomes 0.
 	/// 
 	/// # Examples
 	/// 
@@ -39,19 +42,41 @@ impl P8Num {
 	/// assert_eq!(P8Num::new(0.5), P8Num::from_raw(0x0000_8000));
 	/// assert_eq!(P8Num::new(-0.5), P8Num::from_raw(-0x0000_8000));
 	/// assert_eq!(P8Num::new(4660.337890625), P8Num::from_raw(0x1234_5680));
-	/// assert_eq!(P8Num::new(100_000.0), P8Num::MAX);
+	/// assert_eq!(P8Num::new(32768.0), P8Num::new(-32768.0));
+	/// assert_eq!(P8Num::new(-32769.0), P8Num::new(32767.0));
 	/// assert_eq!(P8Num::new(f32::INFINITY), P8Num::MAX);
-	/// assert_eq!(P8Num::new(-100_000.0), P8Num::MIN);
 	/// assert_eq!(P8Num::new(f32::NEG_INFINITY), P8Num::MIN);
 	/// assert_eq!(P8Num::new(f32::NAN), P8Num::ZERO);
 	/// ```
 	pub const fn new(value: f32) -> Self {
-		Self((value * (1 << 16) as f32) as i32)
+		match value.classify() {
+			FpCategory::Zero |
+			FpCategory::Subnormal |
+			FpCategory::Nan => P8Num::ZERO,
+			FpCategory::Infinite => if value.is_sign_positive() { P8Num::MAX } else { P8Num::MIN },
+			FpCategory::Normal => {
+				let bits: u32 = value.to_bits();
+				let negative = bits >> 31 != 0;
+				let exponent = ((bits >> 23) & 0xff) as i32 - 127 - 23 + 16;
+				let mantissa = (bits & 0x7fffff) | 0x800000;
+				
+				let mut units = match exponent {
+					..0 => mantissa.unbounded_shr((-exponent) as u32),
+					0.. => mantissa.unbounded_shl(exponent as u32),
+				} as i32;
+				
+				if negative {
+					units = (!units).wrapping_add(1)
+				}
+				
+				Self(units)
+			}
+		}
 	}
 	
 	/// Creates new value from `f64`.
 	///
-	/// Overflow is handled in a saturating manner. NaN becomes 0.
+	/// Overflow is handled in a wrapping manner. Infinities become MIN/MAX and NaN becomes 0.
 	///
 	/// # Examples
 	///
@@ -62,14 +87,36 @@ impl P8Num {
 	/// assert_eq!(P8Num::new_f64(0.5), P8Num::from_raw(0x0000_8000));
 	/// assert_eq!(P8Num::new_f64(-0.5), P8Num::from_raw(-0x0000_8000));
 	/// assert_eq!(P8Num::new_f64(4660.3377685546875), P8Num::from_raw(0x1234_5678));
-	/// assert_eq!(P8Num::new_f64(100_000.0), P8Num::MAX);
+	/// assert_eq!(P8Num::new_f64(32768.0), P8Num::new(-32768.0));
+	/// assert_eq!(P8Num::new_f64(-32769.0), P8Num::new(32767.0));
 	/// assert_eq!(P8Num::new_f64(f64::INFINITY), P8Num::MAX);
-	/// assert_eq!(P8Num::new_f64(-100_000.0), P8Num::MIN);
 	/// assert_eq!(P8Num::new_f64(f64::NEG_INFINITY), P8Num::MIN);
 	/// assert_eq!(P8Num::new_f64(f64::NAN), P8Num::ZERO);
 	/// ```
 	pub const fn new_f64(value: f64) -> Self {
-		Self((value * (1 << 16) as f64) as i32)
+		match value.classify() {
+			FpCategory::Zero |
+			FpCategory::Subnormal |
+			FpCategory::Nan => P8Num::ZERO,
+			FpCategory::Infinite => if value.is_sign_positive() { P8Num::MAX } else { P8Num::MIN },
+			FpCategory::Normal => {
+				let bits: u64 = value.to_bits();
+				let negative = bits >> 63 != 0;
+				let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023 - 52 + 16;
+				let mantissa = (bits & 0xfffffffffffff) | 0x10000000000000;
+				
+				let mut units = match exponent {
+					..0 => mantissa.unbounded_shr((-exponent) as u32),
+					0.. => mantissa.unbounded_shl(exponent as u32),
+				} as i32;
+				
+				if negative {
+					units = (!units).wrapping_add(1)
+				}
+				
+				Self(units)
+			}
+		}
 	}
 	
 	/// Parses an integer from an P8SCII slice with decimal digits.
@@ -133,6 +180,90 @@ impl P8Num {
 		unimplemented!()
 	}
 	
+	/// Formats `self` into an ASCII-byte slice.
+	/// 
+	/// See also [Self::to_str].
+	///
+	/// # Examples
+	///
+	/// ```
+	/// #![feature(ascii_char)]
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(0.0).to_ascii().as_ref().as_str(), "0");
+	/// assert_eq!(P8Num::new(0.5).to_ascii().as_ref().as_str(), "0.5");
+	/// assert_eq!(P8Num::new(-0.5).to_ascii().as_ref().as_str(), "-0.5");
+	/// assert_eq!(P8Num::new(0.12345).to_ascii().as_ref().as_str(), "0.1234");
+	/// assert_eq!(P8Num::EPSILON.to_ascii().as_ref().as_str(), "0");
+	/// assert_eq!((-P8Num::EPSILON).to_ascii().as_ref().as_str(), "-0");
+	/// assert_eq!(P8Num::MAX.to_ascii().as_ref().as_str(), "32768");
+	/// ```
+	pub fn to_ascii(&self) -> impl AsRef<[core::ascii::Char]> {
+		use core::ascii::Char;
+		
+		let mut buffer = ArrayVec::from_array_empty([Char::Null; 11]); // 1 sign + 5 digits + 1 dot + 4 decimals
+		let mut integer = i32::from(self.trunc()).abs();
+		let mut fraction = self.fract().to_raw();
+		
+		if self.is_negative() {
+			buffer.push(Char::HyphenMinus);
+		}
+		
+		if fraction <= 0x0006 {
+			fraction = 0;
+		} else if fraction >= 0xFFFA {
+			integer += 1;
+			fraction = 0;
+		}
+		
+		if integer == 0 {
+			buffer.push(Char::Digit0);
+		} else {
+			let digits = [10000, 1000, 100, 10, 1];
+			let mut rem = integer;
+			for digit in digits.iter().skip_while(|&&digit| digit > integer) {
+				let quot = rem / digit;
+				rem %= digit;
+				buffer.push(Char::digit(quot as u8).unwrap());
+			}
+		}
+		
+		if fraction != 0 {
+			buffer.push(Char::FullStop);
+			
+			fraction += 0x0004; // :^)
+			let mut rem = fraction;
+			for _ in 0..4 {
+				rem *= 10;
+				let quot = rem / (1 << 16);
+				rem %= 1 << 16;
+				buffer.push(Char::digit(quot as u8).unwrap());
+			}
+			
+			while let Some(Char::Digit0) = buffer.last() {
+				buffer.pop();
+			}
+		}
+		
+		buffer
+	}
+	
+	/// Formats `self` into a &str.
+	/// 
+	/// See [Self::to_ascii] for more info.
+	pub fn to_str(&self) -> impl AsRef<str> {
+		use core::ascii::Char;
+		
+		struct CharToStr<T: AsRef<[Char]>>(T);
+		impl<T: AsRef<[Char]>> AsRef<str> for CharToStr<T> {
+			fn as_ref(&self) -> &str {
+				self.0.as_ref().as_str()
+			}
+		}
+		
+		CharToStr(self.to_ascii())
+	}
+	
 	/// Constructs new value from raw i32 value.
 	///
 	/// The opposite of [Self::to_raw]. Returns [P8Num] value equal to `value` / 2^16
@@ -142,12 +273,13 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::from_raw(0x0001_0000), P8Num::new(1.0));
 	/// assert_eq!(P8Num::from_raw(-0x0001_0000), P8Num::new(-1.0));
-	/// assert_eq!(P8Num::from_raw(0x0000_8000), P8Num::new(0.5));
 	/// assert_eq!(P8Num::from_raw(-0x0000_8000), P8Num::new(-0.5));
+	/// assert_eq!(P8Num::from_raw(0x0000_8000), P8Num::new(0.5));
+	/// assert_eq!(P8Num::from_raw(0x0001_0000), P8Num::new(1.0));
 	/// assert_eq!(P8Num::from_raw(0x1234_5678), P8Num::new_f64(4660.3377685546875));
 	/// ```
+	#[inline]
 	pub const fn from_raw(value: i32) -> Self {
 		Self(value)
 	}
@@ -161,48 +293,130 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(1.0).to_raw(), 0x0001_0000);
 	/// assert_eq!(P8Num::new(-1.0).to_raw(), -0x0001_0000);
-	/// assert_eq!(P8Num::new(0.5).to_raw(), 0x0000_8000);
 	/// assert_eq!(P8Num::new(-0.5).to_raw(), -0x0000_8000);
+	/// assert_eq!(P8Num::new(0.5).to_raw(), 0x0000_8000);
+	/// assert_eq!(P8Num::new(1.0).to_raw(), 0x0001_0000);
 	/// assert_eq!(P8Num::new_f64(4660.3377685546875).to_raw(), 0x1234_5678);
 	/// ```
+	#[inline]
 	pub const fn to_raw(self) -> i32 {
 		self.0
 	}
 	
-	/// Returns integer part, rounded down.
+	/// Returns the integer part of `self`.
+	/// 
+	/// This means that non-integer numbers are always truncated towards zero.
 	///
 	/// # Examples
 	///
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(1.0).integer(), 1);
-	/// assert_eq!(P8Num::new(-1.0).integer(), -1);
-	/// assert_eq!(P8Num::new(0.5).integer(), 0);
-	/// assert_eq!(P8Num::new(-0.5).integer(), -1);
-	/// assert_eq!(P8Num::from_raw(0x1234_5678).integer(), 0x1234);
+	/// assert_eq!(P8Num::new(-1.5).trunc(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.5).trunc(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.5).trunc(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(1.5).trunc(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::from_raw(0x1234_5678).trunc(), P8Num::new(0x1234 as f32));
 	/// ```
-	pub const fn integer(self) -> i16 {
-		(self.0 >> 16) as i16
+	#[must_use = "method returns a new number and does not mutate the original value"]
+	#[inline]
+	pub const fn trunc(self) -> Self {
+		if self.is_negative() {
+			self.ceil()
+		} else {
+			self.floor()
+		}
 	}
 	
-	/// Returns fractional part.
+	/// Returns the fractional part of `self`.
 	///
 	/// # Examples
 	///
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(1.0).fractional(), 0);
-	/// assert_eq!(P8Num::new(-1.0).fractional(), 0);
-	/// assert_eq!(P8Num::new(0.5).fractional(), 0x8000);
-	/// assert_eq!(P8Num::new(-0.5).fractional(), 0x8000);
-	/// assert_eq!(P8Num::from_raw(0x1234_5678).fractional(), 0x5678);
+	/// assert_eq!(P8Num::new(-1.0).fract(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(-0.5).fract(), P8Num::new(0.5));
+	/// assert_eq!(P8Num::new(-0.2).fract(), P8Num::new(0.2));
+	/// assert_eq!(P8Num::new(0.2).fract(), P8Num::new(0.2));
+	/// assert_eq!(P8Num::new(0.5).fract(), P8Num::new(0.5));
+	/// assert_eq!(P8Num::new(1.0).fract(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::from_raw(0x1234_5678).fract(), P8Num::from_raw(0x0000_5678));
 	/// ```
-	pub const fn fractional(self) -> u16 {
-		(self.0 & 0xFFFF) as u16
+	#[must_use = "method returns a new number and does not mutate the original value"]
+	#[inline]
+	pub const fn fract(self) -> Self {
+		(self - self.trunc()).abs()
+	}
+	
+	/// Returns the largest integer less than or equal to `self`.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(-1.0).floor(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.5).floor(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.2).floor(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(0.2).floor(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.5).floor(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(1.0).floor(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::from_raw(0x1234_5678).floor(), P8Num::new(0x1234 as f32));
+	/// ```
+	#[must_use = "method returns a new number and does not mutate the original value"]
+	#[inline]
+	pub const fn floor(self) -> Self {
+		Self((self.0 as u32 & 0xFFFF_0000) as i32)
+	}
+	
+	/// Returns the smallest integer greater than or equal to `self`.
+	/// 
+	/// Numbers larger than 32767.0 get wrapped around to -32767.0
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(-1.0).ceil(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.5).ceil(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(-0.2).ceil(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.2).ceil(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.5).ceil(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(1.0).ceil(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::from_raw(0x1234_5678).ceil(), P8Num::new(0x1235 as f32));
+	/// ```
+	#[must_use = "method returns a new number and does not mutate the original value"]
+	#[inline]
+	pub const fn ceil(self) -> Self {
+		Self(self.0.wrapping_add(0xFFFF)).floor()
+	}
+	
+	/// Returns the nearest integer to `self`. If a value is half-way between two
+	/// integers, round away from `0.0`.
+	/// 
+	/// Numbers larger or equal to 32767.5 gets wrapped around to -32767.0
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(-1.0).round(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.5).round(), P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(-0.2).round(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.2).round(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.5).round(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(1.0).round(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::from_raw(0x1234_5678).round(), P8Num::new(0x1234 as f32));
+	/// ```
+	#[must_use = "method returns a new number and does not mutate the original value"]
+	#[inline]
+	pub const fn round(self) -> Self {
+		let midpoint = if self.is_negative() { 0x7FFF } else { 0x8000 };
+		Self(self.0.wrapping_add(midpoint)).floor()
 	}
 	
 	/// Computes the absolute value of `self`.
@@ -389,18 +603,104 @@ impl P8Num {
 		self.checked_rem_euclid(rhs).unwrap()
 	}
 	
-	/// Raises self to the power of `exp`, using exponentiation by squaring.
+	/// Raises a number to a real power.
 	///
 	/// # Examples
 	///
 	/// ```should_panic
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(3.0).pow(P8Num::new(4.0)), P8Num::new(81.0));
+	/// assert_eq!(P8Num::new(3.0).powf(P8Num::new(4.0)), P8Num::new(81.0));
+	/// assert_eq!(P8Num::new(81.0).powf(P8Num::new(0.25)), P8Num::new(4.0));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline]
-	pub const fn pow(self, mut _exp: Self) -> Self {
+	pub const fn powf(self, _exp: Self) -> Self {
+		unimplemented!()
+	}
+	
+	/// Raises a number to an integer power.
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert_eq!(P8Num::new(3.0).powi(4), P8Num::new(81.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn powi(self, _exp: i32) -> Self {
+		unimplemented!()
+	}
+	
+	/// Computes the sine of a number (in turns).
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	/// 
+	/// assert_eq!(P8Num::new(0).sin(),     P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.125).sin(), P8Num::new(-0.7071));
+	/// assert_eq!(P8Num::new(0.25).sin(),  P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(0.375).sin(), P8Num::new(-0.7071));
+	/// assert_eq!(P8Num::new(0.5).sin(),   P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.625).sin(), P8Num::new(0.7071));
+	/// assert_eq!(P8Num::new(0.75).sin(),  P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.875).sin(), P8Num::new(0.7071));
+	/// assert_eq!(P8Num::new(1).sin(),     P8Num::new(0.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn sin(self, _exp: Self) -> Self {
+		unimplemented!()
+	}
+	
+	/// Computes the cosine of a number (in turns).
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	/// 
+	/// assert_eq!(P8Num::new(0).cos(),     P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.125).cos(), P8Num::new(0.7071));
+	/// assert_eq!(P8Num::new(0.25).cos(),  P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.375).cos(), P8Num::new(-0.7071));
+	/// assert_eq!(P8Num::new(0.5).cos(),   P8Num::new(-1.0));
+	/// assert_eq!(P8Num::new(0.625).cos(), P8Num::new(-0.7071));
+	/// assert_eq!(P8Num::new(0.75).cos(),  P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.875).cos(), P8Num::new(0.7071));
+	/// assert_eq!(P8Num::new(1).cos(),     P8Num::new(1.0));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn cos(self, _exp: Self) -> Self {
+		unimplemented!()
+	}
+	
+	/// Computes the cosine of a number (in turns).
+	///
+	/// # Examples
+	///
+	/// ```should_panic
+	/// use p8rs_types::p8num::P8Num;
+	/// 
+	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(0)),  P8Num::new(0.0));
+	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(1)),  P8Num::new(0.875));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(1)),  P8Num::new(0.75));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(1)),  P8Num::new(0.625));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(0)),  P8Num::new(0.5));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(-1)), P8Num::new(0.375));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(-1)), P8Num::new(0.25));
+	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(-1)), P8Num::new(0.125));
+	/// assert_eq!(P8Num::atan2(P8Num::new(99), P8Num::new(99)), P8Num::new(0.875));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(0)),  P8Num::new(0.25));
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	#[inline]
+	pub const fn atan2(_x: Self, _y: Self) -> Self {
 		unimplemented!()
 	}
 	
@@ -1689,7 +1989,7 @@ impl const Add for P8Num {
 	type Output = P8Num;
 	
 	fn add(self, rhs: Self) -> P8Num {
-		self.saturating_add(rhs)
+		self.wrapping_add(rhs)
 	}
 }
 
@@ -1703,7 +2003,7 @@ impl const Sub for P8Num {
 	type Output = P8Num;
 	
 	fn sub(self, rhs: Self) -> P8Num {
-		self.saturating_sub(rhs)
+		self.wrapping_sub(rhs)
 	}
 }
 
@@ -1717,7 +2017,7 @@ impl const Mul for P8Num {
 	type Output = P8Num;
 	
 	fn mul(self, rhs: Self) -> P8Num {
-		self.saturating_mul(rhs)
+		self.wrapping_mul(rhs)
 	}
 }
 
@@ -1731,7 +2031,7 @@ impl const Div for P8Num {
 	type Output = P8Num;
 	
 	fn div(self, rhs: Self) -> P8Num {
-		self.saturating_div(rhs)
+		self.wrapping_div(rhs)
 	}
 }
 
@@ -1745,13 +2045,41 @@ impl const Rem for P8Num {
 	type Output = P8Num;
 	
 	fn rem(self, rhs: Self) -> P8Num {
-		Self(self.0 % rhs.0)
+		self.wrapping_rem(rhs)
 	}
 }
 
 impl RemAssign for P8Num {
 	fn rem_assign(&mut self, rhs: Self) {
 		*self = *self / rhs;
+	}
+}
+
+impl const Shl<u32> for P8Num {
+	type Output = P8Num;
+	
+	fn shl(self, rhs: u32) -> P8Num {
+		self.wrapping_shl(rhs)
+	}
+}
+
+impl ShlAssign<u32> for P8Num {
+	fn shl_assign(&mut self, rhs: u32) {
+		*self = *self << rhs;
+	}
+}
+
+impl const Shr<u32> for P8Num {
+	type Output = P8Num;
+	
+	fn shr(self, rhs: u32) -> P8Num {
+		self.wrapping_shr(rhs)
+	}
+}
+
+impl ShrAssign<u32> for P8Num {
+	fn shr_assign(&mut self, rhs: u32) {
+		*self = *self << rhs;
 	}
 }
 
@@ -1809,19 +2137,20 @@ impl Neg for P8Num {
 	type Output = P8Num;
 	
 	fn neg(self) -> P8Num {
-		Self(-self.0)
+		self.wrapping_neg()
 	}
 }
 
 impl Display for P8Num {
 	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-		Display::fmt(&f64::from(*self), f)
+		write!(f, "{}", self.to_str().as_ref())
 	}
 }
 
 impl Debug for P8Num {
 	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-		write!(f, "P8Num(0x{:04X}.{:04X} = {})", self.integer(), self.fractional(), f64::from(self))
+		let raw = self.to_raw() as u32;
+		write!(f, "P8Num(0x{:04X}.{:04X} = {})", raw >> 16, raw & 0xFFFF, f64::from(self))
 	}
 }
 
@@ -1831,21 +2160,45 @@ impl const From<P8Num> for f32 {
 	}
 }
 
-impl const From<P8Num> for f64 {
-	fn from(value: P8Num) -> f64 {
-		value.0 as f64 / (1 << 16) as f64
-	}
-}
-
 impl const From<&P8Num> for f32 {
 	fn from(value: &P8Num) -> f32 {
 		f32::from(*value)
 	}
 }
 
+impl const From<P8Num> for f64 {
+	fn from(value: P8Num) -> f64 {
+		value.0 as f64 / (1 << 16) as f64
+	}
+}
+
 impl const From<&P8Num> for f64 {
 	fn from(value: &P8Num) -> f64 {
 		f64::from(*value)
+	}
+}
+
+impl const From<P8Num> for i16 {
+	fn from(value: P8Num) -> i16 {
+		(value.trunc().to_raw() >> 16) as i16
+	}
+}
+
+impl const From<&P8Num> for i16 {
+	fn from(value: &P8Num) -> i16 {
+		i16::from(*value)
+	}
+}
+
+impl const From<P8Num> for i32 {
+	fn from(value: P8Num) -> i32 {
+		value.trunc().to_raw() >> 16
+	}
+}
+
+impl const From<&P8Num> for i32 {
+	fn from(value: &P8Num) -> i32 {
+		i32::from(*value)
 	}
 }
 
