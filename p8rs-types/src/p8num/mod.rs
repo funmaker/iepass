@@ -1,8 +1,7 @@
-use alloc::string::String;
 use core::fmt::{Debug, Display, Formatter};
 use core::num::FpCategory;
 use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
-use tinyvec::ArrayVec;
+use arrayvec::{ArrayVec, ArrayString};
 
 pub mod consts;
 
@@ -200,49 +199,28 @@ impl P8Num {
 	/// ```
 	pub fn to_ascii(&self) -> impl AsRef<[core::ascii::Char]> {
 		use core::ascii::Char;
+		use core::fmt::Write;
 		
-		let mut buffer = ArrayVec::from_array_empty([Char::Null; 11]); // 1 sign + 5 digits + 1 dot + 4 decimals
-		let mut integer = i32::from(self.trunc()).abs();
-		let mut fraction = self.fract().to_raw();
+		let mut fval = f64::from(self).abs();
+		if !(0.0001..=0.9999).contains(&fval) {
+			fval = fval.round();
+		}
 		
+		let mut string = ArrayString::<11>::new_const();
 		if self.is_negative() {
-			buffer.push(Char::HyphenMinus);
+			write!(&mut string, "-").unwrap();
+		}
+		write!(&mut string, "{:.4}", fval).unwrap();
+		
+		let mut buffer = ArrayVec::<_, 11>::new_const();
+		buffer.extend(string.as_ascii().unwrap().iter().copied());
+		
+		while let Some(Char::Digit0) = buffer.last() {
+			buffer.pop();
 		}
 		
-		if fraction <= 0x0006 {
-			fraction = 0;
-		} else if fraction >= 0xFFFA {
-			integer += 1;
-			fraction = 0;
-		}
-		
-		if integer == 0 {
-			buffer.push(Char::Digit0);
-		} else {
-			let digits = [10000, 1000, 100, 10, 1];
-			let mut rem = integer;
-			for digit in digits.iter().skip_while(|&&digit| digit > integer) {
-				let quot = rem / digit;
-				rem %= digit;
-				buffer.push(Char::digit(quot as u8).unwrap());
-			}
-		}
-		
-		if fraction != 0 {
-			buffer.push(Char::FullStop);
-			
-			fraction += 0x0004; // :^)
-			let mut rem = fraction;
-			for _ in 0..4 {
-				rem *= 10;
-				let quot = rem / (1 << 16);
-				rem %= 1 << 16;
-				buffer.push(Char::digit(quot as u8).unwrap());
-			}
-			
-			while let Some(Char::Digit0) = buffer.last() {
-				buffer.pop();
-			}
+		if let Some(Char::FullStop) = buffer.last() {
+			buffer.pop();
 		}
 		
 		buffer

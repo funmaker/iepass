@@ -2908,7 +2908,7 @@ dependencies = [
 name = "p8rs-types"
 version = "0.1.0"
 dependencies = [
- "tinyvec",
+ "arrayvec",
 ]
 
 [[package]]
@@ -3728,12 +3728,6 @@ dependencies = [
  "displaydoc",
  "zerovec",
 ]
-
-[[package]]
-name = "tinyvec"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa5fdc3bce6191a1dbc8c02d5c8bffcf557bafa17c124c5264a458f1b0613fa"
 
 [[package]]
 name = "toml_datetime"
