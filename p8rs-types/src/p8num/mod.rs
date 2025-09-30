@@ -28,6 +28,12 @@ impl P8Num {
 	/// The smallest positive value of [P8Num] (0.00001525878 or 0x0000.0001).
 	pub const EPSILON: Self = Self(1);
 	
+	/// The fractional part bits mask (0x0000.FFFF).
+	pub const FRACT_BITS: Self = Self(0x0000_FFFF);
+	
+	/// The integer part bits mask (0xFFFF.0000).
+	pub const INTEGER_BITS: Self = Self(0xFFFF_0000_u32 as i32);
+	
 	/// Creates new value from `f32`.
 	/// 
 	/// Overflow is handled in a wrapping manner. Infinities become MIN/MAX and NaN becomes 0.
@@ -592,7 +598,6 @@ impl P8Num {
 	/// assert_eq!(P8Num::new(81.0).powf(P8Num::new(0.25)), P8Num::new(4.0));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
 	pub const fn powf(self, _exp: Self) -> Self {
 		unimplemented!()
 	}
@@ -607,7 +612,6 @@ impl P8Num {
 	/// assert_eq!(P8Num::new(3.0).powi(4), P8Num::new(81.0));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
 	pub const fn powi(self, _exp: i32) -> Self {
 		unimplemented!()
 	}
@@ -616,46 +620,58 @@ impl P8Num {
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	/// 
-	/// assert_eq!(P8Num::new(0).sin(),     P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(0.125).sin(), P8Num::new(-0.7071));
-	/// assert_eq!(P8Num::new(0.25).sin(),  P8Num::new(-1.0));
-	/// assert_eq!(P8Num::new(0.375).sin(), P8Num::new(-0.7071));
-	/// assert_eq!(P8Num::new(0.5).sin(),   P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(0.625).sin(), P8Num::new(0.7071));
-	/// assert_eq!(P8Num::new(0.75).sin(),  P8Num::new(1.0));
-	/// assert_eq!(P8Num::new(0.875).sin(), P8Num::new(0.7071));
-	/// assert_eq!(P8Num::new(1).sin(),     P8Num::new(0.0));
+	/// assert!((P8Num::new(0.000).sin() - P8Num::new( 0.0000)).abs() == P8Num::ZERO);
+	/// assert!((P8Num::new(0.125).sin() - P8Num::new(-0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.250).sin() - P8Num::new(-1.0000)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.375).sin() - P8Num::new(-0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.500).sin() - P8Num::new( 0.0000)).abs() == P8Num::ZERO);
+	/// assert!((P8Num::new(0.625).sin() - P8Num::new( 0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.750).sin() - P8Num::new( 1.0000)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.875).sin() - P8Num::new( 0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(1.000).sin() - P8Num::new( 0.0000)).abs() == P8Num::ZERO);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn sin(self, _exp: Self) -> Self {
-		unimplemented!()
+	pub fn sin(self) -> Self {
+		let mut x = self << 2;                    // Expand angle domain to [0.0, 4.0)
+		let flip = x.to_raw() & 0x0002_0000 == 0; // [2.0, 4.0) is just [0.0, 2.0) * -1
+		x &= P8Num::from_raw(0x0001_FFFF);        // Fold to [0.0, 2.0)
+		x -= P8Num::ONE;                          // Shift to [-1.0, 1.0)
+		
+		// cos(xπ/2)
+		//   ≈ 1 + x^2 *  -1.233521 + x^4 *  0.252594 + x^6 * 0.019073
+		//   = 1 + x^2 * (-1.233521 + x^2 * (0.252594 + x^2 * 0.019073))
+		let x2 = x * x;
+		let res = P8Num::ONE
+			+ x2 * (P8Num::from_raw(-0x0001_3bc8)
+				+ x2 * (P8Num::from_raw(0x0000_40aa)
+					+ x2 * P8Num::from_raw(-0x0000_04e2)));
+		
+		if flip { -res } else { res }
 	}
 	
 	/// Computes the cosine of a number (in turns).
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	/// 
-	/// assert_eq!(P8Num::new(0).cos(),     P8Num::new(1.0));
-	/// assert_eq!(P8Num::new(0.125).cos(), P8Num::new(0.7071));
-	/// assert_eq!(P8Num::new(0.25).cos(),  P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(0.375).cos(), P8Num::new(-0.7071));
-	/// assert_eq!(P8Num::new(0.5).cos(),   P8Num::new(-1.0));
-	/// assert_eq!(P8Num::new(0.625).cos(), P8Num::new(-0.7071));
-	/// assert_eq!(P8Num::new(0.75).cos(),  P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(0.875).cos(), P8Num::new(0.7071));
-	/// assert_eq!(P8Num::new(1).cos(),     P8Num::new(1.0));
+	/// assert!((P8Num::new(0.000).cos() - P8Num::new( 1.0000)).abs() == P8Num::ZERO);
+	/// assert!((P8Num::new(0.125).cos() - P8Num::new( 0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.250).cos() - P8Num::new( 0.0000)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.375).cos() - P8Num::new(-0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.500).cos() - P8Num::new(-1.0000)).abs() == P8Num::ZERO);
+	/// assert!((P8Num::new(0.625).cos() - P8Num::new(-0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.750).cos() - P8Num::new( 0.0000)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(0.875).cos() - P8Num::new( 0.7071)).abs() <= P8Num::EPSILON);
+	/// assert!((P8Num::new(1.000).cos() - P8Num::new( 1.0000)).abs() == P8Num::ZERO);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn cos(self, _exp: Self) -> Self {
-		unimplemented!()
+	pub fn cos(self) -> Self {
+		(self + P8Num::new(0.75)).sin()
 	}
 	
 	/// Computes the cosine of a number (in turns).
@@ -677,8 +693,7 @@ impl P8Num {
 	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(0)),  P8Num::new(0.25));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	#[inline]
-	pub const fn atan2(_x: Self, _y: Self) -> Self {
+	pub fn atan2(_x: Self, _y: Self) -> Self {
 		unimplemented!()
 	}
 	
