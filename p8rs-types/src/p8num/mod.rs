@@ -681,16 +681,16 @@ impl P8Num {
 	/// ```should_panic
 	/// use p8rs_types::p8num::P8Num;
 	/// 
-	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(0)),  P8Num::new(0.0));
-	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(1)),  P8Num::new(0.875));
-	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(1)),  P8Num::new(0.75));
-	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(1)),  P8Num::new(0.625));
-	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(0)),  P8Num::new(0.5));
-	/// assert_eq!(P8Num::atan2(P8Num::new(-1), P8Num::new(-1)), P8Num::new(0.375));
-	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(-1)), P8Num::new(0.25));
-	/// assert_eq!(P8Num::atan2(P8Num::new(1),  P8Num::new(-1)), P8Num::new(0.125));
-	/// assert_eq!(P8Num::atan2(P8Num::new(99), P8Num::new(99)), P8Num::new(0.875));
-	/// assert_eq!(P8Num::atan2(P8Num::new(0),  P8Num::new(0)),  P8Num::new(0.25));
+	/// assert_eq!(P8Num::atan2(P8Num::new(1.0),  P8Num::new(0.0)),  P8Num::new(0.0));
+	/// assert_eq!(P8Num::atan2(P8Num::new(1.0),  P8Num::new(1.0)),  P8Num::new(0.875));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0.0),  P8Num::new(1.0)),  P8Num::new(0.75));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1.0), P8Num::new(1.0)),  P8Num::new(0.625));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1.0), P8Num::new(0.0)),  P8Num::new(0.5));
+	/// assert_eq!(P8Num::atan2(P8Num::new(-1.0), P8Num::new(-1.0)), P8Num::new(0.375));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0.0),  P8Num::new(-1.0)), P8Num::new(0.25));
+	/// assert_eq!(P8Num::atan2(P8Num::new(1.0),  P8Num::new(-1.0)), P8Num::new(0.125));
+	/// assert_eq!(P8Num::atan2(P8Num::new(99.0), P8Num::new(99.0)), P8Num::new(0.875));
+	/// assert_eq!(P8Num::atan2(P8Num::new(0.0),  P8Num::new(0.0)),  P8Num::new(0.25));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	pub fn atan2(_x: Self, _y: Self) -> Self {
