@@ -635,9 +635,10 @@ impl P8Num {
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	pub fn sin(self) -> Self {
-		let mut x = self << 2;                    // Expand angle domain to [0.0, 4.0)
+		let mut x = self + P8Num::from_raw(2);    // Nudge forward for later rounding to emulate pico8 precision
+		x <<= 2;                                  // Expand angle domain to [0.0, 4.0)
 		let flip = x.to_raw() & 0x0002_0000 == 0; // [2.0, 4.0) is just [0.0, 2.0) * -1
-		x &= P8Num::from_raw(0x0001_FFFF);        // Fold to [0.0, 2.0)
+		x &= P8Num::from_raw(0x0001_FFF0);        // Fold to [0.0, 2.0) and round up closest 4
 		x -= P8Num::ONE;                          // Shift to [-1.0, 1.0)
 		
 		// cos(xπ/2)
@@ -706,7 +707,7 @@ impl P8Num {
 		
 		let xa = x.abs();
 		let ya = y.abs();
-		let r = xa.min(ya) / xa.max(ya);
+		let mut r = xa.min(ya) / xa.max(ya);
 		
 		// atan(r)
 		//   ≈ r *  0.15899 + r^3 *  -0.05092 + r^5 *  0.02286 + r^7 * -0.00594
