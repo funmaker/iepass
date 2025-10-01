@@ -674,11 +674,17 @@ impl P8Num {
 		(self + P8Num::new(0.75)).sin()
 	}
 	
-	/// Computes the cosine of a number (in turns).
+	/// Computes the four quadrant arctangent of `x` and `y` (in turns).
+	///
+	/// * `x = 0 ∧ y = 0`: -> `0.25`
+	/// * `x > 0 ∧ y ≤ 0`: -> `[0, 0.25)`
+	/// * `x ≤ 0 ∧ y < 0`: -> `[0.25, 0.5)`
+	/// * `x < 0 ∧ y ≥ 0`: -> `[0.5, 0.75)`
+	/// * `x ≥ 0 ∧ y > 0`: -> `[0.75, 1)`
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	/// 
 	/// assert_eq!(P8Num::atan2(P8Num::new(1.0),  P8Num::new(0.0)),  P8Num::new(0.0));
@@ -693,8 +699,30 @@ impl P8Num {
 	/// assert_eq!(P8Num::atan2(P8Num::new(0.0),  P8Num::new(0.0)),  P8Num::new(0.25));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	pub fn atan2(_x: Self, _y: Self) -> Self {
-		unimplemented!()
+	pub fn atan2(x: Self, y: Self) -> Self {
+		if x == P8Num::ZERO && y == P8Num::ZERO {
+			return P8Num::new(0.25);
+		}
+		
+		let xa = x.abs();
+		let ya = y.abs();
+		let r = xa.min(ya) / xa.max(ya);
+		
+		// atan(r)
+		//   ≈ r *  0.15899 + r^3 *  -0.05092 + r^5 *  0.02286 + r^7 * -0.00594
+		//   = r * (0.15899 + r^2 * (-0.05092 + r^2 * (0.02286 + r^2 * -0.00594)))
+		let r2 = r * r;
+		let mut res =
+			r * (P8Num::from_raw(0x0000_28B4)
+				+ r2 * (P8Num::from_raw(-0x0000_0D09)
+					+ r2 * (P8Num::from_raw(0x0000_05DA)
+						+ r2 * P8Num::from_raw(-0x0000_0185))));
+		
+		if xa < ya         { res = P8Num::new(0.25) - res; }
+		if x < P8Num::ZERO { res = P8Num::new(0.5)  - res; }
+		if y > P8Num::ZERO { res = P8Num::new(1.0)  - res; }
+		
+		res
 	}
 	
 	/// Returns the number of ones in the binary representation of `self`.
