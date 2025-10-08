@@ -34,6 +34,9 @@ impl P8Num {
 	/// The integer part bits mask (0xFFFF.0000).
 	pub const INTEGER_BITS: Self = Self(0xFFFF_0000_u32 as i32);
 	
+	/// Euler's number (e).
+	pub const E: Self = Self(0x0002_b7e2);
+	
 	/// Creates new value from `f32`.
 	/// 
 	/// Overflow is handled in a wrapping manner. Infinities become MIN/MAX and NaN becomes 0.
@@ -208,7 +211,7 @@ impl P8Num {
 		use core::fmt::Write;
 		
 		let mut fval = f64::from(self).abs();
-		if !(0.0001..=0.9999).contains(&fval) {
+		if !(0.0001..=0.9999).contains(&fval.fract()) {
 			fval = fval.round();
 		}
 		
@@ -587,33 +590,143 @@ impl P8Num {
 		self.checked_rem_euclid(rhs).unwrap()
 	}
 	
-	/// Raises a number to a real power.
+	/// Returns `e^(self)`, (the exponential function).
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(3.0).powf(P8Num::new(4.0)), P8Num::new(81.0));
-	/// assert_eq!(P8Num::new(81.0).powf(P8Num::new(0.25)), P8Num::new(4.0));
+	/// assert!((P8Num::new( 0.0).exp() - P8Num::new(1.0)    ).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::new( 1.0).exp() - P8Num::E           ).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::new( 2.0).exp() - P8Num::E * P8Num::E).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::new( 2.5).exp() - P8Num::new(12.1825)).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::new(-1.0).exp() - P8Num::E.recip()   ).abs() <= P8Num::new(0.001));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	pub const fn powf(self, _exp: Self) -> Self {
-		unimplemented!()
+	pub fn exp(self) -> Self {
+		let mut fract = self; 
+		fract &= P8Num::FRACT_BITS; // Fold to [0.0, 1.0)
+		fract <<= 1;                // Expand to [0.0, 2.0)
+		fract -= P8Num::ONE;        // Shift to [-1.0, 1.0)
+		
+		// exp(x): 0 <= x <= 1
+		//   ≈ 1.6487274169921875 + x *  0.8242254602827116 + x^2 *  0.206085205078125 + x^3 +  0.034881591796875 + x^4 * 0.00433349609375
+		//   = 1.6487274169921875 + x * (0.8242254602827116 +  x  * (0.206085205078125 +  x  + (0.034881591796875 +  x  * 0.00433349609375)))
+		let res = P8Num::from_raw(0x0001_A613)
+			+ fract * (P8Num::from_raw(0x0000_D300)
+				+ fract * (P8Num::from_raw(0x0000_34C2)
+					+ fract * (P8Num::from_raw(0x0000_08EE)
+						+ fract * P8Num::from_raw(0x0000_011C))));
+		
+		res * P8Num::E.powi(i32::from(self.floor()))
+	}
+	
+	/// Returns the natural logarithm of the number.
+	///
+	/// This returns `None` when the number is less or equal zero.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	///
+	/// assert!((P8Num::new(1.0).ln().unwrap()       - P8Num::new( 0.0)).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::E.ln().unwrap()              - P8Num::new( 1.0)).abs() <= P8Num::new(0.001));
+	/// assert!(((P8Num::E * P8Num::E).ln().unwrap() - P8Num::new( 2.0)).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::new(12.1825).ln().unwrap()   - P8Num::new( 2.5)).abs() <= P8Num::new(0.001));
+	/// assert!((P8Num::E.recip().ln().unwrap()      - P8Num::new(-1.0)).abs() <= P8Num::new(0.001));
+	/// assert_eq!(P8Num::ZERO.ln(), None);
+	/// assert_eq!((-P8Num::ONE).ln(), None);
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	pub fn ln(self) -> Option<Self> {
+		if self <= P8Num::ZERO {
+			return None;
+		}
+		
+		let mut fract = self;
+		let s = 14 - fract.leading_zeros() as i16; // Calculate floor(log2(self))
+		if s < 0 { fract <<= (-s) as u32 }         // Wrap to [2.0, 4.0) between each powers of 2
+		else     { fract >>=   s  as u32 }
+		fract -= P8Num::new(3.0);                  // Shift to [-1.0, 1.0)
+		
+		// exp(x): 0 <= x <= 1
+		//   ≈ 0.4054718017578125 + x *  0.3330535888671875 + x^2 *  -0.05548095703125 + x^3 +  0.013458251953125 + x^4 * -0.0034027099609375
+		//   = 0.4054718017578125 + x * (0.3330535888671875 +  x  * (-0.05548095703125 +  x  + (0.013458251953125 +  x  * -0.0034027099609375)))
+		let res = P8Num::from_raw(0x0000_67CD)
+			+ fract * (P8Num::from_raw(0x0000_5543)
+				+ fract * (P8Num::from_raw(-0x0000_0E34)
+					+ fract * (P8Num::from_raw(0x0000_0372)
+						+ fract * P8Num::from_raw(-0x0000_00DF))));
+		
+		Some(res + P8Num::from_raw(0x000_b172) * P8Num::from(s + 1)) // log(a) = log(a/n) + log(2)*n
 	}
 	
 	/// Raises a number to an integer power.
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
 	/// assert_eq!(P8Num::new(3.0).powi(4), P8Num::new(81.0));
+	/// assert_eq!(P8Num::new(0.5).powi(3), P8Num::new(0.125));
+	/// assert_eq!(P8Num::new(0.5).powi(-3), P8Num::new(8.0));
+	/// assert_eq!(P8Num::new(0.0).powi(2), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(3.0).powi(0), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.0).powi(0), P8Num::new(1.0));
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
-	pub const fn powi(self, _exp: i32) -> Self {
-		unimplemented!()
+	pub const fn powi(self, exp: i32) -> Self {
+		if exp < 0 {
+			self.recip().powi(-exp)
+		} else if exp == 0 {
+			P8Num::ONE
+		} else if exp % 2 == 0 {
+			(self * self).powi(exp / 2)
+		} else {
+			self * (self * self).powi(exp / 2)
+		}
+	}
+	
+	/// Raises a number to a real power.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use p8rs_types::p8num::P8Num;
+	/// 
+	/// assert!((P8Num::new( 3.0).powf(P8Num::new( 4.0)).unwrap() - P8Num::new(81.0  )).abs() < P8Num::new(0.001));
+	/// assert!((P8Num::new( 3.0).powf(P8Num::new( 0.0)).unwrap() - P8Num::new( 1.0  )).abs() < P8Num::new(0.001));
+	/// assert!((P8Num::new( 0.5).powf(P8Num::new( 3.0)).unwrap() - P8Num::new( 0.125)).abs() < P8Num::new(0.001));
+	/// assert!((P8Num::new( 0.5).powf(P8Num::new(-3.0)).unwrap() - P8Num::new( 8.0  )).abs() < P8Num::new(0.001));
+	/// assert!((P8Num::new(81.0).powf(P8Num::new(0.25)).unwrap() - P8Num::new( 3.0  )).abs() < P8Num::new(0.001));
+	/// assert_eq!(P8Num::new( 0.0).powf(P8Num::new(2.0)), Some(P8Num::new(0.0)));
+	/// assert_eq!(P8Num::new( 3.0).powf(P8Num::new(0.0)), Some(P8Num::new(1.0)));
+	/// assert_eq!(P8Num::new( 0.0).powf(P8Num::new(0.0)), Some(P8Num::new(1.0)));
+	/// assert_eq!(P8Num::new(-1.0).powf(P8Num::new(0.5)), None);
+	/// ```
+	#[must_use = "this returns the result of the operation, without modifying the original"]
+	pub fn powf(self, exp: Self) -> Option<Self> {
+		if exp == P8Num::ZERO {
+			return Some(P8Num::ONE);
+		} else if self == P8Num::ZERO {
+			return Some(P8Num::ZERO);
+		}
+		
+		let e_int = i32::from(exp.floor());
+		let e_frc = exp & P8Num::FRACT_BITS;
+		
+		let mut res = self.powi(e_int); // x^y = x^floor(y) * x^fract(y)
+		if e_frc != P8Num::ZERO {       //     = x^floor(y) * e^(fract(y) * log(x))
+			if self < P8Num::ZERO {
+				return None; // Special case
+			}
+			res *= P8Num::exp(e_frc * self.ln().unwrap());
+		}
+		
+		Some(res)
 	}
 	
 	/// Computes the sine of a number (in turns).
@@ -707,7 +820,7 @@ impl P8Num {
 		
 		let xa = x.abs();
 		let ya = y.abs();
-		let mut r = xa.min(ya) / xa.max(ya);
+		let r = xa.min(ya) / xa.max(ya);
 		
 		// atan(r)
 		//   ≈ r *  0.15899 + r^3 *  -0.05092 + r^5 *  0.02286 + r^7 * -0.00594
@@ -733,13 +846,13 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	/// 
-	/// assert_eq!(P8Num::from_raw(0x0001_0000).count_ones(), P8Num::new(1.0));
-	/// assert_eq!(P8Num::from_raw(0x0000_1111).count_ones(), P8Num::new(4.0));
+	/// assert_eq!(P8Num::from_raw(0x0001_0000).count_ones(), 1);
+	/// assert_eq!(P8Num::from_raw(0x0000_1111).count_ones(), 4);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn count_ones(self) -> Self {
-		Self::from(self.0.count_ones() as i16)
+	pub const fn count_ones(self) -> u32 {
+		self.0.count_ones()
 	}
 	
 	/// Returns the number of zeros in the binary representation of `self`.
@@ -749,36 +862,33 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	/// 
-	/// assert_eq!(P8Num::new(0.0).count_zeros(), P8Num::new(32.0));
-	/// assert_eq!(P8Num::new(-1.0).count_zeros(), P8Num::new(16.0));
-	/// assert_eq!((-P8Num::EPSILON).count_zeros(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::MAX.count_zeros(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.0).count_zeros(), 32);
+	/// assert_eq!(P8Num::new(-1.0).count_zeros(), 16);
+	/// assert_eq!((-P8Num::EPSILON).count_zeros(), 0);
+	/// assert_eq!(P8Num::MAX.count_zeros(), 1);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn count_zeros(self) -> Self {
-		Self::from(self.0.count_zeros() as i16)
+	pub const fn count_zeros(self) -> u32 {
+		self.0.count_zeros()
 	}
 	
 	/// Returns the number of leading zeros in the binary representation of `self`.
-	///
-	/// Depending on what you're doing with the value, you might also be interested in the
-	/// [`ilog2`] function which returns a consistent number, even if the type widens.
 	///
 	/// # Examples
 	///
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(0.0).leading_zeros(), P8Num::new(32.0));
-	/// assert_eq!(P8Num::new(1.0).leading_zeros(), P8Num::new(15.0));
-	/// assert_eq!((-P8Num::EPSILON).leading_zeros(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::MAX.leading_zeros(), P8Num::new(1.0));
+	/// assert_eq!(P8Num::new(0.0).leading_zeros(), 32);
+	/// assert_eq!(P8Num::new(1.0).leading_zeros(), 15);
+	/// assert_eq!((-P8Num::EPSILON).leading_zeros(), 0);
+	/// assert_eq!(P8Num::MAX.leading_zeros(), 1);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn leading_zeros(self) -> Self {
-		Self::from(self.0.leading_zeros() as i16)
+	pub const fn leading_zeros(self) -> u32 {
+		self.0.leading_zeros()
 	}
 	
 	/// Returns the number of trailing zeros in the binary representation of `self`.
@@ -788,15 +898,15 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(0.0).trailing_zeros(), P8Num::new(32.0));
-	/// assert_eq!(P8Num::new(1.0).trailing_zeros(), P8Num::new(16.0));
-	/// assert_eq!((-P8Num::EPSILON).trailing_zeros(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::MAX.trailing_zeros(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.0).trailing_zeros(), 32);
+	/// assert_eq!(P8Num::new(1.0).trailing_zeros(), 16);
+	/// assert_eq!((-P8Num::EPSILON).trailing_zeros(), 0);
+	/// assert_eq!(P8Num::MAX.trailing_zeros(), 0);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn trailing_zeros(self) -> Self {
-		Self::from(self.0.trailing_zeros() as i16)
+	pub const fn trailing_zeros(self) -> u32 {
+		self.0.trailing_zeros()
 	}
 	
 	/// Returns the number of leading ones in the binary representation of `self`.
@@ -806,15 +916,15 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(0.0).leading_ones(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(-1.0).leading_ones(), P8Num::new(16.0));
-	/// assert_eq!((-P8Num::EPSILON).leading_ones(), P8Num::new(32.0));
-	/// assert_eq!(P8Num::MAX.leading_ones(), P8Num::new(0.0));
+	/// assert_eq!(P8Num::new(0.0).leading_ones(), 0);
+	/// assert_eq!(P8Num::new(-1.0).leading_ones(), 16);
+	/// assert_eq!((-P8Num::EPSILON).leading_ones(), 32);
+	/// assert_eq!(P8Num::MAX.leading_ones(), 0);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn leading_ones(self) -> Self {
-		Self::from(self.0.leading_ones() as i16)
+	pub const fn leading_ones(self) -> u32 {
+		self.0.leading_ones()
 	}
 	
 	/// Returns the number of trailing ones in the binary representation of `self`.
@@ -824,15 +934,15 @@ impl P8Num {
 	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::new(0.0).trailing_ones(), P8Num::new(0.0));
-	/// assert_eq!(P8Num::new(1.0).trailing_ones(), P8Num::new(0.0));
-	/// assert_eq!((-P8Num::EPSILON).trailing_ones(), P8Num::new(32.0));
-	/// assert_eq!(P8Num::MAX.trailing_ones(), P8Num::new(31.0));
+	/// assert_eq!(P8Num::new(0.0).trailing_ones(), 0);
+	/// assert_eq!(P8Num::new(1.0).trailing_ones(), 0);
+	/// assert_eq!((-P8Num::EPSILON).trailing_ones(), 32);
+	/// assert_eq!(P8Num::MAX.trailing_ones(), 31);
 	/// ```
 	#[must_use = "this returns the result of the operation, without modifying the original"]
 	#[inline(always)]
-	pub const fn trailing_ones(self) -> Self {
-		Self::from(self.0.trailing_ones() as i16)
+	pub const fn trailing_ones(self) -> u32 {
+		self.0.trailing_ones()
 	}
 	
 	/// Shifts the bits to the left by a specified amount, `n`,
@@ -2101,7 +2211,7 @@ impl const Shr<u32> for P8Num {
 
 impl ShrAssign<u32> for P8Num {
 	fn shr_assign(&mut self, rhs: u32) {
-		*self = *self << rhs;
+		*self = *self >> rhs;
 	}
 }
 

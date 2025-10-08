@@ -7,7 +7,7 @@ def find_minimal_polynomial(max_error):
     # Test different degrees
     for degree in range(2, 12):
         # Get Chebyshev coefficients for cosine approximation
-        func = lambda x: np.atan(x) / np.pi / 2
+        func = lambda x: np.log(x / 2 + 1.5)
         cheb = chebyshev.chebinterpolate(func, degree)
         coeffs = chebyshev.cheb2poly(cheb)
 
