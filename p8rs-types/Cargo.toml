@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 arrayvec = "0.7.6"
+thiserror = "2.0.17"
