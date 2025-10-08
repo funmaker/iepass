@@ -27,5 +27,4 @@ pub fn install_pico8_table(ctx: Context) {
 		
 		Ok(CallbackReturn::Return)
 	}));
-	
 }
