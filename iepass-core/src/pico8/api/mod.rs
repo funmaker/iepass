@@ -9,7 +9,7 @@ use alloc::format;
 use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, IntoValue};
+use p8rs_piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, IntoValue};
 use crate::pico8::env::Env;
 
 pub fn install_pico8_apis<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context)

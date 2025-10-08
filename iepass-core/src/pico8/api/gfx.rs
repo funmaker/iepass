@@ -2,7 +2,7 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use piccolo::{Context, Value, Variadic};
+use p8rs_piccolo::{Context, Value, Variadic};
 use crate::pico8::env::Env;
 use super::callback;
 

@@ -1,0 +1,17 @@
+[package]
+name = "p8rs-piccolo-util"
+description = "Utilities for the `piccolo` library"
+readme = "README.md"
+version = "0.3.3"
+edition = "2021"
+authors = ["kyren <catherine@kyju.org>"]
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true, optional = true }
+thiserror.workspace = true
+gc-arena.workspace = true
+p8rs-piccolo.workspace = true
+
+[features]
+default = ["serde"]

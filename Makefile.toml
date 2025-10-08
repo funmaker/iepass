@@ -22,6 +22,7 @@ script = { file = "./scripts/font_gen.rs" }
 dependencies = [
     "test-core",
     "test-types",
+    "test-piccolo",
 ]
 
 [tasks.test-core]
@@ -32,6 +33,10 @@ args = ["test", "--package", "iepass-core", "--features", "std", "${@}"]
 [tasks.test-types]
 command = "cargo"
 args = ["test", "--package", "p8rs-types", "${@}"]
+
+[tasks.test-piccolo]
+command = "cargo"
+args = ["test", "--package", "p8rs-piccolo", "${@}"]
 
 
 # Running

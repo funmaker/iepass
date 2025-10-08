@@ -1,6 +1,6 @@
 use alloc::borrow::ToOwned;
 use alloc::string::String;
-use piccolo::Context;
+use p8rs_piccolo::Context;
 use super::callback;
 
 pub fn install_pico8_string(ctx: Context) {
