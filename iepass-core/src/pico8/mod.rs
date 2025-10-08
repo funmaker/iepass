@@ -1,24 +1,20 @@
-#[allow(unused_imports)]
-use micromath::F32Ext;
-use core::alloc::Allocator;
-use core::cell::{RefCell, RefMut};
 use alloc::alloc::Global;
-use alloc::borrow::ToOwned;
 use alloc::format;
 use alloc::rc::Rc;
-use alloc::string::String;
-use alloc::vec::Vec;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, Lua, IntoValue, Table, Closure, Executor, StashedExecutor, Fuel, ExecutorMode, Value, Variadic};
+use core::alloc::Allocator;
+use core::cell::{RefCell, RefMut};
 use piccolo::table::InvalidTableKey;
+use piccolo::{Closure, Context, Executor, ExecutorMode, Fuel, Lua, StashedExecutor, Value};
 
 pub mod memory;
 pub mod palette;
 pub mod font;
 pub mod env;
 mod numeric;
+mod api;
 
+use crate::pico8::api::install_pico8_apis;
 use env::Env;
-use crate::pico8::numeric::{number_from_string, NumberConversionFlags};
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
@@ -95,190 +91,8 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	
 	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
 		self.lua.enter(|ctx: Context| {
-			// implements: assert, type, select, rawget, rawset,
-			//             getmetatable, setmetatable, next, pairs, ipairs
-			// extra functions: tostring, error, pcall, collectgarbage
-			piccolo::stdlib::load_base(ctx);
-			
-			// todo: format flags
-			ctx.set_global("tostr", ctx.get_global::<Value>("tostring").unwrap());
-			
-			ctx.set_global("tonum", callback("tonum", ctx, move |_, (val, opts): (String, Option<u8>)| {
-				let flags: NumberConversionFlags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
-				let conversion = number_from_string(val.as_str(), flags);
-				if conversion.is_ok() {
-					Some(conversion.unwrap())
-				}else{
-					None
-				}
-			}));
-			
-			// General
-			ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
-			
-			// Math
-			ctx.set_global("abs", callback("abs", ctx, |_, v: f32| v.abs()));
-			ctx.set_global("atan2", callback("atan2", ctx, |_, (dx, dy): (f32, f32)| dy.atan2(dx)));
-			ctx.set_global("ceil", callback("ceil", ctx, |_, v: f32| v.ceil()));
-			ctx.set_global("flr", callback("flr", ctx, |_, v: f32| v.floor()));
-			ctx.set_global("min", callback("min", ctx, |_, (a, b): (f32, f32)| a.min(b)));
-			ctx.set_global("max", callback("max", ctx, |_, (a, b): (f32, f32)| a.max(b)));
-			ctx.set_global("mid", callback("mid", ctx, |_, (a, b, c): (f32, f32, f32)| if (a <= b) != (a <= c) { a } else if (b <= a) != (b <= c) { b } else { c }));
-			ctx.set_global("sgn", callback("sgn", ctx, |_, v: f32| if v < 0f32 { -1 } else { 1 }));
-			
-			// Strings
-			ctx.set_global("sub", callback("abs", ctx, |_, (text, start, end): (String, i32, Option<i32>)| {
-				let start = match start {
-					..0 => text.len() - ((-start-1) as usize).min(text.len()),
-					1.. => (start as usize - 1).min(text.len()),
-					0 => 0,
-				};
-				let end = end.unwrap_or(-1);
-				let end = match end {
-					..0 => text.len() - ((-end-1) as usize).min(text.len()),
-					1.. => (end as usize - 1).min(text.len()),
-					0 => 0,
-				};
-				if end <= start {
-					"".to_owned()
-				} else {
-					text[start..end].to_owned()
-				}
-			}));
-			
-			// Debug
-			ctx.set_global("printh", callback("printh", ctx, |_, (text, filename, _overwrite, _save_to_desktop): (String, Option<String>, Option<bool>, Option<bool>)| {
-				if let Some(filename_str) = filename {
-					info!("[printh/{}] {}", filename_str, text);
-				} else {
-					info!("[printh] {}", text);
-				}
-			}));
-			
-			// Memory
 			let env = self.env.clone();
-			ctx.set_global("peek", callback("peek", ctx, move |ctx, (addr, n): (u32, Option<u32>)| {
-				let env = env.borrow();
-				let n = n.unwrap_or(1);
-				if n == 1 { return Value::Integer(env.memory[addr as usize] as i64); }
-				
-				let table = Table::new(&ctx);
-				for (pos, byte) in env.memory[addr as usize .. (addr + n) as usize].iter().enumerate() {
-					table.set(ctx, pos as u32 + 1, byte).unwrap();
-				}
-				Value::Table(table)
-			}));
-			
-			let env = self.env.clone();
-			ctx.set_global("poke", callback("poke", ctx, move |_, (addr, mut bytes): (u32, Variadic<alloc::vec::Vec<u8>>)| {
-				let mut env = env.borrow_mut();
-				if bytes.is_empty() { bytes.push(0) }
-				for (pos, byte) in bytes.into_iter().enumerate() {
-					env.memory[addr as usize + pos] = byte;
-				}
-			}));
-			
-			// GFX
-			let env = self.env.clone();
-			ctx.set_global("camera", callback("camera", ctx, move |_, (x, y): (Option<u32>, Option<u32>)| {
-				let mut env = env.borrow_mut();
-				let old = (env.memory.read_u16_le(0x5f28), env.memory.read_u16_le(0x5f2a));
-				env.memory.write_u16_le(0x5f28, x.unwrap_or(0) as u16);
-				env.memory.write_u16_le(0x5f2a, y.unwrap_or(0) as u16);
-				old
-			}));
-			
-			let env = self.env.clone();
-			ctx.set_global("color", callback("color", ctx, move |_, val: Option<u32>| {
-				let mut env = env.borrow_mut();
-				let old = env.memory[0x5f25];
-				if let Some(val) = val { env.memory[0x5f25] = val as u8; }
-				old
-			}));
-			
-			let env = self.env.clone();
-			ctx.set_global("clip", callback("clip", ctx, move |_, (x, y, w, h, clip_previous): (Option<u8>, Option<u8>, Option<u8>, Option<u8>, Option<bool>)| {
-				let mut env = env.borrow_mut();
-				let [x_begin_old, y_begin_old, x_end_old, y_end_old] = env.memory[0x5f20..=0x5f23].try_into().unwrap();
-				
-				if let Some(x) = x && let Some(y) = y && let Some(w) = w && let Some(h) = h {
-					let mut x_begin = x;
-					let mut y_begin = y;
-					let mut x_end = x + w;
-					let mut y_end = y + h;
-					
-					if clip_previous.unwrap_or(false) {
-						if x_begin < x_begin_old { x_begin = x_begin_old; }
-						if y_begin < y_begin_old { y_begin = y_begin_old; }
-						if x_end > x_end_old { x_end = x_end_old; }
-						if y_end > y_end_old { y_end = y_end_old; }
-					}
-					
-					env.memory[0x5f20] = x_begin;
-					env.memory[0x5f21] = y_begin;
-					env.memory[0x5f22] = x_end.min(128);
-					env.memory[0x5f23] = y_end.min(128);
-				}else{
-					env.memory[0x5f20] = 0;
-					env.memory[0x5f21] = 0;
-					env.memory[0x5f22] = 128;
-					env.memory[0x5f23] = 128;
-				}
-				
-				(x_begin_old, y_begin_old, x_end_old, y_end_old)
-			}));
-			
-			
-			let env = self.env.clone();
-			ctx.set_global("pal", callback("pal", ctx, move |_, args: Variadic<Vec<Value>>| {
-				let argc = args.len();
-				assert!(argc >= 1 && argc <= 3, "Invalid number of arguments");
-				
-				let mut env = env.borrow_mut();
-				
-				if let Value::Table(t) = args[0] {
-					let base = env.memory.base_addr_palette(if argc > 1 && let Value::Integer(p) = args[1] { p as u8 } else { 0 }) as usize;
-					for (k, v) in t {
-						if let Value::Integer(k) = k && let Value::Integer(v) = v {
-							env.memory[base + (k % 16) as usize] = v as u8;
-						}
-					}
-				}else if let Value::Integer(c0) = args[0] && let Value::Integer(c1) = args[1] {
-					let base = env.memory.base_addr_palette(if argc > 2 && let Value::Integer(p) = args[2] { p as u8 } else { 0 }) as usize;
-					env.memory[base + (c0 % 16) as usize] = c1 as u8;
-				}else{
-					panic!("Invalid arguments");
-				}
-			}));
-			
-			
-			// Table
-			
-			ctx.set_global("pack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
-				let t = Table::new(&ctx);
-				for i in 0..stack.len() {
-					t.set(ctx, i as i64 + 1, stack[i]).unwrap();
-				}
-				t.set(ctx, "n", stack.len() as i64).unwrap();
-				stack.replace(ctx, t);
-				Ok(CallbackReturn::Return)
-			}));
-			
-			ctx.set_global("unpack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
-				let (table, start, end): (Table, Option<i64>, Option<i64>) =
-					stack.consume(ctx)?;
-				let start = start.unwrap_or(1);
-				let end = end.unwrap_or_else(|| table.length());
-				
-				if start <= end {
-					stack.resize((end - start + 1) as usize);
-					for i in start..=end {
-						stack[(i - start) as usize] = table.get_value(ctx, i);
-					}
-				}
-				
-				Ok(CallbackReturn::Return)
-			}));
+			install_pico8_apis(env, ctx);
 			
 			Ok(())
 		})?;
@@ -288,24 +102,12 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	}
 }
 
-fn callback<'gc, F, A, R>(name: &'static str, ctx: Context<'gc>, f: F) -> Callback<'gc>
-where F: Fn(Context<'gc>, A) -> R + 'static,
-      A: FromMultiValue<'gc>,
-      R: IntoMultiValue<'gc> {
-	Callback::from_fn(&ctx, move |ctx, _, mut stack| {
-		let args = stack.consume(ctx)
-		                .map_err(|err| format!("[{name}]: {err}").into_value(ctx))?;
-		let ret = f(ctx, args);
-		stack.replace(ctx, ret);
-		Ok(CallbackReturn::Return)
-	})
-}
 
 #[cfg(test)]
 mod test {
+	use crate::pico8::Pico8VM;
 	use alloc::vec::Vec;
 	use piccolo::{Closure, Executor, Value, Variadic};
-	use crate::pico8::Pico8VM;
 	
 	#[test]
 	pub fn it_works() {
