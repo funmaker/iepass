@@ -1,4 +1,4 @@
-use piccolo::{Callback, CallbackReturn, Context, Table};
+use p8rs_piccolo::{Callback, CallbackReturn, Context, Table};
 
 pub fn install_pico8_table(ctx: Context) {
 	

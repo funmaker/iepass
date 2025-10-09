@@ -7,12 +7,12 @@ use eframe::epaint::TextureHandle;
 use egui::{Color32, Event, Frame, ImageSource, RawInput};
 use egui::load::SizedTexture;
 use iepass_core::pico8::Pico8VM;
+use iepass_core::colors::Color;
+use iepass_core::pico8::palette::PALETTE;
 
 mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
-use iepass_core::colors::Color;
-use iepass_core::pico8::palette::PALETTE;
 
 fn main() -> eframe::Result {
 	let options = eframe::NativeOptions {

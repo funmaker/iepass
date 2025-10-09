@@ -1,7 +1,7 @@
 use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use piccolo::{Context, RuntimeError, Table, Value, Variadic};
+use p8rs_piccolo::{Context, RuntimeError, Table, Value, Variadic};
 use crate::pico8::env::Env;
 use super::{set_global_callback_ctx_env, set_global_callback_env, EnvHandle};
 

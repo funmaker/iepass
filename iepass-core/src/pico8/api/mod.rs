@@ -9,7 +9,7 @@ use alloc::format;
 use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, IntoValue, RuntimeError};
+use p8rs_piccolo::{Callback, CallbackReturn, Context, FromMultiValue, IntoMultiValue, IntoValue, RuntimeError};
 use crate::pico8::env::Env;
 
 pub type EnvHandle<A> = Rc<RefCell<Env<A>>>;

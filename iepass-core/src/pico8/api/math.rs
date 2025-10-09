@@ -1,5 +1,5 @@
 use super::set_global_callback_simple;
-use piccolo::{Context, RuntimeError};
+use p8rs_piccolo::{Context, RuntimeError};
 
 #[allow(unused_imports)]
 use micromath::F32Ext;

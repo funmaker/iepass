@@ -4,7 +4,7 @@ use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use piccolo::{Context, RuntimeError, Value, Variadic};
+use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
 
 pub fn install_pico8_gfx<A: Allocator + Clone + 'static>(env_orig: Rc<RefCell<Env<A>>>, ctx: Context) {
 	set_global_callback_env("camera", ctx, env_orig.clone(), camera);

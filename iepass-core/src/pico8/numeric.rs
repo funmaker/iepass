@@ -1,4 +1,4 @@
-use piccolo::Value;
+use p8rs_piccolo::Value;
 use bitflags::bitflags;
 
 bitflags! {

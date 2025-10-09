@@ -51,8 +51,11 @@ for i, y_col in enumerate(y_columns):
     axes[i].set_xticks(np.linspace(0, 2**16, 9), np.linspace(0, 1, 9))
     axes[i].yaxis.set_major_formatter(FormatStrFormatter('%dε'))
     axes[i].yaxis.set_major_locator(MaxNLocator(integer=True))
-    if y_col == 'x^2' or y_col == '2^x' or y_col == 'Sqrt': continue
     axes[i].scatter(pico8['Hex'], y, marker='x', alpha=0.25)
+    y_np = y.to_numpy()
+    if (y_np[0] == y_np).all():
+        axes[i].set_yticks([y_np[0]])
+
 
 plt.tight_layout()
 plt.show()

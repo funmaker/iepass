@@ -1,13 +1,13 @@
 use super::set_global_callback_simple;
 use crate::pico8::numeric::{number_from_string, NumberConversionFlags};
 use alloc::string::String;
-use piccolo::{Callback, CallbackReturn, Context, RuntimeError, Value};
+use p8rs_piccolo::{Callback, CallbackReturn, Context, RuntimeError, Value};
 
 pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
-	piccolo::stdlib::load_base(ctx);
+	p8rs_piccolo::stdlib::load_base(ctx);
 	
 	// todo: format flags
 	ctx.set_global("tostr", ctx.get_global::<Value>("tostring").unwrap());

@@ -17,9 +17,9 @@ fn main() {
 			tostr(P8Num::atan2(-val,  val - P8Num::ONE)),
 			tostr(P8Num::atan2( val - P8Num::ONE,  val)),
 			tostr(P8Num::atan2( val,  P8Num::ONE - val)),
-			tostr(P8Num::ZERO),
-			tostr(P8Num::ZERO),
-			tostr(P8Num::ZERO),
+			tostr(val.powf(P8Num::new(0.5)).unwrap()),
+			tostr(val.powf(P8Num::new(2.0)).unwrap()),
+			tostr(P8Num::new(2.0).powf(val).unwrap()),
 			val.to_str().as_ref(),
 		)
 	}

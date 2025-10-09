@@ -1,0 +1,30 @@
+use p8rs_piccolo::{Callback, CallbackReturn, Closure, Executor, ExecutorMode, ExternError, Fuel, Lua};
+
+#[test]
+fn test_interrupt() -> Result<(), ExternError> {
+    let mut lua = Lua::core();
+
+    lua.try_enter(|ctx| {
+        let callback = Callback::from_fn(&ctx, |_, mut exec, _| {
+            exec.fuel().interrupt();
+            Ok(CallbackReturn::Return)
+        });
+        ctx.set_global("callback", callback);
+        Ok(())
+    })?;
+
+    let executor = lua.try_enter(|ctx| {
+        let closure = Closure::load(ctx, None, &b"callback(); abort()"[..])?;
+        Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
+    })?;
+
+    lua.enter(|ctx| {
+        let executor = ctx.fetch(&executor);
+        let mut fuel = Fuel::with(i32::MAX);
+        assert!(!executor.step(ctx, &mut fuel).unwrap());
+        assert!(fuel.is_interrupted());
+        assert!(executor.mode() == ExecutorMode::Normal)
+    });
+
+    Ok(())
+}

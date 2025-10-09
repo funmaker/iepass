@@ -1,10 +1,12 @@
 [package]
-name          = "iepass-core"
-version       = "0.1.0"
-authors       = ["Fun Maker <funmaker95@gmail.com>"]
-edition       = "2024"
-resolver      = "3"
-rust-version  = "1.88.0"
+name     = "iepass-core"
+resolver = "3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [features]
 std = ["embedded-io/std"]
@@ -14,11 +16,11 @@ log-04 = ["dep:log-04"]
 [dependencies]
 cfg-if = { version = "1.0.3" }
 log-04 = { package = "log", version = "0.4.27", optional = true }
-embedded-io = { workspace = true }
+embedded-io.workspace = true
 defmt = { workspace = true, optional = true }
-piccolo = { workspace = true }
-micromath = { workspace = true }
-bitflags = { workspace = true }
+p8rs-piccolo.workspace = true
+micromath.workspace = true
+bitflags.workspace = true
 
 [dev-dependencies]
-embedded-io = { workspace = true }
+embedded-io.workspace = true

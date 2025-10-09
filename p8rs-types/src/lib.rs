@@ -6,6 +6,7 @@
 #![feature(const_option_ops)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
+#![feature(allocator_api)]
 extern crate alloc;
 
 pub mod p8scii;

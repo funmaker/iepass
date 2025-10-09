@@ -3,8 +3,8 @@ use alloc::format;
 use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::{RefCell, RefMut};
-use piccolo::table::InvalidTableKey;
-use piccolo::{Closure, Context, Executor, ExecutorMode, Fuel, Lua, StashedExecutor, Value};
+use p8rs_piccolo::table::InvalidTableKey;
+use p8rs_piccolo::{Closure, Context, Executor, ExecutorMode, Fuel, Lua, StashedExecutor, Value};
 
 pub mod memory;
 pub mod palette;
@@ -107,7 +107,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 mod test {
 	use crate::pico8::Pico8VM;
 	use alloc::vec::Vec;
-	use piccolo::{Closure, Executor, Value, Variadic};
+	use p8rs_piccolo::{Closure, Executor, Value, Variadic};
 	
 	#[test]
 	pub fn it_works() {

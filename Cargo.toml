@@ -1,6 +1,14 @@
 [workspace]
 resolver = "3"
-members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass", "p8rs-types"]
+members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass", "p8rs-types", "p8rs-piccolo", "p8rs-piccolo/util"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Fun Maker <funmaker95@gmail.com>", "sebimoe <sebi@sebi.moe>"]
+license = "MIT"
+repository = "https://github.com/funmaker/iepass"
+rust-version = "1.88.0"
 
 [profile.dev]
 # Rust debug is too slow.
@@ -18,6 +26,7 @@ overflow-checks  = false
 
 [workspace.dependencies]
 iepass-core = { path = "./iepass-core", default-features = false }
+p8rs-piccolo = { path = "./p8rs-piccolo", default-features = false }
 iepass = { path = "./iepass" }
 
 embedded-io = { version = "0.6.1", features = ["alloc"] }
@@ -41,7 +50,15 @@ pin-project = "1.1.10"
 static_cell = "2.1.1"
 micromath = "2.1.0"
 bitflags = "2.9.4"
-piccolo = { git = "https://github.com/funmaker/piccolo-nostd.git", rev = "437c8ffe7808f0080557ad5e5a718915b60c00ed", default-features = false }
+arrayvec = "0.7.6"
+thiserror = { version = "2.0", default-features = false }
+
+ahash = { version = "0.8", default-features = false }
+allocator-api2 = { version = "0.2", default-features = false, features = ["alloc"] }
+gc-arena = { git = "https://github.com/kyren/gc-arena", rev = "4d526347a9b625c29e16f7165fd998615e51c52a", default-features = false, features = ["allocator-api2", "hashbrown"] }
+hashbrown = { version = "0.14", features = ["raw"] }
+rand = { version = "0.8", default-features = false, features = ["small_rng"] }
+serde = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [patch.crates-io]
 esp-hal                  = { git = "https://github.com/funmaker/esp-hal.git" }

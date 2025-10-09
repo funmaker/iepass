@@ -1,7 +1,13 @@
 [package]
-name = "p8rs-types"
-version = "0.1.0"
-edition = "2024"
+name     = "p8rs-types"
+resolver = "3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-arrayvec = "0.7.6"
+arrayvec.workspace = true
+thiserror.workspace = true
