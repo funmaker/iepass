@@ -103,9 +103,37 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 }
 
 
+#[derive(Debug, Copy, Clone)]
+#[allow(dead_code)]
+enum StaticValue {
+	Nil,
+	Boolean(bool),
+	Integer(i64),
+	Number(f32),
+	String,
+	Table,
+	Function,
+	Thread,
+	UserData,
+}
+fn to_static_value(x: &Value) -> StaticValue {
+	match x {
+		Value::Nil         => StaticValue::Nil,
+		Value::Boolean(b)  => StaticValue::Boolean(b.clone()),
+		Value::Integer(i)  => StaticValue::Integer(i.clone()),
+		Value::Number(n)   => StaticValue::Number(n.clone() as f32),
+		Value::String(_s)   => StaticValue::String,
+		Value::Table(_t)    => StaticValue::Table,
+		Value::Function(_f) => StaticValue::Function,
+		Value::Thread(_)   => StaticValue::Thread,
+		Value::UserData(_u) => StaticValue::UserData,
+	}
+}
+
+
 #[cfg(test)]
 mod test {
-	use crate::pico8::Pico8VM;
+	use crate::pico8::{to_static_value, Pico8VM, StaticValue};
 	use alloc::vec::Vec;
 	use p8rs_piccolo::{Closure, Executor, Value, Variadic};
 	
@@ -127,32 +155,24 @@ mod test {
 			Ok(ctx.stash(ex))
 		}).unwrap();
 		
-		
+		error!("Test!");
 		vm.lua.finish(&ex).unwrap();
 		
 		let res = vm.lua.try_enter(|ctx| {
 			let exec = ctx.fetch(&ex);
-			let _vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
+			let vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
 			
-			// TODO: co to?
-			// let statics = vals.into_iter().map(|x| {
-			// 	match x {
-			// 		Value::Nil         => StaticValue::Nil,
-			// 		Value::Boolean(b)  => StaticValue::Boolean(b),
-			// 		Value::Integer(i)  => StaticValue::Integer(i),
-			// 		Value::Number(n)   => StaticValue::Number(n),
-			// 		Value::String(s)   => StaticValue::from(ctx.stash(s)),
-			// 		Value::Table(t)    => StaticValue::from(ctx.stash(t)),
-			// 		Value::Function(f) => StaticValue::from(ctx.stash(f)),
-			// 		Value::Thread(_)   => StaticValue::Nil,
-			// 		Value::UserData(u) => StaticValue::from(ctx.stash(u)),
-			// 	}
-			// }).collect::<Vec<StaticValue>>();
-			//
-			// Ok(statics)
+			let results = vals.iter().map(to_static_value).collect::<Vec<_>>();
 			
-			Ok(())
+			
+			Ok(results)
 		}).unwrap();
+		
+		assert_eq!(res.len(), 1, "expected one result");
+		let first = res[0];
+		if let StaticValue::Integer(i) = first {
+			assert_eq!(i, 1, "first element should be 1");
+		}
 		
 		info!("XDD {:?}", res);
 	}
