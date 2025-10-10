@@ -16,6 +16,11 @@ mod api;
 use crate::pico8::api::install_pico8_apis;
 use env::Env;
 
+pub struct Pico8VMRunResult {
+	pub requested_fps: u16,
+	pub stopped: bool,
+}
+
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
 	env: Rc<RefCell<Env<A>>>,
@@ -53,7 +58,9 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		self.executor = Some(ex);
 	}
 	
-	pub fn run(&mut self) {
+	// Returns the FPS requested - should be 30 or 60
+	pub fn run(&mut self) -> Pico8VMRunResult {
+		let mut stopped = false;
 		if let Some(executor) = self.executor.as_mut() {
 			let mut fuel = Fuel::with(10240);
 			self.lua.enter(|ctx| {
@@ -66,13 +73,16 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 					
 					match executor.mode() {
 						ExecutorMode::Normal => continue,
-						ExecutorMode::Stopped => break,
+						ExecutorMode::Stopped => {
+							stopped = true;
+							break
+						},
 						ExecutorMode::Result => {
 							let value = executor.take_result::<Value>(ctx);
 							
 							match executor.mode() {
 								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
-								ExecutorMode::Stopped => info!("Execution stopped. {:?}", format!("{:?}", value)),
+								ExecutorMode::Stopped => info!("Execution stopped. {:?}", value),
 								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
 							
@@ -82,6 +92,11 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 					}
 				}
 			});
+		}
+		
+		Pico8VMRunResult {
+			requested_fps: self.env.borrow().fps,
+			stopped,
 		}
 	}
 	
@@ -105,7 +120,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
-enum StaticValue {
+pub enum StaticValue {
 	Nil,
 	Boolean(bool),
 	Integer(i64),
@@ -116,7 +131,8 @@ enum StaticValue {
 	Thread,
 	UserData,
 }
-fn to_static_value(x: &Value) -> StaticValue {
+// todo: context for strings / tables / maybe function names
+pub fn to_static_value(x: &Value) -> StaticValue {
 	match x {
 		Value::Nil         => StaticValue::Nil,
 		Value::Boolean(b)  => StaticValue::Boolean(b.clone()),
@@ -155,7 +171,7 @@ mod test {
 			Ok(ctx.stash(ex))
 		}).unwrap();
 		
-		error!("Test!");
+		error!("Test!"); // todo: show test output
 		vm.lua.finish(&ex).unwrap();
 		
 		let res = vm.lua.try_enter(|ctx| {

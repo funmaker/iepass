@@ -10,7 +10,7 @@ pub struct Env<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Memory<A>,
 	pub buttons: Buttons,
-	pub fps: u8,
+	pub fps: u16,
 }
 
 impl<A: Allocator + Clone> Env<A> {
@@ -51,7 +51,7 @@ impl Buttons {
 		}
 	}
 	
-	pub fn finish_update_frame(&mut self, fps: u8) {
+	pub fn finish_update_frame(&mut self, fps: u16) {
 		for player in 0..8 {
 			let buttons = self.buttons[player];
 			
@@ -63,7 +63,7 @@ impl Buttons {
 					self.buttons_held_frames[idx] += 1;
 					
 					let repeating = self.buttons_repeat_state[player] & mask != 0;
-					let limit = fps.div(if repeating { 7 } else { 2 });
+					let limit = fps.div(if repeating { 7 } else { 2 }).min(255) as u8;
 					
 					if self.buttons_held_frames[idx] >= limit {
 						self.buttons_held_frames[idx] = 0;
