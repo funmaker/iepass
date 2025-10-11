@@ -1,7 +1,7 @@
 use core::{
     fmt,
     hash::{Hash, Hasher},
-    i64, mem,
+    mem,
 };
 
 use gc_arena::{lock::RefLock, Collect, Gc, Mutation};
@@ -133,7 +133,7 @@ impl<'gc> Table<'gc> {
     ///
     /// If a table has exactly one border, it is called a 'sequence', and this border is the table's
     /// length.
-    pub fn length(self) -> i64 {
+    pub fn length(self) -> u16 {
         self.0.borrow().raw_table.length()
     }
 

@@ -19,7 +19,8 @@ fn async_sequence_works() -> Result<(), ExternError> {
                 for i in 1..=length {
                     let function = seq.try_enter(|ctx, locals, _, _| {
                         let table = locals.fetch(&table);
-                        let func = meta_ops::call(ctx, table.get_value(ctx, i))?;
+                        
+                        let func = meta_ops::call(ctx, table.get_value(ctx, i.cast_signed()))?;
                         Ok(locals.stash(&ctx, func))
                     })?;
 

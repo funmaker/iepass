@@ -9,7 +9,7 @@ use gc_arena::{
 use crate::{
     finalizers::Finalizers,
     stash::{Fetchable, Stashable},
-    stdlib::{load_base, load_coroutine, load_math, load_string, load_table},
+    stdlib::{load_base, load_coroutine},
     string::InternedStringSet,
     thread::BadThreadMode,
     Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError,
@@ -35,7 +35,7 @@ use crate::{
 /// ```
 /// # use gc_arena::Gc;
 /// # use p8rs_piccolo::Lua;
-/// # let mut lua = Lua::empty();
+/// # let mut lua = Lua::core();
 /// lua.enter(|ctx| {
 ///     // Create a new `Gc<'gc, i32>` pointer using the `&Mutation` held inside `ctx`
 ///     let p = Gc::new(&ctx, 13);
@@ -153,7 +153,7 @@ impl Lua {
         lua.load_core();
         lua
     }
-
+    
     /// Create a new `Lua` instance with all of the stdlib loaded.
     #[cfg(feature = "std")]
     pub fn full() -> Self {
@@ -161,7 +161,7 @@ impl Lua {
         lua.load_io();
         lua
     }
-
+    
     /// Load the core parts of the stdlib that do not allow performing any I/O.
     ///
     /// Calls:
@@ -174,18 +174,19 @@ impl Lua {
         self.enter(|ctx| {
             load_base(ctx);
             load_coroutine(ctx);
-            load_math(ctx);
-            load_string(ctx);
-            load_table(ctx);
-        })
+            // load_math(ctx);
+            // load_string(ctx);
+            // load_table(ctx);
+        });
     }
-
+    
     /// Load the parts of the stdlib that allow I/O.
     #[cfg(feature = "std")]
     pub fn load_io(&mut self) {
-        self.enter(|ctx| {
-            crate::stdlib::load_io(ctx);
-        })
+        // self.enter(|ctx| {
+        //     crate::stdlib::load_io(ctx);
+        // })
+        unimplemented!()
     }
 
     /// Size of all memory used by this Lua context.

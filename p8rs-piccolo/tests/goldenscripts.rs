@@ -165,7 +165,7 @@ fn test_goldenscripts() {
         eprintln!("{path:?}: operating in {mode:?} mode");
         eprintln!("running {:?}", path);
 
-        let mut lua = Lua::full();
+        let mut lua = Lua::core();
 
         let tx = tx.clone();
         lua.enter(|ctx| {

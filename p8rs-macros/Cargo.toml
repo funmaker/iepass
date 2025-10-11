@@ -1,5 +1,5 @@
 [package]
-name     = "p8rs-types"
+name     = "p8rs-macros"
 resolver = "3"
 version.workspace = true
 edition.workspace = true
@@ -8,10 +8,11 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[features]
-gc-arena = ["dep:gc-arena"]
+[lib]
+proc-macro = true
 
 [dependencies]
-arrayvec.workspace = true
-thiserror.workspace = true
-gc-arena = { workspace = true, optional = true }
+p8rs-types.workspace = true
+quote = "1.0.41"
+syn = "2.0.106"
+proc-macro2 = "1.0.95"

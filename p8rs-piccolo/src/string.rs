@@ -171,7 +171,7 @@ impl<'gc> fmt::Debug for String<'gc> {
 }
 
 impl<'gc> String<'gc> {
-    pub fn len(self) -> i64 {
+    pub fn len(self) -> u16 {
         self.as_bytes().len().try_into().unwrap()
     }
 

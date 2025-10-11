@@ -1,7 +1,7 @@
 use core::fmt;
 
 use gc_arena::{DynamicRoot, DynamicRootSet, Mutation, Rootable};
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     callback::CallbackInner,
     closure::ClosureInner,
@@ -266,8 +266,7 @@ impl Fetchable for StashedFunction {
 pub enum StashedValue {
     Nil,
     Boolean(bool),
-    Integer(i64),
-    Number(f64),
+    Number(P8Num),
     String(StashedString),
     Table(StashedTable),
     Function(StashedFunction),
@@ -288,7 +287,6 @@ impl StashedValue {
         match self {
             StashedValue::Nil => Some(Value::Nil),
             StashedValue::Boolean(b) => Some(Value::Boolean(*b)),
-            StashedValue::Integer(i) => Some(Value::Integer(*i)),
             StashedValue::Number(n) => Some(Value::Number(*n)),
             _ => None,
         }
@@ -301,14 +299,8 @@ impl From<bool> for StashedValue {
     }
 }
 
-impl From<i64> for StashedValue {
-    fn from(v: i64) -> StashedValue {
-        StashedValue::Integer(v)
-    }
-}
-
-impl From<f64> for StashedValue {
-    fn from(v: f64) -> StashedValue {
+impl From<P8Num> for StashedValue {
+    fn from(v: P8Num) -> StashedValue {
         StashedValue::Number(v)
     }
 }
@@ -356,7 +348,6 @@ impl<'gc> Stashable<'gc> for Value<'gc> {
         match self {
             Value::Nil => StashedValue::Nil,
             Value::Boolean(b) => StashedValue::Boolean(b),
-            Value::Integer(i) => StashedValue::Integer(i),
             Value::Number(n) => StashedValue::Number(n),
             Value::String(s) => StashedValue::String(s.stash(mc, roots)),
             Value::Table(t) => StashedValue::Table(t.stash(mc, roots)),
@@ -374,7 +365,6 @@ impl Fetchable for StashedValue {
         match self {
             StashedValue::Nil => Value::Nil,
             StashedValue::Boolean(b) => Value::Boolean(*b),
-            StashedValue::Integer(i) => Value::Integer(*i),
             StashedValue::Number(n) => Value::Number(*n),
             StashedValue::String(s) => Value::String(s.fetch(roots)),
             StashedValue::Table(t) => Value::Table(t.fetch(roots)),

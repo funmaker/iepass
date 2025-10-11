@@ -1,16 +1,15 @@
 use core::hash::{Hash, Hasher};
 
 use gc_arena::Collect;
-
-use crate::compiler::string_utils::{read_float, read_integer, trim_whitespace};
+use p8rs_types::p8num::P8Num;
+use crate::compiler::string_utils::trim_whitespace;
 
 #[derive(Debug, Copy, Clone, Collect)]
 #[collect(no_drop)]
 pub enum Constant<S> {
     Nil,
     Boolean(bool),
-    Integer(i64),
-    Number(f64),
+    Number(P8Num),
     String(S),
 }
 
@@ -31,7 +30,6 @@ impl<S> Constant<S> {
         match self {
             Constant::Nil => Constant::Nil,
             Constant::Boolean(b) => Constant::Boolean(*b),
-            Constant::Integer(i) => Constant::Integer(*i),
             Constant::Number(n) => Constant::Number(*n),
             Constant::String(s) => Constant::String(s),
         }
@@ -41,7 +39,6 @@ impl<S> Constant<S> {
         match self {
             Constant::Nil => Constant::Nil,
             Constant::Boolean(b) => Constant::Boolean(b),
-            Constant::Integer(i) => Constant::Integer(i),
             Constant::Number(n) => Constant::Number(n),
             Constant::String(s) => Constant::String(f(s)),
         }
@@ -52,13 +49,10 @@ impl<S: AsRef<[u8]>> Constant<S> {
     /// Converts the given constant to an integer or number, if possible.
     pub fn to_numeric(&self) -> Option<Constant<S>> {
         match self {
-            &Self::Integer(a) => Some(Constant::Integer(a)),
             &Self::Number(a) => Some(Constant::Number(a)),
             Self::String(a) => {
                 let a = trim_whitespace(a.as_ref());
-                if let Some(i) = read_integer(a) {
-                    Some(Constant::Integer(i))
-                } else if let Some(n) = read_float(a) {
+                if let Ok(n) = P8Num::from_ascii(a) {
                     Some(Constant::Number(n))
                 } else {
                     None
@@ -69,25 +63,9 @@ impl<S: AsRef<[u8]>> Constant<S> {
     }
 
     /// Interprets Numbers, Integers, and Strings as a Number, if possible.
-    pub fn to_number(&self) -> Option<f64> {
+    pub fn to_number(&self) -> Option<P8Num> {
         match self.to_numeric() {
-            Some(Self::Integer(a)) => Some(a as f64),
             Some(Self::Number(a)) => Some(a),
-            _ => None,
-        }
-    }
-
-    /// Interprets Numbers, Integers, and Strings as an Integer, if possible.
-    pub fn to_integer(&self) -> Option<i64> {
-        match self.to_numeric() {
-            Some(Self::Integer(a)) => Some(a),
-            Some(Self::Number(a)) => {
-                if ((a as i64) as f64) == a {
-                    Some(a as i64)
-                } else {
-                    None
-                }
-            }
             _ => None,
         }
     }
@@ -96,21 +74,18 @@ impl<S: AsRef<[u8]>> Constant<S> {
 
     pub fn add(&self, rhs: &Self) -> Option<Self> {
         Some(match (self, rhs) {
-            (&Self::Integer(a), &Self::Integer(b)) => Self::Integer(a.wrapping_add(b)),
             (a, b) => Self::Number(a.to_number()? + b.to_number()?),
         })
     }
 
     pub fn subtract(&self, rhs: &Self) -> Option<Self> {
         Some(match (self, rhs) {
-            (&Self::Integer(a), &Self::Integer(b)) => Self::Integer(a.wrapping_sub(b)),
             (a, b) => Self::Number(a.to_number()? - b.to_number()?),
         })
     }
 
     pub fn multiply(&self, rhs: &Self) -> Option<Self> {
         Some(match (self, rhs) {
-            (&Self::Integer(a), &Self::Integer(b)) => Self::Integer(a.wrapping_mul(b)),
             (a, b) => Self::Number(a.to_number()? * b.to_number()?),
         })
     }
@@ -124,25 +99,10 @@ impl<S: AsRef<[u8]>> Constant<S> {
     /// negative infinity.
     pub fn floor_divide(&self, rhs: &Self) -> Option<Self> {
         match (self, rhs) {
-            (&Self::Integer(a), &Self::Integer(b)) => {
-                if b == 0 {
-                    None
-                } else {
-                    // Wrapping version of std's div_floor
-                    let d = a.wrapping_div(b);
-                    let r = a.wrapping_rem(b);
-                    let d = if (r > 0 && b < 0) || (r < 0 && b > 0) {
-                        d - 1
-                    } else {
-                        d
-                    };
-                    Some(Self::Integer(d))
-                }
-            }
             (a, b) => {
                 let a = a.to_number()?;
                 let b = b.to_number()?;
-                Some(Self::Number(crate::math::floor(a / b)))
+                Some(Self::Number((a / b).floor()))
             }
         }
     }
@@ -151,13 +111,6 @@ impl<S: AsRef<[u8]>> Constant<S> {
     /// the remainder.
     pub fn modulo(&self, rhs: &Self) -> Option<Self> {
         match (self, rhs) {
-            (&Self::Integer(a), &Self::Integer(b)) => {
-                if b == 0 {
-                    None
-                } else {
-                    Some(Self::Integer(((a % b) + b) % b))
-                }
-            }
             (a, b) => {
                 let (a, b) = (a.to_number()?, b.to_number()?);
                 Some(Self::Number(((a % b) + b) % b))
@@ -169,15 +122,11 @@ impl<S: AsRef<[u8]>> Constant<S> {
     pub fn exponentiate(&self, rhs: &Self) -> Option<Self> {
         let lhs = self.to_number()?;
         let rhs = rhs.to_number()?;
-        // This may fail if the environment doesn't support powf, as is
-        // currently the case for #![no_std] builds.  This will cause an
-        // operator error when evaluating.
-        Some(Self::Number(crate::math::try_powf(lhs, rhs)?))
+        Some(Self::Number(lhs.powf(rhs).unwrap_or(P8Num::ZERO)))
     }
 
     pub fn negate(&self) -> Option<Self> {
         match self {
-            &Self::Integer(a) => Some(Self::Integer(a.wrapping_neg())),
             &Self::Number(a) => Some(Self::Number(-a)),
             s => s.to_number().map(|x| Self::Number(-x)),
         }
@@ -186,40 +135,37 @@ impl<S: AsRef<[u8]>> Constant<S> {
     // Bitwise operators
 
     pub fn bitwise_not(&self) -> Option<Self> {
-        Some(Self::Integer(!self.to_integer()?))
+        Some(Self::Number(!self.to_number()?))
     }
 
     pub fn bitwise_and(&self, rhs: &Self) -> Option<Self> {
-        Some(Self::Integer(self.to_integer()? & rhs.to_integer()?))
+        Some(Self::Number(self.to_number()? & rhs.to_number()?))
     }
 
     pub fn bitwise_or(&self, rhs: &Self) -> Option<Self> {
-        Some(Self::Integer(self.to_integer()? | rhs.to_integer()?))
+        Some(Self::Number(self.to_number()? | rhs.to_number()?))
     }
 
     pub fn bitwise_xor(&self, rhs: &Self) -> Option<Self> {
-        Some(Self::Integer(self.to_integer()? ^ rhs.to_integer()?))
+        Some(Self::Number(self.to_number()? ^ rhs.to_number()?))
     }
 
     pub fn shift_left(&self, rhs: &Self) -> Option<Self> {
-        let rhs = rhs.to_integer()?;
-        if rhs < 0 {
-            return None;
+        let rhs = rhs.to_number()?.floor();
+        if rhs < P8Num::ZERO {
+            return self.shift_right(&Self::Number(-rhs));
         }
-        let rhs = rhs.try_into().ok().unwrap_or(u32::MAX);
-        Some(Self::Integer(
-            self.to_integer()?.checked_shl(rhs).unwrap_or(0),
-        ))
+        let rhs = i32::from(rhs) as u32;
+        Some(Self::Number(self.to_number()?.checked_shl(rhs).unwrap_or(P8Num::ZERO)))
     }
 
     pub fn shift_right(&self, rhs: &Self) -> Option<Self> {
-        let rhs = rhs.to_integer()?;
-        if rhs < 0 {
-            return None;
+        let rhs = rhs.to_number()?.floor();
+        if rhs < P8Num::ZERO {
+            return self.shift_right(&Self::Number(-rhs));
         }
-        let lhs = self.to_integer()? as u64;
-        let rhs = rhs.try_into().ok().unwrap_or(u32::MAX);
-        Some(Self::Integer(lhs.checked_shr(rhs).unwrap_or(0) as i64))
+        let rhs = i32::from(rhs) as u32;
+        Some(Self::Number(self.to_number()?.checked_shr(rhs).unwrap_or(P8Num::ZERO)))
     }
 
     // Comparison operators
@@ -232,12 +178,7 @@ impl<S: AsRef<[u8]>> Constant<S> {
             (Self::Boolean(a), Self::Boolean(b)) => a == b,
             (Self::Boolean(_), _) => false,
 
-            (Self::Integer(a), Self::Integer(b)) => a == b,
-            (Self::Integer(a), Self::Number(b)) => *a as f64 == *b,
-            (Self::Integer(_), _) => false,
-
             (Self::Number(a), Self::Number(b)) => a == b,
-            (Self::Number(a), Self::Integer(b)) => *b as f64 == *a,
             (Self::Number(_), _) => false,
 
             (Self::String(a), Self::String(b)) => a.as_ref() == b.as_ref(),
@@ -247,10 +188,7 @@ impl<S: AsRef<[u8]>> Constant<S> {
 
     pub fn less_than(&self, rhs: &Self) -> Option<bool> {
         Some(match (self, rhs) {
-            (Self::Integer(a), Self::Integer(b)) => a < b,
-            (Self::Integer(a), Self::Number(b)) => (*a as f64) < *b,
             (Self::Number(a), Self::Number(b)) => a < b,
-            (Self::Number(a), Self::Integer(b)) => *a < *b as f64,
             (Self::String(a), Self::String(b)) => a.as_ref() < b.as_ref(),
             _ => return None,
         })
@@ -258,10 +196,7 @@ impl<S: AsRef<[u8]>> Constant<S> {
 
     pub fn less_equal(&self, rhs: &Self) -> Option<bool> {
         Some(match (self, rhs) {
-            (Self::Integer(a), Self::Integer(b)) => a <= b,
-            (Self::Integer(a), Self::Number(b)) => (*a as f64) <= *b,
             (Self::Number(a), Self::Number(b)) => a <= b,
-            (Self::Number(a), Self::Integer(b)) => *a <= *b as f64,
             (Self::String(a), Self::String(b)) => a.as_ref() <= b.as_ref(),
             _ => return None,
         })
@@ -295,10 +230,7 @@ impl<S: AsRef<[u8]>> PartialEq for IdenticalConstant<S> {
             (Constant::Boolean(a), Constant::Boolean(b)) => a == b,
             (Constant::Boolean(_), _) => false,
 
-            (Constant::Integer(a), Constant::Integer(b)) => a == b,
-            (Constant::Integer(_), _) => false,
-
-            (Constant::Number(a), Constant::Number(b)) => a.to_bits() == b.to_bits(),
+            (Constant::Number(a), Constant::Number(b)) => a == b,
             (Constant::Number(_), _) => false,
 
             (Constant::String(a), Constant::String(b)) => a.as_ref() == b.as_ref(),
@@ -319,13 +251,9 @@ impl<S: AsRef<[u8]>> Hash for IdenticalConstant<S> {
                 Hash::hash(&1, state);
                 b.hash(state);
             }
-            Constant::Integer(i) => {
-                Hash::hash(&2, state);
-                i.hash(state);
-            }
             Constant::Number(n) => {
                 Hash::hash(&3, state);
-                n.to_bits().hash(state);
+                n.hash(state);
             }
             Constant::String(s) => {
                 Hash::hash(&4, state);

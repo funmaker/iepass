@@ -6,7 +6,7 @@ use core::{error::Error as StdError, fmt};
 
 use gc_arena::{Collect, Gc, Rootable};
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     Callback, CallbackReturn, Context, FromValue, Function, IntoValue, MetaMethod, Singleton,
     Table, UserData, Value,
@@ -56,9 +56,7 @@ pub enum ExternLuaError {
     #[error("{0}")]
     Boolean(bool),
     #[error("{0}")]
-    Integer(i64),
-    #[error("{0}")]
-    Number(f64),
+    Number(P8Num),
     #[error("{0}")]
     String(StdString),
     #[error("<table {0:p}>")]
@@ -76,7 +74,6 @@ impl<'gc> From<LuaError<'gc>> for ExternLuaError {
         match error.0 {
             Value::Nil => ExternLuaError::Nil,
             Value::Boolean(b) => ExternLuaError::Boolean(b),
-            Value::Integer(i) => ExternLuaError::Integer(i),
             Value::Number(n) => ExternLuaError::Number(n),
             Value::String(s) => ExternLuaError::String(s.display_lossy().to_string()),
             Value::Table(t) => ExternLuaError::Table(Gc::as_ptr(t.into_inner()) as *const ()),

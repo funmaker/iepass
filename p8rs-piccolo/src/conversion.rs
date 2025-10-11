@@ -1,6 +1,6 @@
 use alloc::{borrow::ToOwned, string::String as StdString, vec::Vec};
 use core::{array, iter, ops};
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     Callback, Closure, Context, Function, String, Table, Thread, TypeError, UserData, Value,
 };
@@ -22,8 +22,7 @@ macro_rules! impl_into {
 }
 impl_into!(
     bool,
-    i64,
-    f64,
+    P8Num,
     String<'gc>,
     Table<'gc>,
     Function<'gc>,
@@ -39,17 +38,23 @@ macro_rules! impl_int_into {
         $(
             impl<'gc> IntoValue<'gc> for $i {
                 fn into_value(self, _: Context<'gc>) -> Value<'gc> {
-                    Value::Integer(self.into())
+                    Value::Number(self.into())
                 }
             }
         )*
     };
 }
-impl_int_into!(i8, u8, i16, u16, i32, u32);
+impl_int_into!(i8, u8, i16);
 
 impl<'gc> IntoValue<'gc> for f32 {
     fn into_value(self, _: Context<'gc>) -> Value<'gc> {
-        Value::Number(self.into())
+        Value::Number(P8Num::new(self))
+    }
+}
+
+impl<'gc> IntoValue<'gc> for f64 {
+    fn into_value(self, _: Context<'gc>) -> Value<'gc> {
+        Value::Number(P8Num::new_f64(self))
     }
 }
 
@@ -67,12 +72,8 @@ macro_rules! impl_copy_into {
 impl_copy_into!(
     bool,
     i8,
-    i16,
-    i32,
-    i64,
     u8,
-    u16,
-    u32,
+    i16,
     f32,
     f64,
     String<'gc>,
@@ -122,7 +123,7 @@ impl<'gc, T: IntoValue<'gc>> IntoValue<'gc> for Vec<T> {
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc> {
         let table = Table::new(&ctx);
         for (i, v) in self.into_iter().enumerate() {
-            table.set(ctx, i64::try_from(i).unwrap() + 1, v).unwrap();
+            table.set(ctx, i as i16 + 1, v).unwrap();
         }
         table.into()
     }
@@ -135,7 +136,7 @@ where
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc> {
         let table = Table::new(&ctx);
         for (i, v) in self.iter().enumerate() {
-            table.set(ctx, i64::try_from(i).unwrap() + 1, v).unwrap();
+            table.set(ctx, i as i16 + 1, v).unwrap();
         }
         table.into()
     }
@@ -148,7 +149,7 @@ where
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc> {
         let table = Table::new(&ctx);
         for (i, v) in self.into_iter().enumerate() {
-            table.set(ctx, i64::try_from(i).unwrap() + 1, v).unwrap();
+            table.set(ctx, i as i16 + 1, v).unwrap();
         }
         table.into()
     }
@@ -179,7 +180,7 @@ impl<'gc, T: FromValue<'gc>> FromValue<'gc> for Vec<T> {
         if let Value::Table(table) = value {
             (1..=table.length())
                 .into_iter()
-                .map(|i| table.get(ctx, i))
+                .map(|i| table.get(ctx, i as i16))
                 .collect()
         } else {
             Err(TypeError {
@@ -195,7 +196,7 @@ impl<'gc, T: FromValue<'gc>, const N: usize> FromValue<'gc> for [T; N] {
         if let Value::Table(table) = value {
             let mut res: [Option<T>; N] = array::from_fn(|_| None);
             for i in 0..N {
-                res[i] = Some(table.get(ctx, i64::try_from(i).unwrap() + 1)?);
+                res[i] = Some(table.get(ctx, i16::try_from(i).unwrap() + 1)?);
             }
             Ok(res.map(|r| r.unwrap()))
         } else {
@@ -216,7 +217,7 @@ macro_rules! impl_int_from {
                     _: Context<'gc>,
                     value: Value<'gc>,
                 ) -> Result<Self, TypeError> {
-                    if let Some(i) = value.to_integer() {
+                    if let Some(i) = value.to_number() {
                         if let Ok(i) = <$i>::try_from(i) {
                             Ok(i)
                         } else {
@@ -247,7 +248,7 @@ macro_rules! impl_float_from {
                     value: Value<'gc>,
                 ) -> Result<Self, TypeError> {
                     if let Some(n) = value.to_number() {
-                        Ok(n as $f)
+                        Ok(n.into())
                     } else {
                         Err(TypeError {
                             expected: stringify!($f),

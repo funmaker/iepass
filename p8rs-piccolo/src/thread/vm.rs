@@ -1,7 +1,7 @@
 use alloc::borrow::ToOwned;
 use allocator_api2::vec;
 use gc_arena::allocator_api::MetricsAlloc;
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     meta_ops::{self, ConcatMetaResult, MetaResult},
     opcode::{Operation, RCIndex},
@@ -144,6 +144,7 @@ pub(super) fn run_vm<'gc>(
                 let table = registers.get_upvalue(&ctx, current_upvalues[table.0 as usize]);
                 let key = get_rc(&registers.stack_frame, &current_prototype.constants, key);
                 let value = get_rc(&registers.stack_frame, &current_prototype.constants, value);
+                println!("SetUpTable\n{table:?}\n{key:?}\n{value:?}");
                 if let Some(call) = meta_ops::new_index(ctx, table, key, value)? {
                     lua_frame.call_meta_function(
                         ctx,
@@ -256,44 +257,6 @@ pub(super) fn run_vm<'gc>(
                     registers.stack_frame[base.0 as usize + 1],
                     registers.stack_frame[base.0 as usize + 2],
                 ) {
-                    (Value::Integer(index), Value::Integer(limit), Value::Integer(step)) => {
-                        let (index, overflow) = index.overflowing_add(step);
-                        registers.stack_frame[base.0 as usize] = Value::Integer(index);
-
-                        let past_end = overflow
-                            || if step < 0 {
-                                index < limit
-                            } else {
-                                index > limit
-                            };
-                        if !past_end {
-                            *registers.pc = add_offset(*registers.pc, jump);
-                            registers.stack_frame[base.0 as usize + 3] = Value::Integer(index);
-                        }
-                    }
-                    (Value::Integer(index), limit, Value::Integer(step)) => {
-                        if let Some(limit) = limit.to_number() {
-                            let (index, overflow) = index.overflowing_add(step);
-                            registers.stack_frame[base.0 as usize] = Value::Integer(index);
-
-                            let past_end = overflow
-                                || if step < 0 {
-                                    !(index as f64 >= limit)
-                                } else {
-                                    !(index as f64 <= limit)
-                                };
-                            if !past_end {
-                                *registers.pc = add_offset(*registers.pc, jump);
-                                registers.stack_frame[base.0 as usize + 3] = Value::Integer(index);
-                            }
-                        } else {
-                            return Err(VMError::BadForLoop(
-                                "integer",
-                                limit.type_name(),
-                                "integer",
-                            ));
-                        }
-                    }
                     (index, limit, step) => {
                         if let (Some(index), Some(limit), Some(step)) =
                             (index.to_number(), limit.to_number(), step.to_number())
@@ -301,7 +264,7 @@ pub(super) fn run_vm<'gc>(
                             let index = index + step;
                             registers.stack_frame[base.0 as usize] = Value::Number(index);
 
-                            let past_end = if step < 0.0 {
+                            let past_end = if step < P8Num::ZERO {
                                 !(index >= limit)
                             } else {
                                 !(index <= limit)

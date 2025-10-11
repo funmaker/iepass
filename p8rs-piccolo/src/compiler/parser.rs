@@ -2,7 +2,7 @@ use core::{fmt, ops};
 use alloc::{borrow::ToOwned, boxed::Box, format, rc::Rc, string::String, vec, vec::Vec};
 
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use super::{
     lexer::{LexError, Lexer, LineNumber, Token},
     StringInterner,
@@ -232,8 +232,7 @@ pub enum HeadExpression<S> {
 
 #[derive(Debug, Clone)]
 pub enum SimpleExpression<S> {
-    Float(f64),
-    Integer(i64),
+    Number(P8Num),
     String(S),
     Nil,
     True,
@@ -802,13 +801,9 @@ impl<S: StringInterner> Parser<'_, S> {
 
     fn parse_simple_expression(&mut self) -> Result<SimpleExpression<S::String>, ParseError> {
         Ok(match **self.get_next()? {
-            Token::Float(f) => {
+            Token::Number(f) => {
                 self.take_next()?;
-                SimpleExpression::Float(f)
-            }
-            Token::Integer(i) => {
-                self.take_next()?;
-                SimpleExpression::Integer(i)
+                SimpleExpression::Number(f)
             }
             Token::String(_) => SimpleExpression::String(self.expect_string()?.inner),
             Token::Nil => {

@@ -5,7 +5,7 @@ use hashbrown::hash_map;
 use gc_arena::Collect;
 use hashbrown::HashMap;
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     constant::IdenticalConstant,
     opcode::{OpCode, Operation, RCIndex},
@@ -577,7 +577,7 @@ impl<S: StringInterner> Compiler<S> {
                 let step = if let Some(step) = step {
                     self.expression(step)?
                 } else {
-                    ExprDescriptor::Constant(Constant::Integer(1))
+                    ExprDescriptor::Constant(Constant::Number(P8Num::ONE))
                 };
                 self.expr_discharge(step, ExprDestination::PushNew)?;
 
@@ -1134,8 +1134,7 @@ impl<S: StringInterner> Compiler<S> {
         simple_expression: &SimpleExpression<S::String>,
     ) -> Result<ExprDescriptor<S::String>, CompileErrorKind> {
         Ok(match simple_expression {
-            SimpleExpression::Float(f) => ExprDescriptor::Constant(Constant::Number(*f)),
-            SimpleExpression::Integer(i) => ExprDescriptor::Constant(Constant::Integer(*i)),
+            SimpleExpression::Number(f) => ExprDescriptor::Constant(Constant::Number(*f)),
             SimpleExpression::String(s) => ExprDescriptor::Constant(Constant::String(s.clone())),
             SimpleExpression::Nil => ExprDescriptor::Constant(Constant::Nil),
             SimpleExpression::True => ExprDescriptor::Constant(Constant::Boolean(true)),
@@ -2135,7 +2134,7 @@ impl<S: StringInterner> Compiler<S> {
 
                 // Index must start at zero.
                 self.expr_discharge(
-                    ExprDescriptor::Constant(Constant::Integer(0)),
+                    ExprDescriptor::Constant(Constant::Number(P8Num::ZERO)),
                     ExprDestination::Register(index),
                 )?;
 

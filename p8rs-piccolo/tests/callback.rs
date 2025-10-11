@@ -1,6 +1,7 @@
 use core::pin::Pin;
 
 use gc_arena::Collect;
+use p8rs_macros::p8;
 use p8rs_piccolo::{
     BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Execution, Executor,
     ExternError, Function, IntoValue, Lua, Sequence, SequencePoll, Stack, String, Thread, Value,
@@ -12,7 +13,7 @@ fn callback() -> Result<(), ExternError> {
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, _, mut stack| {
-            stack.push_back(Value::Integer(42));
+            stack.push_back(Value::Number(p8!(42)));
             Ok(CallbackReturn::Return)
         });
         ctx.set_global("callback", callback);
@@ -44,7 +45,7 @@ fn tail_call_trivial_callback() -> Result<(), ExternError> {
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, _, mut stack| {
-            stack.push_back(Value::Integer(3));
+            stack.push_back(Value::Number(p8!(3)));
             Ok(CallbackReturn::Return)
         });
         ctx.set_global("callback", callback);
@@ -75,7 +76,7 @@ fn loopy_callback() -> Result<(), ExternError> {
         let callback = Callback::from_fn(&ctx, |ctx, _, _| {
             #[derive(Collect)]
             #[collect(require_static)]
-            struct Cont(i64);
+            struct Cont(i16);
 
             impl<'gc> Sequence<'gc> for Cont {
                 fn poll(
@@ -165,10 +166,10 @@ fn yield_sequence() -> Result<(), ExternError> {
                             let (a, b): (i32, i32) = stack.consume(ctx)?;
                             assert_eq!((a, b), (5, 6));
                             stack.extend([
-                                Value::Integer(5),
-                                Value::Integer(6),
-                                Value::Integer(7),
-                                Value::Integer(8),
+                                Value::Number(p8!(5)),
+                                Value::Number(p8!(6)),
+                                Value::Number(p8!(7)),
+                                Value::Number(p8!(8)),
                             ]);
                             self.0 = 1;
                             Ok(SequencePoll::Yield {
@@ -179,7 +180,7 @@ fn yield_sequence() -> Result<(), ExternError> {
                         1 => {
                             let (a, b, c, d): (i32, i32, i32, i32) = stack.consume(ctx)?;
                             assert_eq!((a, b, c, d), (5, 6, 9, 10));
-                            stack.extend([Value::Integer(11), Value::Integer(12)]);
+                            stack.extend([Value::Number(p8!(11)), Value::Number(p8!(12))]);
                             self.0 = 2;
                             Ok(SequencePoll::Return)
                         }
@@ -190,7 +191,7 @@ fn yield_sequence() -> Result<(), ExternError> {
 
             let (a, b): (i32, i32) = stack.consume(ctx)?;
             assert_eq!((a, b), (1, 2));
-            stack.extend([Value::Integer(3), Value::Integer(4)]);
+            stack.extend([Value::Number(p8!(3)), Value::Number(p8!(4))]);
             Ok(CallbackReturn::Yield {
                 to_thread: None,
                 then: Some(BoxSequence::new(&ctx, Cont(0))),
@@ -244,7 +245,7 @@ fn resume_with_err() {
                     _exec: Execution<'gc, '_>,
                     mut stack: Stack<'gc, '_>,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
-                    stack.replace(ctx, 12);
+                    stack.replace(ctx, 12_i16);
                     Ok(SequencePoll::Call {
                         function: Callback::from_fn(&ctx, |ctx, _, _| {
                             Err("an error".into_value(ctx).into())

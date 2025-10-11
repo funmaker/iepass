@@ -6,67 +6,67 @@ use crate::{
     meta_ops::{self, MetaResult},
     table::NextValue,
     BoxSequence, Callback, CallbackReturn, Context, Error, Execution, IntoValue, MetaMethod,
-    Sequence, SequencePoll, Stack, String, Table, TypeError, Value, Variadic,
+    Sequence, SequencePoll, Stack, String, Table, Value, Variadic,
 };
 
 pub fn load_base<'gc>(ctx: Context<'gc>) {
-    ctx.set_global(
-        "tonumber",
-        Callback::from_fn(&ctx, |ctx, _, mut stack| {
-            use crate::compiler::string_utils::{read_neg, trim_whitespace};
-
-            fn extract_number_data(bytes: &[u8]) -> (&[u8], bool) {
-                let bytes = trim_whitespace(bytes);
-                let (is_neg, bytes) = read_neg(bytes);
-                (bytes, is_neg)
-            }
-
-            if stack.is_empty() {
-                Err("Missing argument(s) to tonumber".into_value(ctx))?
-            } else if stack.len() == 1 || stack.get(1).is_nil() {
-                let prenumber = stack.consume::<Value>(ctx)?;
-                stack.replace(ctx, prenumber.to_numeric().unwrap_or(Value::Nil));
-            } else {
-                let (value, base) = stack.consume::<(Value, i64)>(ctx)?;
-                // Avoid implicitly converting value to a string
-                let s = match value {
-                    Value::String(s) => s,
-                    _ => {
-                        return Err(TypeError {
-                            expected: "string",
-                            found: value.type_name(),
-                        }
-                        .into())
-                    }
-                };
-                if !(2..=36).contains(&base) {
-                    Err("base out of range".into_value(ctx))?;
-                }
-                let (bytes, is_neg) = extract_number_data(s.as_bytes());
-                let result = bytes
-                    .iter()
-                    .map(|b| {
-                        if b.is_ascii_digit() {
-                            Some((*b - b'0') as i64)
-                        } else if b.is_ascii_lowercase() {
-                            Some((*b - b'a') as i64 + 10)
-                        } else if b.is_ascii_uppercase() {
-                            Some((*b - b'A') as i64 + 10)
-                        } else {
-                            None
-                        }
-                    })
-                    .try_fold(0i64, |acc, v| match v {
-                        Some(v) if v < base => Some(acc.wrapping_mul(base).wrapping_add(v)),
-                        _ => None,
-                    })
-                    .map(|v| if is_neg { v.wrapping_neg() } else { v });
-                stack.replace(ctx, result.map(Value::Integer).unwrap_or(Value::Nil));
-            }
-
-            Ok(CallbackReturn::Return)
-        }),
-    );
+    // ctx.set_global(
+    //     "tonumber",
+    //     Callback::from_fn(&ctx, |ctx, _, mut stack| {
+    //         use crate::compiler::string_utils::{read_neg, trim_whitespace};
+    // 
+    //         fn extract_number_data(bytes: &[u8]) -> (&[u8], bool) {
+    //             let bytes = trim_whitespace(bytes);
+    //             let (is_neg, bytes) = read_neg(bytes);
+    //             (bytes, is_neg)
+    //         }
+    // 
+    //         if stack.is_empty() {
+    //             Err("Missing argument(s) to tonumber".into_value(ctx))?
+    //         } else if stack.len() == 1 || stack.get(1).is_nil() {
+    //             let prenumber = stack.consume::<Value>(ctx)?;
+    //             stack.replace(ctx, prenumber.to_numeric().unwrap_or(Value::Nil));
+    //         } else {
+    //             let (value, base) = stack.consume::<(Value, i64)>(ctx)?;
+    //             // Avoid implicitly converting value to a string
+    //             let s = match value {
+    //                 Value::String(s) => s,
+    //                 _ => {
+    //                     return Err(TypeError {
+    //                         expected: "string",
+    //                         found: value.type_name(),
+    //                     }
+    //                     .into())
+    //                 }
+    //             };
+    //             if !(2..=36).contains(&base) {
+    //                 Err("base out of range".into_value(ctx))?;
+    //             }
+    //             let (bytes, is_neg) = extract_number_data(s.as_bytes());
+    //             let result = bytes
+    //                 .iter()
+    //                 .map(|b| {
+    //                     if b.is_ascii_digit() {
+    //                         Some((*b - b'0') as i64)
+    //                     } else if b.is_ascii_lowercase() {
+    //                         Some((*b - b'a') as i64 + 10)
+    //                     } else if b.is_ascii_uppercase() {
+    //                         Some((*b - b'A') as i64 + 10)
+    //                     } else {
+    //                         None
+    //                     }
+    //                 })
+    //                 .try_fold(0i64, |acc, v| match v {
+    //                     Some(v) if v < base => Some(acc.wrapping_mul(base).wrapping_add(v)),
+    //                     _ => None,
+    //                 })
+    //                 .map(|v| if is_neg { v.wrapping_neg() } else { v });
+    //             stack.replace(ctx, result.map(Value::Integer).unwrap_or(Value::Nil));
+    //         }
+    // 
+    //         Ok(CallbackReturn::Return)
+    //     }),
+    // );
 
     ctx.set_global(
         "tostring",
@@ -134,33 +134,33 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    ctx.set_global(
-        "select",
-        Callback::from_fn(&ctx, |ctx, _, mut stack| {
-            let ind = stack.get(0);
-            if let Some(n) = ind.to_integer() {
-                if n >= 1 {
-                    let last = (n as usize).min(stack.len());
-                    stack.drain(0..last);
-                    return Ok(CallbackReturn::Return);
-                } else if n < 0 {
-                    let inverse_index = n.unsigned_abs() as usize;
-                    let len = stack.len();
-                    if inverse_index < len {
-                        stack.drain(0..len - inverse_index);
-                        return Ok(CallbackReturn::Return);
-                    }
-                }
-            }
-
-            if matches!(ind, Value::String(s) if s == b"#") {
-                stack.replace(ctx, stack.len() as i64 - 1);
-                return Ok(CallbackReturn::Return);
-            }
-
-            Err("Bad argument to 'select'".into_value(ctx).into())
-        }),
-    );
+    // ctx.set_global(
+    //     "select",
+    //     Callback::from_fn(&ctx, |ctx, _, mut stack| {
+    //         let ind = stack.get(0);
+    //         if let Some(n) = ind.to_integer() {
+    //             if n >= 1 {
+    //                 let last = (n as usize).min(stack.len());
+    //                 stack.drain(0..last);
+    //                 return Ok(CallbackReturn::Return);
+    //             } else if n < 0 {
+    //                 let inverse_index = n.unsigned_abs() as usize;
+    //                 let len = stack.len();
+    //                 if inverse_index < len {
+    //                     stack.drain(0..len - inverse_index);
+    //                     return Ok(CallbackReturn::Return);
+    //                 }
+    //             }
+    //         }
+    // 
+    //         if matches!(ind, Value::String(s) if s == b"#") {
+    //             stack.replace(ctx, stack.len() as i64 - 1);
+    //             return Ok(CallbackReturn::Return);
+    //         }
+    // 
+    //         Err("Bad argument to 'select'".into_value(ctx).into())
+    //     }),
+    // );
 
     ctx.set_global(
         "rawget",
@@ -175,7 +175,7 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
         "rawlen",
         Callback::from_fn(&ctx, |ctx, _, mut stack| {
             let table: Table = stack.consume(ctx)?;
-            stack.replace(ctx, table.length());
+            stack.replace(ctx, table.length().cast_signed());
             Ok(CallbackReturn::Return)
         }),
     );
@@ -278,51 +278,51 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    let inext = Callback::from_fn(&ctx, |ctx, _, mut stack| {
-        let (table, index): (Value, Option<i64>) = stack.consume(ctx)?;
-        let next_index = index.unwrap_or(0).wrapping_add(1);
-        Ok(match meta_ops::index(ctx, table, next_index.into())? {
-            MetaResult::Value(v) => {
-                if !v.is_nil() {
-                    stack.extend([next_index.into(), v]);
-                }
-                CallbackReturn::Return
-            }
-            MetaResult::Call(call) => {
-                #[derive(Collect)]
-                #[collect(require_static)]
-                struct INext(i64);
+    // let inext = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+    //     let (table, index): (Value, Option<i64>) = stack.consume(ctx)?;
+    //     let next_index = index.unwrap_or(0).wrapping_add(1);
+    //     Ok(match meta_ops::index(ctx, table, next_index.into())? {
+    //         MetaResult::Value(v) => {
+    //             if !v.is_nil() {
+    //                 stack.extend([next_index.into(), v]);
+    //             }
+    //             CallbackReturn::Return
+    //         }
+    //         MetaResult::Call(call) => {
+    //             #[derive(Collect)]
+    //             #[collect(require_static)]
+    //             struct INext(i64);
+    // 
+    //             impl<'gc> Sequence<'gc> for INext {
+    //                 fn poll(
+    //                     self: Pin<&mut Self>,
+    //                     _ctx: Context<'gc>,
+    //                     _exec: Execution<'gc, '_>,
+    //                     mut stack: Stack<'gc, '_>,
+    //                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
+    //                     if !stack.get(0).is_nil() {
+    //                         stack.push_front(self.0.into());
+    //                     }
+    //                     Ok(SequencePoll::Return)
+    //                 }
+    //             }
+    // 
+    //             stack.extend(call.args);
+    //             CallbackReturn::Call {
+    //                 function: call.function,
+    //                 then: Some(BoxSequence::new(&ctx, INext(next_index))),
+    //             }
+    //         }
+    //     })
+    // });
 
-                impl<'gc> Sequence<'gc> for INext {
-                    fn poll(
-                        self: Pin<&mut Self>,
-                        _ctx: Context<'gc>,
-                        _exec: Execution<'gc, '_>,
-                        mut stack: Stack<'gc, '_>,
-                    ) -> Result<SequencePoll<'gc>, Error<'gc>> {
-                        if !stack.get(0).is_nil() {
-                            stack.push_front(self.0.into());
-                        }
-                        Ok(SequencePoll::Return)
-                    }
-                }
-
-                stack.extend(call.args);
-                CallbackReturn::Call {
-                    function: call.function,
-                    then: Some(BoxSequence::new(&ctx, INext(next_index))),
-                }
-            }
-        })
-    });
-
-    ctx.set_global(
-        "ipairs",
-        Callback::from_fn_with(&ctx, inext, move |inext, ctx, _, mut stack| {
-            stack.into_front(ctx, *inext);
-            Ok(CallbackReturn::Return)
-        }),
-    );
+    // ctx.set_global(
+    //     "ipairs",
+    //     Callback::from_fn_with(&ctx, inext, move |inext, ctx, _, mut stack| {
+    //         stack.into_front(ctx, *inext);
+    //         Ok(CallbackReturn::Return)
+    //     }),
+    // );
 
     ctx.set_global(
         "collectgarbage",

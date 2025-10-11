@@ -349,6 +349,18 @@ pub fn is_hex_digit(c: u8) -> bool {
     from_hex_digit(c).is_some()
 }
 
+pub fn from_bin_digit(c: u8) -> Option<u8> {
+    if c == b'0' || c == b'1' {
+        Some(c - b'0')
+    } else {
+        None
+    }
+}
+
+pub fn is_bin_digit(c: u8) -> bool {
+    from_bin_digit(c).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

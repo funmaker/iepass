@@ -400,8 +400,8 @@ pub fn len<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, 
     }
 
     match v {
-        Value::String(s) => Ok(MetaResult::Value(s.len().into())),
-        Value::Table(t) => Ok(MetaResult::Value(t.length().into())),
+        Value::String(s) => Ok(MetaResult::Value(s.len().cast_signed().into())),
+        Value::Table(t) => Ok(MetaResult::Value(t.length().cast_signed().into())),
         f => Err(MetaOperatorError::Unary(MetaMethod::Len, f.type_name())),
     }
 }
@@ -447,12 +447,7 @@ pub fn equal<'gc>(
         (Value::Boolean(a), Value::Boolean(b)) => Value::Boolean(a == b).into(),
         (Value::Boolean(_), _) => Value::Boolean(false).into(),
 
-        (Value::Integer(a), Value::Integer(b)) => Value::Boolean(a == b).into(),
-        (Value::Integer(a), Value::Number(b)) => Value::Boolean(a as f64 == b).into(),
-        (Value::Integer(_), _) => Value::Boolean(false).into(),
-
         (Value::Number(a), Value::Number(b)) => Value::Boolean(a == b).into(),
-        (Value::Number(a), Value::Integer(b)) => Value::Boolean(b as f64 == a).into(),
         (Value::Number(_), _) => Value::Boolean(false).into(),
 
         (Value::String(a), Value::String(b)) => Value::Boolean(a == b).into(),
@@ -768,7 +763,6 @@ pub fn concat<'gc>(
             let mut bytes = Vec::new();
             for value in [a, b] {
                 match value {
-                    Value::Integer(i) => write!(VecWriter(&mut bytes), "{}", i).unwrap(),
                     Value::Number(n) => write!(VecWriter(&mut bytes), "{}", n).unwrap(),
                     Value::String(s) => bytes.extend(s.as_bytes()),
                     _ => return None,
@@ -789,8 +783,6 @@ fn estimate_concatenated_len<'gc>(
     let mut len = 0usize;
     for value in values {
         let value_len = match value {
-            // ilog10 panics for values <= 0
-            Value::Integer(i) => i.abs().max(1).ilog10() as usize + i.is_negative() as usize,
             Value::Number(_n) => 10,
             Value::String(s) => s.as_bytes().len(),
             _ => return Ok(None),
@@ -818,7 +810,6 @@ pub fn concat_many<'gc>(
         let mut bytes = Vec::with_capacity(len);
         for value in values {
             match value {
-                Value::Integer(i) => write!(VecWriter(&mut bytes), "{}", i).unwrap(),
                 Value::Number(n) => write!(VecWriter(&mut bytes), "{}", n).unwrap(),
                 Value::String(s) => bytes.extend(s.as_bytes()),
                 _ => unreachable!(),
@@ -882,7 +873,6 @@ pub fn concat_separated<'gc>(
         let mut iter = values.iter();
         if let Some(val) = iter.next() {
             match val {
-                Value::Integer(i) => write!(VecWriter(&mut bytes), "{}", i).unwrap(),
                 Value::Number(n) => write!(VecWriter(&mut bytes), "{}", n).unwrap(),
                 Value::String(s) => bytes.extend(s.as_bytes()),
                 _ => unreachable!(),
@@ -891,7 +881,6 @@ pub fn concat_separated<'gc>(
             while let Some(val) = iter.next() {
                 bytes.extend(&*sep_str);
                 match val {
-                    Value::Integer(i) => write!(VecWriter(&mut bytes), "{}", i).unwrap(),
                     Value::Number(n) => write!(VecWriter(&mut bytes), "{}", n).unwrap(),
                     Value::String(s) => bytes.extend(s.as_bytes()),
                     _ => unreachable!(),

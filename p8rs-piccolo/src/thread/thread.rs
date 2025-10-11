@@ -9,7 +9,7 @@ use gc_arena::{
     allocator_api::MetricsAlloc, lock::RefLock, Collect, Finalization, Gc, GcWeak, Mutation,
 };
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::{
     closure::{UpValue, UpValueState},
     fuel::count_fuel,
@@ -651,7 +651,7 @@ impl<'gc, 'a> LuaFrame<'gc, 'a> {
         let table = self.state.stack[table_ind];
         let start = self.state.stack[start_ind];
 
-        let (Value::Table(table), Value::Integer(mut start)) = (table, start) else {
+        let (Value::Table(table), Value::Number(mut start)) = (table, start) else {
             return Err(VMError::BadSetList(table.type_name(), start.type_name()));
         };
 
@@ -663,7 +663,7 @@ impl<'gc, 'a> LuaFrame<'gc, 'a> {
         self.fuel
             .consume(count_fuel(Self::FUEL_PER_ITEM, set_count));
         for i in 0..set_count {
-            if let Some(inc) = start.checked_add(1) {
+            if let Some(inc) = start.checked_add(P8Num::ONE) {
                 start = inc;
                 table
                     .set_raw(mc, inc.into(), self.state.stack[table_ind + 2 + i])
@@ -673,7 +673,7 @@ impl<'gc, 'a> LuaFrame<'gc, 'a> {
             }
         }
 
-        self.state.stack[start_ind] = Value::Integer(start);
+        self.state.stack[start_ind] = Value::Number(start);
 
         if count.is_variable() {
             self.state.stack.resize(base + stack_size, Value::Nil);

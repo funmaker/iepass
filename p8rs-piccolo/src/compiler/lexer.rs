@@ -3,11 +3,8 @@ use core::{char, fmt};
 
 use gc_arena::Collect;
 use thiserror::Error;
-
-use crate::compiler::string_utils::{
-    from_digit, from_hex_digit, is_hex_digit, is_space, read_dec_float, read_dec_integer,
-    read_hex_float, read_hex_integer, ALERT_BEEP, BACKSPACE,
-};
+use p8rs_types::p8num::P8Num;
+use crate::compiler::string_utils::{from_digit, from_hex_digit, is_bin_digit, is_hex_digit, is_space, ALERT_BEEP, BACKSPACE};
 
 use super::{
     string_utils::{debug_utf8_lossy, is_alpha, is_digit, is_newline, FORM_FEED, VERTICAL_TAB},
@@ -71,10 +68,7 @@ pub enum Token<S> {
     RightBracket,
     LeftBrace,
     RightBrace,
-    /// Numerals are only lexed as integers in the range [-(2^63-1), 2^63-1], otherwise they will be
-    /// lexed as floats.
-    Integer(i64),
-    Float(f64),
+    Number(P8Num),
     Name(S),
     String(S),
 }
@@ -137,8 +131,7 @@ impl<S: AsRef<[u8]>> PartialEq for Token<S> {
             (Token::RightBracket, Token::RightBracket) => true,
             (Token::LeftBrace, Token::LeftBrace) => true,
             (Token::RightBrace, Token::RightBrace) => true,
-            (Token::Integer(a), Token::Integer(b)) => a == b,
-            (Token::Float(a), Token::Float(b)) => a.total_cmp(b).is_eq(),
+            (Token::Number(a), Token::Number(b)) => a == b,
             (Token::Name(a), Token::Name(b)) => a.as_ref() == b.as_ref(),
             (Token::String(a), Token::String(b)) => a.as_ref() == b.as_ref(),
             _ => false,
@@ -204,8 +197,7 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::RightBracket => write!(f, "RightBracket"),
             Token::LeftBrace => write!(f, "LeftBrace"),
             Token::RightBrace => write!(f, "RightBrace"),
-            Token::Integer(i) => write!(f, "Integer({})", *i),
-            Token::Float(d) => write!(f, "Float({})", *d),
+            Token::Number(d) => write!(f, "{:?}", d),
             Token::Name(n) => write!(f, "Name({:?})", debug_utf8_lossy(n.as_ref())),
             Token::String(s) => write!(f, "String({:?})", debug_utf8_lossy(s.as_ref())),
         }
@@ -770,82 +762,44 @@ where
         Ok(())
     }
 
-    // Reads a hex or decimal integer or floating point identifier. Allows decimal integers (123),
-    // hex integers (0xdeadbeef), decimal floating point with optional exponent and exponent sign
-    // (3.21e+1), and hex floats with optional exponent and exponent sign (0xe.2fp-1c).
+    // Reads a binary, hex or decimal integer or floating point identifier. Allows decimal numbers (123.456),
+    // hex numbers (0xdead.beef) and binary numbers (0b11110.10110)
     fn read_numeral(&mut self) -> Result<Token<S::String>, LexError> {
         let p1 = self.peek(0).unwrap().unwrap();
         assert!(p1 == b'.' || is_digit(p1));
-
+        
         self.string_buffer.clear();
-
+        
         let p2 = self.peek(1)?;
         let is_hex = p1 == b'0' && (p2 == Some(b'x') || p2 == Some(b'X'));
-        if is_hex {
-            self.string_buffer.push(p1);
-            self.string_buffer.push(p2.unwrap());
+        let is_bin = p1 == b'0' && (p2 == Some(b'b') || p2 == Some(b'B'));
+        if is_hex || is_bin {
             self.advance(2);
         }
-
+        
         let mut has_radix = false;
         while let Some(c) = self.peek(0)? {
             if c == b'.' && !has_radix {
                 self.string_buffer.push(b'.');
                 has_radix = true;
                 self.advance(1);
-            } else if (!is_hex && is_digit(c)) || (is_hex && is_hex_digit(c)) {
+            } else if (is_hex && is_hex_digit(c)) || (is_bin && is_bin_digit(c)) || (!is_hex && !is_bin && is_digit(c)) {
                 self.string_buffer.push(c);
                 self.advance(1);
             } else {
                 break;
             }
         }
-
-        let mut has_exp = false;
-        if let Some(exp_begin) = self.peek(0)? {
-            if (is_hex && (exp_begin == b'p' || exp_begin == b'P'))
-                || (!is_hex && (exp_begin == b'e' || exp_begin == b'E'))
-            {
-                self.string_buffer.push(exp_begin);
-                has_exp = true;
-                self.advance(1);
-
-                if let Some(sign) = self.peek(0)? {
-                    if sign == b'+' || sign == b'-' {
-                        self.string_buffer.push(sign);
-                        self.advance(1);
-                    }
-                }
-
-                while let Some(c) = self.peek(0)? {
-                    if is_digit(c) {
-                        self.string_buffer.push(c);
-                        self.advance(1);
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-
-        if !has_exp && !has_radix {
+        
+        Ok(Token::Number(
             if is_hex {
-                if let Some(i) = read_hex_integer(&self.string_buffer) {
-                    return Ok(Token::Integer(i));
-                }
-            }
-            if let Some(i) = read_dec_integer(&self.string_buffer) {
-                return Ok(Token::Integer(i));
-            }
-        }
-
-        Ok(Token::Float(
-            if is_hex {
-                read_hex_float(&self.string_buffer)
+                P8Num::from_ascii_radix(&self.string_buffer, 16)
+            } else if is_bin {
+                P8Num::from_ascii_radix(&self.string_buffer, 2)
             } else {
-                read_dec_float(&self.string_buffer)
+                P8Num::from_ascii_radix(&self.string_buffer, 10)
             }
-            .ok_or(LexError::BadNumber)?,
+            .map_err(|_| LexError::BadNumber)?,
         ))
     }
 
@@ -922,7 +876,7 @@ fn get_reserved_word_token<S>(word: &[u8]) -> Option<Token<S>> {
 #[cfg(test)]
 mod tests {
     use alloc::rc::Rc;
-
+    use p8rs_macros::p8;
     use crate::compiler::interning::BasicInterner;
 
     use super::*;
@@ -1034,30 +988,18 @@ mod tests {
     fn numerals() {
         test_tokens(
             r#"
+                0xdead.beef
                 0xdeadbeef
                 12345
                 12345.
-                3.1415e-2
-                0x22.4p+1
-                0Xaa.8P-2
-                0x8.4P0
-                .123E-10
-                0x99999999999999999999999999999999p999999999999999999999999999999
-                9223372036854775807
-                9223372036854775808
+                3.1415
             "#,
             &[
-                Token::Integer(0xdeadbeef),
-                Token::Integer(12345),
-                Token::Float(12345.0),
-                Token::Float(3.1415e-2),
-                Token::Float(68.5),
-                Token::Float(42.625),
-                Token::Float(8.25),
-                Token::Float(0.123e-10),
-                Token::Float(f64::INFINITY),
-                Token::Integer(9223372036854775807),
-                Token::Float(9223372036854775808.0),
+                Token::Number(p8!(hex dead.beef)),
+                Token::Number(p8!(hex beef.0000)),
+                Token::Number(p8!(12345)),
+                Token::Number(p8!(12345)),
+                Token::Number(p8!(3.1415)),
             ],
         );
     }

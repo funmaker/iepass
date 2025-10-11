@@ -4,7 +4,7 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, Collect, Gc, Mutation};
 use hashbrown::{hash_map, HashMap};
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::{Callback, Closure, Function, String, Table, Thread, UserData, Value};
 
 #[derive(Debug, Copy, Clone, Error)]
@@ -51,7 +51,7 @@ impl<'gc> fmt::Debug for RawTable<'gc> {
                     .enumerate()
                     .map(|(i, v)| {
                         (
-                            Value::Integer((i + 1).try_into().unwrap()).debug_shallow(),
+                            Value::Number((i + 1).try_into().unwrap()).debug_shallow(),
                             v.debug_shallow(),
                         )
                     })
@@ -174,7 +174,7 @@ impl<'gc> RawTable<'gc> {
             // First, we find the total count of array candidate elements across the array part, the
             // map part, and the newly inserted key.
 
-            const USIZE_BITS: usize = mem::size_of::<usize>() * 8;
+            const USIZE_BITS: usize = size_of::<usize>() * 8;
 
             // Count of array-candidate elements based on the highest bit in the index
             let mut array_counts = [0; USIZE_BITS];
@@ -249,10 +249,10 @@ impl<'gc> RawTable<'gc> {
     /// Returns a 'border' for this table.
     ///
     /// See [`Table::length`] for a more full description of what this means.
-    pub fn length(&self) -> i64 {
+    pub fn length(&self) -> u16 {
         // Binary search for a border. Entry at max must be Nil, min must be 0 or entry at min must
         // be != Nil.
-        fn binary_search<F: Fn(i64) -> bool>(mut min: i64, mut max: i64, is_nil: F) -> i64 {
+        fn binary_search<F: Fn(u16) -> bool>(mut min: u16, mut max: u16, is_nil: F) -> u16 {
             while max - min > 1 {
                 let mid = min + (max - min) / 2;
                 if is_nil(mid) {
@@ -264,7 +264,7 @@ impl<'gc> RawTable<'gc> {
             min
         }
 
-        let array_len: i64 = self.array.len().try_into().unwrap();
+        let array_len: u16 = self.array.len().try_into().unwrap();
 
         if !self.array.is_empty() && self.array[array_len as usize - 1].is_nil() {
             // If the array part ends in a Nil, there must be a border inside it
@@ -282,21 +282,21 @@ impl<'gc> RawTable<'gc> {
                 .map
                 .raw_entry()
                 .from_hash(
-                    self.hash_builder.hash_one(CanonicalKey::Integer(max)),
-                    |k| k.eq(CanonicalKey::Integer(max)),
+                    self.hash_builder.hash_one(CanonicalKey::Number(max.cast_signed().into())),
+                    |k| k.eq(CanonicalKey::Number(max.cast_signed().into())),
                 )
                 .is_some_and(|(_, v)| !v.is_nil())
             {
-                if max == i64::MAX {
+                if max == u16::MAX {
                     // If we can't find a nil entry by doubling, then the table is pathological. We
-                    // return the favor with a pathological answer: i64::MAX + 1 can't exist in the
+                    // return the favor with a pathological answer: u16::MAX + 1 can't exist in the
                     // table, therefore it is Nil, so since the table contains i64::MAX, i64::MAX is
                     // a border.
-                    return i64::MAX;
+                    return u16::MAX;
                 } else if let Some(double_max) = max.checked_mul(2) {
                     max = double_max;
                 } else {
-                    max = i64::MAX;
+                    max = u16::MAX;
                 }
             }
 
@@ -305,8 +305,8 @@ impl<'gc> RawTable<'gc> {
                 match self
                     .map
                     .raw_entry()
-                    .from_hash(self.hash_builder.hash_one(CanonicalKey::Integer(i)), |k| {
-                        k.eq(CanonicalKey::Integer(i))
+                    .from_hash(self.hash_builder.hash_one(CanonicalKey::Number(i.cast_signed().into())), |k| {
+                        k.eq(CanonicalKey::Number(i.cast_signed().into()))
                     }) {
                     Some((_, v)) => v.is_nil(),
                     None => true,
@@ -345,7 +345,7 @@ impl<'gc> RawTable<'gc> {
             for i in start_index..self.array.len() {
                 if !self.array[i].is_nil() {
                     return NextValue::Found {
-                        key: Value::Integer((i + 1).try_into().unwrap()),
+                        key: Value::Number((i + 1).try_into().unwrap()),
                         value: self.array[i],
                     };
                 }
@@ -483,8 +483,7 @@ impl<'gc> RawTable<'gc> {
 #[collect(no_drop)]
 enum CanonicalKey<'gc> {
     Boolean(bool),
-    Integer(i64),
-    Number(u64),
+    Number(P8Num),
     String(String<'gc>),
     Table(Table<'gc>),
     Closure(Closure<'gc>),
@@ -499,19 +498,8 @@ impl<'gc> CanonicalKey<'gc> {
             Value::Nil => {
                 return Err(InvalidTableKey::IsNil);
             }
-            Value::Number(n) => {
-                // NaN keys are disallowed, f64 keys where their closest i64 representation is equal
-                // to themselves when cast back to f64 are considered integer keys.
-                if n.is_nan() {
-                    return Err(InvalidTableKey::IsNaN);
-                } else if let Some(i) = f64_to_i64(n) {
-                    CanonicalKey::Integer(i)
-                } else {
-                    CanonicalKey::Number(canonical_float_bytes(n))
-                }
-            }
+            Value::Number(n) => CanonicalKey::Number(n),
             Value::Boolean(b) => CanonicalKey::Boolean(b),
-            Value::Integer(i) => CanonicalKey::Integer(i),
             Value::String(s) => CanonicalKey::String(s),
             Value::Table(t) => CanonicalKey::Table(t),
             Value::Function(Function::Closure(c)) => CanonicalKey::Closure(c),
@@ -524,8 +512,7 @@ impl<'gc> CanonicalKey<'gc> {
     fn to_value(self) -> Value<'gc> {
         match self {
             CanonicalKey::Boolean(b) => b.into(),
-            CanonicalKey::Integer(i) => i.into(),
-            CanonicalKey::Number(n) => f64::from_bits(n).into(),
+            CanonicalKey::Number(n) => n.into(),
             CanonicalKey::String(s) => s.into(),
             CanonicalKey::Table(t) => t.into(),
             CanonicalKey::Closure(c) => c.into(),
@@ -554,7 +541,7 @@ impl<'gc> Key<'gc> {
     fn kill(self) -> Option<Key<'gc>> {
         if let Key::Live(v) = self {
             match v {
-                CanonicalKey::Boolean(_) | CanonicalKey::Integer(_) | CanonicalKey::Number(_) => {
+                CanonicalKey::Boolean(_) | CanonicalKey::Number(_) => {
                     None
                 }
                 CanonicalKey::String(s) => Some(Key::Dead(Gc::as_ptr(s.into_inner()) as *const ())),
@@ -602,39 +589,16 @@ impl<'gc> Key<'gc> {
     }
 }
 
-// Returns the closest i64 to a given f64 such that casting the i64 back to an f64 results in an
-// equal value, if such an integer exists.
-fn f64_to_i64(n: f64) -> Option<i64> {
-    let i = n as i64;
-    if i as f64 == n {
-        Some(i)
-    } else {
-        None
-    }
-}
-
-// Parameter must not be NaN, should return a bit-pattern which is always equal when the
-// corresponding f64s are equal (-0.0 and 0.0 return the same bit pattern).
-fn canonical_float_bytes(f: f64) -> u64 {
-    assert!(!f.is_nan());
-    if f == 0.0 {
-        0.0f64.to_bits()
-    } else {
-        f.to_bits()
-    }
-}
-
 // If the given key can live in the array part of the table (integral value between 1 and
 // usize::MAX), returns the associated array index.
-fn to_array_index<'gc>(key: Value<'gc>) -> Option<usize> {
-    let i = match key {
-        Value::Integer(i) => i,
-        Value::Number(f) => f64_to_i64(f)?,
+fn to_array_index(key: Value) -> Option<usize> {
+    let f = match key {
+        Value::Number(f) => f,
         _ => return None,
     };
-
-    if i > 0 {
-        Some(usize::try_from(i).ok()? - 1)
+    
+    if f.fract() == P8Num::ZERO && f >= P8Num::ONE {
+        Some(i16::from(f).cast_unsigned() as usize - 1)
     } else {
         None
     }

@@ -33,8 +33,6 @@ pub mod value;
 #[cfg(feature = "std")]
 pub mod io;
 
-mod math;
-
 pub use self::{
     async_callback::{async_sequence, SequenceReturn},
     callback::{BoxSequence, Callback, CallbackFn, CallbackReturn, Sequence, SequencePoll},

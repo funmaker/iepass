@@ -4,11 +4,13 @@ use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor
 use arrayvec::{ArrayVec, ArrayString};
 
 pub mod consts;
+mod from_ascii;
 
 /// 16.16-bit fixed point number type.
 ///
 /// [P8Num] uses 16 bits for integer part and 16 bits for fractional part. It can represent values from -32768.0 to 32767.9999847412109375 inclusive.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "gc-arena", derive(gc_arena::Collect), collect(require_static))]
 #[repr(transparent)]
 pub struct P8Num(i32);
 
@@ -137,20 +139,20 @@ impl P8Num {
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::from_p8scii(b"+10"), Ok(P8Num::new(10.0)));
+	/// assert_eq!(P8Num::from_ascii(b"+10"), Ok(P8Num::new(10.0)));
 	/// ```
 	/// Trailing space returns error:
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert!(P8Num::from_p8scii(b"1 ").is_err());
+	/// assert!(P8Num::from_ascii(b"1 ").is_err());
 	/// ```
 	#[inline]
-	pub const fn from_p8scii(_src: &[u8]) -> Result<Self, ()> {
-		unimplemented!()
+	pub fn from_ascii(src: &[u8]) -> Result<Self, FromAsciiError> {
+		Self::from_ascii_radix(src, 10)
 	}
 	
 	/// Parses an integer from an ASCII-byte slice with digits in a given base.
@@ -172,20 +174,25 @@ impl P8Num {
 	///
 	/// # Examples
 	///
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert_eq!(P8Num::from_p8scii_radix(b"A", 16), Ok(P8Num::new(10.0)));
+	/// assert_eq!(P8Num::from_ascii_radix(b"A", 16), Ok(P8Num::new(10.0)));
 	/// ```
 	/// Trailing space returns error:
-	/// ```should_panic
+	/// ```
 	/// use p8rs_types::p8num::P8Num;
 	///
-	/// assert!(P8Num::from_p8scii_radix(b"1 ", 10).is_err());
+	/// assert!(P8Num::from_ascii_radix(b"1 ", 10).is_err());
 	/// ```
 	#[inline]
-	pub const fn from_p8scii_radix(_src: &[u8], _radix: u32) -> Result<Self, ()> {
-		unimplemented!()
+	pub fn from_ascii_radix(src: &[u8], radix: u32) -> Result<Self, FromAsciiError> {
+		match radix {
+			2 => from_ascii::from_ascii_bin(src),
+			10 => from_ascii::from_ascii_dec(src),
+			16 => from_ascii::from_ascii_hex(src),
+			_ => unreachable!(),
+		}
 	}
 	
 	/// Formats `self` into an ASCII-byte slice.
@@ -210,7 +217,7 @@ impl P8Num {
 		use core::ascii::Char;
 		use core::fmt::Write;
 		
-		let mut fval = f64::from(self).abs();
+		let mut fval = f64::from(*self).abs();
 		if !(0.0001..=0.9999).contains(&fval.fract()) {
 			fval = fval.round();
 		}
@@ -2282,73 +2289,19 @@ impl Display for P8Num {
 impl Debug for P8Num {
 	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
 		let raw = self.to_raw() as u32;
-		write!(f, "P8Num(0x{:04X}.{:04X} = {})", raw >> 16, raw & 0xFFFF, f64::from(self))
+		write!(f, "P8Num(0x{:04X}.{:04X} = {})", raw >> 16, raw & 0xFFFF, f64::from(*self))
 	}
 }
 
 impl const From<P8Num> for f32 {
-	fn from(value: P8Num) -> f32 {
+	fn from(value: P8Num) -> Self {
 		value.0 as f32 / (1 << 16) as f32
 	}
 }
 
-impl const From<&P8Num> for f32 {
-	fn from(value: &P8Num) -> f32 {
-		f32::from(*value)
-	}
-}
-
 impl const From<P8Num> for f64 {
-	fn from(value: P8Num) -> f64 {
+	fn from(value: P8Num) -> Self {
 		value.0 as f64 / (1 << 16) as f64
-	}
-}
-
-impl const From<&P8Num> for f64 {
-	fn from(value: &P8Num) -> f64 {
-		f64::from(*value)
-	}
-}
-
-impl const From<P8Num> for i16 {
-	fn from(value: P8Num) -> i16 {
-		(value.trunc().to_raw() >> 16) as i16
-	}
-}
-
-impl const From<&P8Num> for i16 {
-	fn from(value: &P8Num) -> i16 {
-		i16::from(*value)
-	}
-}
-
-impl const From<P8Num> for i32 {
-	fn from(value: P8Num) -> i32 {
-		value.trunc().to_raw() >> 16
-	}
-}
-
-impl const From<&P8Num> for i32 {
-	fn from(value: &P8Num) -> i32 {
-		i32::from(*value)
-	}
-}
-
-impl const From<i16> for P8Num {
-	fn from(integer: i16) -> Self {
-		P8Num((integer as i32) << 16)
-	}
-}
-
-impl const From<i8> for P8Num {
-	fn from(integer: i8) -> Self {
-		P8Num((integer as i32) << 16)
-	}
-}
-
-impl const From<u8> for P8Num {
-	fn from(integer: u8) -> Self {
-		P8Num((integer as i32) << 16)
 	}
 }
 
@@ -2377,11 +2330,84 @@ impl const TryFrom<f64> for P8Num {
 }
 
 /// The error type returned when a checked conversion fails.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TryFromError {
 	/// The provided value is outside the range of representable values or is NaN.
 	OutOfRange,
 }
+
+/// The error type returned when a P8Num::from_ascii or P8Num::from_ascii_radix fails.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FromAsciiError {
+	/// The string contains an unexpected character
+	UnexpectedChar(u8),
+}
+
+macro_rules! impl_int_conv {
+	(From $T:ty; $( $rest:tt )*) => {
+		impl const From<$T> for P8Num {
+			fn from(value: $T) -> P8Num {
+				P8Num(i32::from(value) << 16)
+			}
+		}
+		
+		impl_int_conv!($( $rest )*);
+	};
+	(TryFrom $T:ty; $( $rest:tt )*) => {
+		impl const TryFrom<$T> for P8Num {
+			type Error = TryFromError;
+			
+			fn try_from(value: $T) -> Result<Self, Self::Error> {
+				match value.checked_shl(16)
+				           .map(TryInto::try_into) {
+					Some(Ok(v)) => Ok(P8Num::from_raw(v)),
+					_ => Err(TryFromError::OutOfRange),
+				}
+			}
+		}
+		
+		impl_int_conv!($( $rest )*);
+	};
+	(Into $T:ty; $( $rest:tt )*) => {
+		impl const From<P8Num> for $T {
+			fn from(value: P8Num) -> Self {
+				((value.to_raw() >> 16) as i16).into()
+			}
+		}
+		
+		impl_int_conv!($( $rest )*);
+	};
+	(TryInto $T:ty; $( $rest:tt )*) => {
+		impl const TryFrom<P8Num> for $T {
+			type Error = <i32 as TryInto<$T>>::Error;
+			
+			fn try_from(value: P8Num) -> Result<Self, Self::Error> {
+				(value.to_raw() >> 16).try_into()
+			}
+		}
+		
+		impl_int_conv!($( $rest )*);
+	};
+	() => {};
+}
+
+impl_int_conv!(
+	From    i8;    TryInto i8;
+	From    i16;   Into    i16;
+	TryFrom i32;   Into    i32;
+	TryFrom i64;   Into    i64;
+	TryFrom i128;  Into    i128;
+	TryFrom isize; Into    isize;
+	
+	From    u8;    TryInto u8;
+	TryFrom u16;   TryInto u16;
+	TryFrom u32;   TryInto u32;
+	TryFrom u64;   TryInto u64;
+	TryFrom u128;  TryInto u128;
+	TryFrom usize; TryInto usize;
+);
 
 //TODO: use feature(const_result_trait_fn)
 const fn try_into_some(value: i64) -> Option<i32> {

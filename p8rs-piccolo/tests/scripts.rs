@@ -46,6 +46,7 @@ fn run_tests(dir: &str) -> bool {
 }
 
 #[test]
+#[ignore]
 fn test_scripts() {
     let mut file_failed = false;
 

@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use core::fmt;
 
 use gc_arena::{Collect, Gc};
-
+use p8rs_types::p8num::P8Num;
 use crate::{Callback, Closure, Constant, Function, String, Table, Thread, UserData};
 
 /// The single data type for all Lua variables.
@@ -13,8 +13,7 @@ use crate::{Callback, Closure, Constant, Function, String, Table, Thread, UserDa
 pub enum Value<'gc> {
     Nil,
     Boolean(bool),
-    Integer(i64),
-    Number(f64),
+    Number(P8Num),
     String(String<'gc>),
     Table(Table<'gc>),
     Function(Function<'gc>),
@@ -33,7 +32,7 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Nil => "nil",
             Value::Boolean(_) => "boolean",
-            Value::Integer(_) | Value::Number(_) => "number",
+            Value::Number(_) => "number",
             Value::String(_) => "string",
             Value::Table(_) => "table",
             Value::Function(_) => "function",
@@ -61,7 +60,6 @@ impl<'gc> Value<'gc> {
                 match self.0 {
                     Value::Nil => write!(fmt, "nil"),
                     Value::Boolean(b) => write!(fmt, "{}", b),
-                    Value::Integer(i) => write!(fmt, "{}", i),
                     Value::Number(f) => write!(fmt, "{}", f),
                     Value::String(s) => write!(fmt, "{}", s.display_lossy()),
                     Value::Table(t) => write!(fmt, "<table {:p}>", Gc::as_ptr(t.into_inner())),
@@ -140,13 +138,8 @@ impl<'gc> Value<'gc> {
     }
 
     /// Interprets Numbers, Integers, and Strings as a Number, if possible.
-    pub fn to_number(self) -> Option<f64> {
+    pub fn to_number(self) -> Option<P8Num> {
         self.to_constant().and_then(|c| c.to_number())
-    }
-
-    /// Interprets Numbers, Integers, and Strings as an Integer, if possible.
-    pub fn to_integer(self) -> Option<i64> {
-        self.to_constant().and_then(|c| c.to_integer())
     }
 
     /// Interprets Numbers, Integers, and Strings as a String, otherwise returns None.
@@ -155,7 +148,6 @@ impl<'gc> Value<'gc> {
     /// returned string will always be the same as what [`Value::display`] would display.
     pub fn into_string(self, ctx: crate::Context<'gc>) -> Option<String<'gc>> {
         match self {
-            Value::Integer(i) => Some(ctx.intern(i.to_string().as_bytes())),
             Value::Number(n) => Some(ctx.intern(n.to_string().as_bytes())),
             Value::String(s) => Some(s),
             _ => None,
@@ -166,7 +158,6 @@ impl<'gc> Value<'gc> {
     /// [`Value::into_string`] will always return `Some`.
     pub fn is_implicit_string(self) -> bool {
         match self {
-            Value::Integer(_) => true,
             Value::Number(_) => true,
             Value::String(_) => true,
             _ => false,
@@ -177,7 +168,6 @@ impl<'gc> Value<'gc> {
         match self {
             Value::Nil => Some(Constant::Nil),
             Value::Boolean(b) => Some(Constant::Boolean(b)),
-            Value::Integer(i) => Some(Constant::Integer(i)),
             Value::Number(n) => Some(Constant::Number(n)),
             Value::String(s) => Some(Constant::String(s)),
             _ => None,
@@ -191,15 +181,21 @@ impl<'gc> From<bool> for Value<'gc> {
     }
 }
 
-impl<'gc> From<i64> for Value<'gc> {
-    fn from(v: i64) -> Value<'gc> {
-        Value::Integer(v)
+impl<'gc> From<P8Num> for Value<'gc> {
+    fn from(v: P8Num) -> Value<'gc> {
+        Value::Number(v)
+    }
+}
+
+impl<'gc> From<i16> for Value<'gc> {
+    fn from(v: i16) -> Value<'gc> {
+        Value::Number(P8Num::from(v))
     }
 }
 
 impl<'gc> From<f64> for Value<'gc> {
     fn from(v: f64) -> Value<'gc> {
-        Value::Number(v)
+        Value::Number(P8Num::new_f64(v))
     }
 }
 
@@ -211,7 +207,6 @@ where
         match constant {
             Constant::Nil => Value::Nil,
             Constant::Boolean(b) => Value::Boolean(b),
-            Constant::Integer(i) => Value::Integer(i),
             Constant::Number(n) => Value::Number(n),
             Constant::String(s) => Value::String(s.into()),
         }
@@ -263,7 +258,7 @@ impl<'gc> From<UserData<'gc>> for Value<'gc> {
 #[cfg(test)]
 mod tests {
     use gc_arena::Rootable;
-
+    
     use crate::table::Table;
     use crate::{Lua, UserData};
 
@@ -274,16 +269,16 @@ mod tests {
             let table = Table::new(&ctx);
             table.set_field(ctx, "a", table);
             println!("{:?}", table);
-
+        
             let table2 = Table::new(&ctx);
             table2.set_metatable(&ctx, Some(table2));
             println!("{:?}", table2);
-
+        
             let combined = Table::new(&ctx);
             combined.set_field(ctx, "a", combined);
             combined.set_metatable(&ctx, Some(combined));
             println!("{:?}", combined);
-
+        
             let user = UserData::new::<Rootable![()]>(&ctx, ());
             user.set_metatable(&ctx, Some(combined));
             println!("{:?}", user);

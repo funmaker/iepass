@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass", "p8rs-types", "p8rs-piccolo", "p8rs-piccolo/util"]
+members = [".", "iepass", "iepass-core", "iepass-calib", "iepass-emu", "iepass", "p8rs-types", "p8rs-piccolo", "p8rs-piccolo/util", "p8rs-macros"]
 
 [workspace.package]
 version = "0.1.0"
@@ -27,6 +27,8 @@ overflow-checks  = false
 [workspace.dependencies]
 iepass-core = { path = "./iepass-core", default-features = false }
 p8rs-piccolo = { path = "./p8rs-piccolo", default-features = false }
+p8rs-types = { path = "./p8rs-types" }
+p8rs-macros = { path = "./p8rs-macros" }
 iepass = { path = "./iepass" }
 
 embedded-io = { version = "0.6.1", features = ["alloc"] }
