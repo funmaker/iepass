@@ -7,18 +7,18 @@ pub fn install_pico8_string(ctx: Context) {
 	set_global_callback_simple("sub", ctx, sub);
 }
 
+fn get_string_offset(len: usize, offset: i32) -> usize {
+	match offset {
+		..0 => len - ((-offset-1) as usize).min(len),
+		1.. => (offset as usize - 1).min(len),
+		0 => 0,
+	}
+}
+
 pub fn sub((text, start, end): (String, i32, Option<i32>)) -> Result<String, RuntimeError> {
-	let start = match start {
-		..0 => text.len() - ((-start-1) as usize).min(text.len()),
-		1.. => (start as usize - 1).min(text.len()),
-		0 => 0,
-	};
-	let end = end.unwrap_or(-1);
-	let end = match end {
-		..0 => text.len() - ((-end-1) as usize).min(text.len()),
-		1.. => (end as usize - 1).min(text.len()),
-		0 => 0,
-	};
+	let len = text.len();
+	let start = get_string_offset(len, start);
+	let end = end.map(|e| get_string_offset(len, e)).unwrap_or(len);
 	if end <= start {
 		Ok("".to_owned())
 	} else {

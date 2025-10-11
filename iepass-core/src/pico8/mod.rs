@@ -16,9 +16,13 @@ mod api;
 use crate::pico8::api::install_pico8_apis;
 use env::Env;
 
+const ENABLE_STEP_DEBUG: bool = false;
+
+#[derive(Debug)]
 pub struct Pico8VMRunResult {
 	pub requested_fps: u16,
 	pub stopped: bool,
+	pub out_of_fuel: bool,
 }
 
 pub struct Pico8VM<A: Allocator = Global> {
@@ -58,30 +62,54 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		self.executor = Some(ex);
 	}
 	
-	// Returns the FPS requested - should be 30 or 60
 	pub fn run(&mut self) -> Pico8VMRunResult {
+		self.run_fuel(1024*1024)
+	}
+	
+	pub fn run_fuel(&mut self, max_fuel: i32) -> Pico8VMRunResult {
+		let mut max_fuel = max_fuel;
+		if max_fuel < 1 {
+			warn!("run_fuel called with {max_fuel} fuel, using 1 fuel");
+			max_fuel = 1;
+		}
+		
+		let mut fuel = Fuel::with(max_fuel);
+		let mut out_of_fuel = false;
 		let mut stopped = false;
 		if let Some(executor) = self.executor.as_mut() {
-			let mut fuel = Fuel::with(10240);
 			self.lua.enter(|ctx| {
 				let executor = ctx.fetch(executor);
 				
 				loop {
 					if !executor.step(ctx, &mut fuel).unwrap() {
-						panic!("Out of fuel!");
+						if fuel.is_interrupted() {
+							if ENABLE_STEP_DEBUG { debug!("[step] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode()); }
+						}else {
+							if ENABLE_STEP_DEBUG { debug!("[step] Out of fuel! {:?}", fuel); }
+							out_of_fuel = true;
+							break
+						}
 					}
 					
 					match executor.mode() {
-						ExecutorMode::Normal => continue,
+						ExecutorMode::Normal => {
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Normal {:?}", fuel); }
+							continue
+						},
 						ExecutorMode::Stopped => {
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Stopped, {:?}", fuel); }
 							stopped = true;
 							break
 						},
 						ExecutorMode::Result => {
 							let value = executor.take_result::<Value>(ctx);
 							
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Value: {:?}, fuel {:?}", value, fuel); }
+							
 							match executor.mode() {
-								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
+								ExecutorMode::Suspended => {
+									executor.resume(ctx, ()).unwrap();
+								},
 								ExecutorMode::Stopped => info!("Execution stopped. {:?}", value),
 								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
@@ -94,10 +122,15 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 			});
 		}
 		
-		Pico8VMRunResult {
+		let ret = Pico8VMRunResult {
 			requested_fps: self.env.borrow().fps,
-			stopped,
-		}
+			stopped: stopped || fuel.is_interrupted(),
+			out_of_fuel,
+		};
+		
+		if ENABLE_STEP_DEBUG { debug!("[step] Step finished {:?}", ret); }
+		
+		ret
 	}
 	
 	pub fn env(&self) -> RefMut<'_, Env<A>> {

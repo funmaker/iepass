@@ -37,6 +37,7 @@ struct EmulatorApp {
 	last_frames: [Instant; 10],
 	requested_fps: u16,
 	pico8: Pico8VM,
+	running: bool,
 }
 
 impl EmulatorApp {
@@ -55,6 +56,7 @@ impl EmulatorApp {
 			last_frames: [Instant::now().sub(Duration::from_millis(1000)); 10],
 			requested_fps: 30,
 			pico8,
+			running: true,
 		}
 	}
 }
@@ -71,35 +73,46 @@ impl eframe::App for EmulatorApp {
 		
 		let delta = requested_delay - elapsed.as_secs_f32() - 0.5f32*previous_error.clamp(-requested_delay*0.9f32, requested_delay*0.9f32);
 		
-		if delta < 0.001f32 {
-			// println!("elapsed: {:?}, prev err: {previous_error}, delta: {delta}", elapsed);
-			let run_result = self.pico8.run();
-			self.requested_fps = if run_result.stopped { 10 } else { run_result.requested_fps };
+		if delta < 0.001f32 && self.running {
+			let mut run_result = self.pico8.run_fuel(25000);
+			while run_result.out_of_fuel && (Instant::now() - now).as_secs_f32() < requested_delay {
+				run_result = self.pico8.run_fuel(25000);
+			}
 			
-			let mut env = self.pico8.env();
+			self.requested_fps = if run_result.stopped { 10 } else { run_result.requested_fps.max(1) };
+			// println!("Target FPS {}, since last frame: {:.1} ({:.1} fps)", self.requested_fps, elapsed.as_secs_f32() * 1000f32, 1f32/elapsed.as_secs_f32());
 			
-			let screen_palette = env.memory.palette(1);
+			if run_result.stopped {
+				self.running = false;
+			}
 			
-			let map_color = |color: u8| -> Color {
-				assert!(color < 16);
-				PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
-			};
-			
-			self.fb_tex.set(self.fb_pool.from_iter(
-				env
-					.memory
-					.screen()
-					.iter()
-					.map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
-					.flatten()
-					.map(|color| {
-						let (r, g, b) = color.rgb();
-						Color32::from_rgb(r, g, b)
-					})
-			), FRAMEBUFFER_OPTS);
-			
-			self.last_frames.rotate_right(1);
-			self.last_frames[0] = now;
+			if !run_result.out_of_fuel {
+				let mut env = self.pico8.env();
+				
+				let screen_palette = env.memory.palette(1);
+				
+				let map_color = |color: u8| -> Color {
+					assert!(color < 16);
+					PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
+				};
+				
+				self.fb_tex.set(self.fb_pool.from_iter(
+					env
+						.memory
+						.screen()
+						.iter()
+						.map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
+						.flatten()
+						.map(|color| {
+							let (r, g, b) = color.rgb();
+							Color32::from_rgb(r, g, b)
+						})
+				), FRAMEBUFFER_OPTS);
+				
+				self.frame = self.frame + 1;
+				self.last_frames.rotate_right(1);
+				self.last_frames[0] = now;
+			}
 		}
 		
 		egui::SidePanel::left("framebuffer")
@@ -116,6 +129,7 @@ impl eframe::App for EmulatorApp {
 			.show(ctx, |ui| {
 				ui.heading("IE Pass: The Console The Pass The Emulator");
 				ui.separator();
+				ui.label(format!("{}", if self.running { "Running" } else { "Stopped" }));
 				ui.label(format!("Frame {}", self.frame));
 				ui.label(format!("FPS: {:>4.0}", self.last_frames.len() as f32 / self.last_frames.last().unwrap().elapsed().as_secs_f32()));
 			});
