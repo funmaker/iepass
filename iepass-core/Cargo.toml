@@ -21,6 +21,7 @@ defmt = { workspace = true, optional = true }
 p8rs-piccolo.workspace = true
 micromath.workspace = true
 bitflags.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 embedded-io.workspace = true

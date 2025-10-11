@@ -10,11 +10,13 @@ pub mod memory;
 pub mod palette;
 pub mod font;
 pub mod env;
+pub mod cart;
 mod numeric;
 mod api;
 
 use crate::pico8::api::install_pico8_apis;
 use env::Env;
+use crate::pico8::cart::CartridgeParseError;
 
 const ENABLE_STEP_DEBUG: bool = false;
 
@@ -62,6 +64,9 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		self.executor = Some(ex);
 	}
 	
+	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartridgeParseError> {
+		cart::load_cartridge(self, source)
+	}
 	pub fn run(&mut self) -> Pico8VMRunResult {
 		self.run_fuel(1024*1024)
 	}
@@ -224,5 +229,23 @@ mod test {
 		}
 		
 		info!("XDD {:?}", res);
+	}
+
+	#[test]
+	pub fn test_cartridge_loading() {
+		let cartridge_content = r#"pico-8 cartridge // http://www.pico-8.com
+version 8
+
+__lua__
+printh("Hello from cartridge!")
+return 42
+"#;
+
+		let mut vm = Pico8VM::new().unwrap();
+		assert!(vm.load_cartridge(cartridge_content.as_bytes()).is_ok());
+
+		// Run the cartridge and verify it executes
+		let result = vm.run();
+		assert!(!result.stopped); // Should complete successfully
 	}
 }

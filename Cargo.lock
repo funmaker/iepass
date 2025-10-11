@@ -2336,6 +2336,7 @@ dependencies = [
  "log",
  "micromath",
  "p8rs-piccolo",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
