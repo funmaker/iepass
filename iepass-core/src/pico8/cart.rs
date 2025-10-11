@@ -138,82 +138,25 @@ pub fn load_cartridge<A: Allocator + Clone + 'static>(_vm: &mut Pico8VM<A>, cart
 	}
 }
 
-/// Load GFX section data into VM memory
-/// The GFX section contains 128 lines of 128 hexadecimal digits representing a 128x128 sprite sheet
-/// Each hex digit represents a 4-bit color value (0-15)
-/// File format: hex digits in pixel order
-/// Memory format: nibbles swapped (LSB first)
 fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8]) -> Result<(), CartridgeParseError> {
 	let gfx_base_addr = vm.env().memory.base_addr_gfx() as usize;
-	let mut memory_offset = 0;
+	let memory_offset = 0; // sprite sheet
 	
-	// Process the GFX data line by line
 	let lines = data.split(|&b| b == b'\n' || b == b'\r');
 	
 	for (line_idx, line) in lines.enumerate() {
-		// Skip empty lines
-		if line.is_empty() {
-			continue;
-		}
+		if line.is_empty() { continue; }
 		
-		// Each line should have up to 128 hex digits for one pixel row
-		// Process in pairs to create bytes for memory storage
-		let hex_chars: Vec<u8> = line.iter()
-			.filter(|&&b| b.is_ascii_hexdigit())
-			.copied()
-			.collect();
+		// todo: implement
 		
-		// Process hex digits in pairs, swapping nibbles for memory format
-		for (_pair_idx, hex_pair) in hex_chars.chunks(2).enumerate() {
-			let memory_addr = gfx_base_addr + memory_offset;
-			
-			// Ensure we don't write beyond sprite memory bounds
-			if memory_addr >= gfx_base_addr + 0x2000 {
-				debug!("GFX data exceeds sprite memory bounds, truncating");
-				return Ok(());
-			}
-			
-			let byte_value = match hex_pair.len() {
-				2 => {
-					// Two hex digits: convert both and swap nibbles for memory format
-					let first_digit = hex_char_to_nibble(hex_pair[0]);
-					let second_digit = hex_char_to_nibble(hex_pair[1]);
-					// File format: first_digit second_digit (pixel order)
-					// Memory format: second_digit first_digit (LSB first)
-					(first_digit) | (second_digit << 4)
-				},
-				1 => {
-					// Single hex digit: treat as lower nibble
-					hex_char_to_nibble(hex_pair[0])
-				},
-				_ => 0,
-			};
-			
-			vm.env().memory[memory_addr] = byte_value;
-			memory_offset += 1;
-		}
-		
-		// Track progress for debugging
 		if line_idx < 5 || line_idx % 32 == 0 {
-			debug!("GFX line {}: {} hex chars -> {} bytes", line_idx, hex_chars.len(), hex_chars.len() / 2);
+			debug!("GFX line {}", line_idx);
 		}
 	}
 	
 	debug!("GFX section loaded: {} bytes written to memory starting at 0x{:04x}", memory_offset, gfx_base_addr);
 	Ok(())
 }
-
-/// Convert a hex character to a 4-bit nibble value
-/// Invalid characters return 0 (as per Pico-8 specification)
-fn hex_char_to_nibble(hex_char: u8) -> u8 {
-	match hex_char {
-		b'0'..=b'9' => hex_char - b'0',
-		b'a'..=b'f' => hex_char - b'a' + 10,
-		b'A'..=b'F' => hex_char - b'A' + 10,
-		_ => 0, // Invalid characters become color 0
-	}
-}
-
 
 
 #[derive(Debug, Clone)]
