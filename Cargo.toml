@@ -52,7 +52,7 @@ pin-project = "1.1.10"
 static_cell = "2.1.1"
 micromath = "2.1.0"
 bitflags = "2.9.4"
-arrayvec = "0.7.6"
+arrayvec = { version = "0.7.6", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 
 ahash = { version = "0.8", default-features = false }

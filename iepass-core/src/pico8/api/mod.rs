@@ -4,6 +4,7 @@ mod table;
 mod memory;
 mod gfx;
 mod string;
+mod internal;
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -20,9 +21,10 @@ pub fn install_pico8_apis<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>
 	math::install_pico8_math(ctx);
 	gfx::install_pico8_gfx(env.clone(), ctx);
 	math::install_pico8_math(ctx);
-	memory::install_pico8_memory(env, ctx);
+	memory::install_pico8_memory(env.clone(), ctx);
 	string::install_pico8_string(ctx);
 	table::install_pico8_table(ctx);
+	internal::install_pico8_internal(env, ctx);
 }
 
 fn set_global_callback_ctx<'gc, F, A, R>(name: &'static str, ctx: Context<'gc>, f: F)

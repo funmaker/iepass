@@ -2,8 +2,10 @@ use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::RefCell;
 use p8rs_piccolo::{Context, RuntimeError, Table, Value, Variadic};
-use crate::pico8::env::Env;
+use p8rs_types::p8num::P8Num;
+
 use super::{set_global_callback_ctx_env, set_global_callback_env, EnvHandle};
+use crate::pico8::env::Env;
 
 pub fn install_pico8_memory<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context) {
 	set_global_callback_ctx_env("peek", ctx, env.clone(), peek);
@@ -22,11 +24,11 @@ pub fn poke<A: Allocator + Clone + 'static>(env: EnvHandle<A>,  (addr, mut bytes
 pub fn peek<A: Allocator + Clone + 'static>(ctx: Context, env: EnvHandle<A>,  (addr, n): (u32, Option<u32>)) -> Result<Value, RuntimeError> {
 	let env = env.borrow();
 	let n = n.unwrap_or(1);
-	if n == 1 { return Ok(Value::Integer(env.memory[addr as usize] as i64)); }
+	if n == 1 { return Ok(Value::Number(P8Num::from(env.memory[addr as usize]))); }
 	
 	let table = Table::new(&ctx);
 	for (pos, byte) in env.memory[addr as usize .. (addr + n) as usize].iter().enumerate() {
-		table.set(ctx, pos as u32 + 1, byte)?;
+		table.set(ctx, (pos as i16).wrapping_add(1), byte)?;
 	}
 	Ok(Value::Table(table))
 }

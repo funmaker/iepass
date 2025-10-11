@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 std = ["embedded-io/std"]
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "p8rs-types/defmt"]
 log-04 = ["dep:log-04"]
 
 [dependencies]
@@ -19,8 +19,11 @@ log-04 = { package = "log", version = "0.4.27", optional = true }
 embedded-io.workspace = true
 defmt = { workspace = true, optional = true }
 p8rs-piccolo.workspace = true
+p8rs-types.workspace = true
+p8rs-macros.workspace = true
 micromath.workspace = true
 bitflags.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 embedded-io.workspace = true

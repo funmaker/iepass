@@ -1,7 +1,7 @@
 use super::set_global_callback_simple;
 use crate::pico8::numeric::{number_from_string, NumberConversionFlags};
 use alloc::string::String;
-use p8rs_piccolo::{Callback, CallbackReturn, Context, RuntimeError, Value};
+use p8rs_piccolo::{Context, RuntimeError, Value};
 
 pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
@@ -11,8 +11,6 @@ pub fn install_pico8_base(ctx: Context) {
 	
 	// todo: format flags
 	ctx.set_global("tostr", ctx.get_global::<Value>("tostring").unwrap());
-	
-	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
 	
 	set_global_callback_simple("tonum", ctx, tonum);
 	set_global_callback_simple("printh", ctx, printh);

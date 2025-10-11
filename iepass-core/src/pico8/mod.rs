@@ -5,6 +5,7 @@ use core::alloc::Allocator;
 use core::cell::{RefCell, RefMut};
 use p8rs_piccolo::table::InvalidTableKey;
 use p8rs_piccolo::{Closure, Context, Executor, ExecutorMode, Fuel, Lua, StashedExecutor, Value};
+use p8rs_types::p8num::P8Num;
 
 pub mod memory;
 pub mod palette;
@@ -15,6 +16,15 @@ mod api;
 
 use crate::pico8::api::install_pico8_apis;
 use env::Env;
+
+const ENABLE_STEP_DEBUG: bool = false;
+
+#[derive(Debug)]
+pub struct Pico8VMRunResult {
+	pub requested_fps: u16,
+	pub stopped: bool,
+	pub out_of_fuel: bool,
+}
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
@@ -53,25 +63,54 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		self.executor = Some(ex);
 	}
 	
-	pub fn run(&mut self) {
+	pub fn run(&mut self) -> Pico8VMRunResult {
+		self.run_fuel(1024*1024)
+	}
+	
+	pub fn run_fuel(&mut self, max_fuel: i32) -> Pico8VMRunResult {
+		let mut max_fuel = max_fuel;
+		if max_fuel < 1 {
+			warn!("run_fuel called with {} fuel, using 1 fuel", max_fuel);
+			max_fuel = 1;
+		}
+		
+		let mut fuel = Fuel::with(max_fuel);
+		let mut out_of_fuel = false;
+		let mut stopped = false;
 		if let Some(executor) = self.executor.as_mut() {
-			let mut fuel = Fuel::with(10240);
 			self.lua.enter(|ctx| {
 				let executor = ctx.fetch(executor);
 				
 				loop {
 					if !executor.step(ctx, &mut fuel).unwrap() {
-						panic!("Out of fuel!");
+						if fuel.is_interrupted() {
+							if ENABLE_STEP_DEBUG { debug!("[step] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode()); }
+						}else {
+							if ENABLE_STEP_DEBUG { debug!("[step] Out of fuel! {:?}", fuel); }
+							out_of_fuel = true;
+							break
+						}
 					}
 					
 					match executor.mode() {
-						ExecutorMode::Normal => continue,
-						ExecutorMode::Stopped => break,
+						ExecutorMode::Normal => {
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Normal {:?}", fuel); }
+							continue
+						},
+						ExecutorMode::Stopped => {
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Stopped, {:?}", fuel); }
+							stopped = true;
+							break
+						},
 						ExecutorMode::Result => {
 							let value = executor.take_result::<Value>(ctx);
 							
+							if ENABLE_STEP_DEBUG { debug!("[step] Result - Value: {:?}, fuel {:?}", value, fuel); }
+							
 							match executor.mode() {
-								ExecutorMode::Suspended => executor.resume(ctx, ()).unwrap(),
+								ExecutorMode::Suspended => {
+									executor.resume(ctx, ()).unwrap();
+								},
 								ExecutorMode::Stopped => info!("Execution stopped. {:?}", format!("{:?}", value)),
 								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
@@ -83,6 +122,16 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 				}
 			});
 		}
+		
+		let ret = Pico8VMRunResult {
+			requested_fps: self.env.borrow().fps,
+			stopped: stopped || fuel.is_interrupted(),
+			out_of_fuel,
+		};
+		
+		if ENABLE_STEP_DEBUG { debug!("[step] Step finished {:?}", ret); }
+		
+		ret
 	}
 	
 	pub fn env(&self) -> RefMut<'_, Env<A>> {
@@ -103,11 +152,40 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 }
 
 
+#[derive(Debug, Copy, Clone)]
+#[allow(dead_code)]
+pub enum StaticValue {
+	Nil,
+	Boolean(bool),
+	Number(P8Num),
+	String,
+	Table,
+	Function,
+	Thread,
+	UserData,
+}
+
+// todo: context for strings / tables / maybe function names
+pub fn to_static_value(x: &Value) -> StaticValue {
+	match x {
+		Value::Nil          => StaticValue::Nil,
+		Value::Boolean(b)   => StaticValue::Boolean(b.clone()),
+		Value::Number(n)    => StaticValue::Number(*n),
+		Value::String(_s)   => StaticValue::String,
+		Value::Table(_t)    => StaticValue::Table,
+		Value::Function(_f) => StaticValue::Function,
+		Value::Thread(_)    => StaticValue::Thread,
+		Value::UserData(_u) => StaticValue::UserData,
+	}
+}
+
+
 #[cfg(test)]
 mod test {
-	use crate::pico8::Pico8VM;
+	use crate::pico8::{to_static_value, Pico8VM, StaticValue};
 	use alloc::vec::Vec;
 	use p8rs_piccolo::{Closure, Executor, Value, Variadic};
+	use p8rs_types::p8num::P8Num;
 	
 	#[test]
 	pub fn it_works() {
@@ -127,32 +205,24 @@ mod test {
 			Ok(ctx.stash(ex))
 		}).unwrap();
 		
-		
+		error!("Test!"); // todo: show test output
 		vm.lua.finish(&ex).unwrap();
 		
 		let res = vm.lua.try_enter(|ctx| {
 			let exec = ctx.fetch(&ex);
-			let _vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
+			let vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
 			
-			// TODO: co to?
-			// let statics = vals.into_iter().map(|x| {
-			// 	match x {
-			// 		Value::Nil         => StaticValue::Nil,
-			// 		Value::Boolean(b)  => StaticValue::Boolean(b),
-			// 		Value::Integer(i)  => StaticValue::Integer(i),
-			// 		Value::Number(n)   => StaticValue::Number(n),
-			// 		Value::String(s)   => StaticValue::from(ctx.stash(s)),
-			// 		Value::Table(t)    => StaticValue::from(ctx.stash(t)),
-			// 		Value::Function(f) => StaticValue::from(ctx.stash(f)),
-			// 		Value::Thread(_)   => StaticValue::Nil,
-			// 		Value::UserData(u) => StaticValue::from(ctx.stash(u)),
-			// 	}
-			// }).collect::<Vec<StaticValue>>();
-			//
-			// Ok(statics)
+			let results = vals.iter().map(to_static_value).collect::<Vec<_>>();
 			
-			Ok(())
+			
+			Ok(results)
 		}).unwrap();
+		
+		assert_eq!(res.len(), 1, "expected one result");
+		let first = res[0];
+		if let StaticValue::Number(i) = first {
+			assert_eq!(i, P8Num::ONE, "first element should be 1");
+		}
 		
 		info!("XDD {:?}", res);
 	}

@@ -144,7 +144,6 @@ pub(super) fn run_vm<'gc>(
                 let table = registers.get_upvalue(&ctx, current_upvalues[table.0 as usize]);
                 let key = get_rc(&registers.stack_frame, &current_prototype.constants, key);
                 let value = get_rc(&registers.stack_frame, &current_prototype.constants, value);
-                println!("SetUpTable\n{table:?}\n{key:?}\n{value:?}");
                 if let Some(call) = meta_ops::new_index(ctx, table, key, value)? {
                     lua_frame.call_meta_function(
                         ctx,

@@ -65,7 +65,7 @@ args = ["run", "${@}"]
 [tasks.build]
 dependencies = ["build-assets", "build-iepass", "build-calib"]
 command = "cargo"
-args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
+args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "${@}"]
 
 [tasks.build-assets]
 cwd = "./assets"

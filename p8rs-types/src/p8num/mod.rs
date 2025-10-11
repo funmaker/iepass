@@ -11,6 +11,7 @@ mod from_ascii;
 /// [P8Num] uses 16 bits for integer part and 16 bits for fractional part. It can represent values from -32768.0 to 32767.9999847412109375 inclusive.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default)]
 #[cfg_attr(feature = "gc-arena", derive(gc_arena::Collect), collect(require_static))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(transparent)]
 pub struct P8Num(i32);
 
@@ -217,16 +218,16 @@ impl P8Num {
 		use core::ascii::Char;
 		use core::fmt::Write;
 		
-		let mut fval = f64::from(*self).abs();
-		if !(0.0001..=0.9999).contains(&fval.fract()) {
-			fval = fval.round();
+		let mut value = *self;
+		if !(P8Num::from_raw(0x0000_0007) ..= P8Num::from_raw(0x0000_FFF9)).contains(&value.fract()) {
+			value = value.round();
 		}
 		
 		let mut string = ArrayString::<11>::new_const();
 		if self.is_negative() {
 			write!(&mut string, "-").unwrap();
 		}
-		write!(&mut string, "{:.4}", fval).unwrap();
+		write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap();
 		
 		let mut buffer = ArrayVec::<_, 11>::new_const();
 		buffer.extend(string.as_ascii().unwrap().iter().copied());
@@ -296,6 +297,10 @@ impl P8Num {
 	#[inline]
 	pub const fn to_raw(self) -> i32 {
 		self.0
+	}
+	
+	pub const fn to_integer(self) -> i16 {
+		(self.0 >> 16) as i16
 	}
 	
 	/// Returns the integer part of `self`.
@@ -2194,7 +2199,7 @@ impl RemAssign for P8Num {
 	}
 }
 
-impl const Shl<u32> for P8Num {
+impl Shl<u32> for P8Num {
 	type Output = P8Num;
 	
 	fn shl(self, rhs: u32) -> P8Num {
@@ -2208,7 +2213,7 @@ impl ShlAssign<u32> for P8Num {
 	}
 }
 
-impl const Shr<u32> for P8Num {
+impl Shr<u32> for P8Num {
 	type Output = P8Num;
 	
 	fn shr(self, rhs: u32) -> P8Num {
@@ -2373,7 +2378,7 @@ macro_rules! impl_int_conv {
 	(Into $T:ty; $( $rest:tt )*) => {
 		impl const From<P8Num> for $T {
 			fn from(value: P8Num) -> Self {
-				((value.to_raw() >> 16) as i16).into()
+				value.to_integer().into()
 			}
 		}
 		
@@ -2384,7 +2389,7 @@ macro_rules! impl_int_conv {
 			type Error = <i32 as TryInto<$T>>::Error;
 			
 			fn try_from(value: P8Num) -> Result<Self, Self::Error> {
-				(value.to_raw() >> 16).try_into()
+				value.to_integer().try_into()
 			}
 		}
 		

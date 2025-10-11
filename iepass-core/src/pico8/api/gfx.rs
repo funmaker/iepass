@@ -13,11 +13,11 @@ pub fn install_pico8_gfx<A: Allocator + Clone + 'static>(env_orig: Rc<RefCell<En
 	set_global_callback_env("pal", ctx, env_orig.clone(), pal);
 }
 
-pub fn camera<A: Allocator + Clone + 'static>(env: EnvHandle<A>, (x, y): (Option<u32>, Option<u32>)) -> Result<(u16, u16), RuntimeError> {
+pub fn camera<A: Allocator + Clone + 'static>(env: EnvHandle<A>, (x, y): (Option<i16>, Option<i16>)) -> Result<(i16, i16), RuntimeError> {
 	let mut env = env.borrow_mut();
-	let old = (env.memory.read_u16_le(0x5f28), env.memory.read_u16_le(0x5f2a));
-	env.memory.write_u16_le(0x5f28, x.unwrap_or(0) as u16);
-	env.memory.write_u16_le(0x5f2a, y.unwrap_or(0) as u16);
+	let old = (env.memory.read_u16_le(0x5f28).cast_signed(), env.memory.read_u16_le(0x5f2a).cast_signed());
+	env.memory.write_u16_le(0x5f28, x.unwrap_or(0).cast_unsigned());
+	env.memory.write_u16_le(0x5f2a, y.unwrap_or(0).cast_unsigned());
 	Ok(old)
 }
 pub fn color<A: Allocator + Clone + 'static>(env: EnvHandle<A>, val: Option<u32>) -> Result<u8, RuntimeError> {
@@ -64,18 +64,21 @@ pub fn pal<A: Allocator + Clone + 'static>(env: EnvHandle<A>, args: Variadic<Vec
 	
 	let mut env = env.borrow_mut();
 	
-	if let Value::Table(t) = args[0] {
-		let base = env.memory.base_addr_palette(if argc > 1 && let Value::Integer(p) = args[1] { p as u8 } else { 0 }) as usize;
-		for (k, v) in t {
-			if let Value::Integer(k) = k && let Value::Integer(v) = v {
-				env.memory[base + (k % 16) as usize] = v as u8;
+	if let Value::Table(new_pal) = args[0] {
+		let pal_idx = if argc > 1 && let Some(p) = args[1].to_number() { p.to_integer() as u8 } else { 0 };
+		let pal_base = env.memory.base_addr_palette(pal_idx) as usize;
+		for (idx, col) in new_pal {
+			if let Some(k) = idx.to_number() && let Some(v) = col.to_number() {
+				env.memory[pal_base + k.to_integer().rem_euclid(16) as usize] = v.to_integer() as u8;
 			}
 		}
-	}else if let Value::Integer(c0) = args[0] && let Value::Integer(c1) = args[1] {
-		let base = env.memory.base_addr_palette(if argc > 2 && let Value::Integer(p) = args[2] { p as u8 } else { 0 }) as usize;
-		env.memory[base + (c0 % 16) as usize] = c1 as u8;
-	}else{
+	} else if let Some(idx) = args[0].to_number() && let Some(col) = args[1].to_number() {
+		let pal_idx = if argc > 2 && let Value::Number(p) = args[2] { p.to_integer() as u8 } else { 0 };
+		let pal_base = env.memory.base_addr_palette(pal_idx) as usize;
+		env.memory[pal_base + (idx.to_integer() % 16) as usize] = col.to_integer() as u8;
+	} else {
 		panic!("Invalid arguments");
 	}
+	
 	Ok(())
 }

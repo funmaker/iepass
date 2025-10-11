@@ -2335,7 +2335,10 @@ dependencies = [
  "embedded-io",
  "log",
  "micromath",
+ "p8rs-macros",
  "p8rs-piccolo",
+ "p8rs-types",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -3105,6 +3108,7 @@ name = "p8rs-types"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "defmt 1.0.1",
  "gc-arena",
  "thiserror 2.0.17",
 ]

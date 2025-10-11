@@ -189,7 +189,14 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             speaker.reset().await?;
         }
         
-        pico8.run();
+        let result = pico8.run();
+        if result.out_of_fuel {
+            // don't render, run again if out of fuel
+            continue;
+        }
+        // todo: result.requested_fps
+        
+        
         let mut env = pico8.env();
         let screen_palette = env.memory.palette(1);
         let map_color = |color: u8| -> Color {
