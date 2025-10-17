@@ -441,8 +441,8 @@ function createStyle() {
     .p8sciTable td {
       position: relative;
       text-align: center;
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       padding: 0 !important;
     }
     
@@ -483,7 +483,17 @@ function createStyle() {
     
     .p8sciWrap {
       display: flex;
+      flex-wrap: wrap;
       gap: 1rem;
+    }
+    
+    .p8sciWrap .tableInfo {
+      flex: 1 0 160px;
+    }
+    
+    .p8sciWrap .tableInfo > div {
+      margin-bottom: 0.5em;
+      line-height: 1.2;
     }
     
     .p8sciWrap canvas {
@@ -507,7 +517,6 @@ function createStyle() {
       padding: 1px;
       background: gray;
       border: 15px solid black;
-      margin-top: 1em;
     }
     
     .p8sciButtons {
