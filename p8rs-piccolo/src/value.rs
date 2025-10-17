@@ -3,6 +3,7 @@ use core::fmt;
 
 use gc_arena::{Collect, Gc};
 use p8rs_types::p8num::P8Num;
+use p8rs_types::p8scii;
 use crate::{Callback, Closure, Constant, Function, String, Table, Thread, UserData};
 
 /// The single data type for all Lua variables.
@@ -61,7 +62,12 @@ impl<'gc> Value<'gc> {
                     Value::Nil => write!(fmt, "nil"),
                     Value::Boolean(b) => write!(fmt, "{}", b),
                     Value::Number(f) => write!(fmt, "{}", f),
-                    Value::String(s) => write!(fmt, "{}", s.display_lossy()),
+                    Value::String(s) => {
+                        for char in p8scii::to_iter(s.as_bytes()) {
+                            write!(fmt, "{}", char)?;
+                        }
+                        Ok(())
+                    },
                     Value::Table(t) => write!(fmt, "<table {:p}>", Gc::as_ptr(t.into_inner())),
                     Value::Function(Function::Closure(c)) => {
                         write!(fmt, "<function {:p}>", Gc::as_ptr(c.into_inner()))

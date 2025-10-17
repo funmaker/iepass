@@ -1,3 +1,5 @@
+//! Pico-8 fixed point math.
+
 use core::fmt::{Debug, Display, Formatter};
 use core::num::FpCategory;
 use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
@@ -425,7 +427,7 @@ impl P8Num {
 	/// The absolute value of `P8Num::MIN` cannot be represented as an `i32`, and attempting
 	/// to calculate it will cause an overflow. This means that code in debug mode will trigger
 	/// a panic on this case and optimized code will return `P8Num::MIN` without a panic. If you
-	/// do not want this behavior, consider using [`unsigned_abs`](Self::unsigned_abs) instead.
+	/// do not want this behavior, consider using [`checked_abs`](Self::checked_abs) instead.
 	///
 	/// # Examples
 	///
@@ -2342,7 +2344,7 @@ pub enum TryFromError {
 	OutOfRange,
 }
 
-/// The error type returned when a P8Num::from_ascii or P8Num::from_ascii_radix fails.
+/// The error type returned when a [P8Num::from_ascii] or [P8Num::from_ascii_radix] fails.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FromAsciiError {

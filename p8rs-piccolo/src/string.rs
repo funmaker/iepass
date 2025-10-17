@@ -4,7 +4,6 @@ use core::{
     fmt,
     hash::{BuildHasherDefault, Hash, Hasher},
     ops, slice,
-    str::{self, Utf8Error},
 };
 
 use ahash::AHasher;
@@ -13,13 +12,11 @@ use gc_arena::{
     Collection, Gc, GcWeak, Mutation, Static,
 };
 use hashbrown::{hash_map, raw::RawTable, HashMap};
-
-use crate::compiler::string_utils::{debug_utf8_lossy, display_utf8_lossy};
+use p8rs_types::p8scii;
 
 /// The Lua string type.
 ///
-/// Unlike Rust strings, Lua strings may contain *arbitrary bytes*, and as such are not necessarily
-/// UTF-8.
+/// Unlike Rust strings, p8rs-piccolo strings are PSCII encoded.
 #[derive(Copy, Clone, Collect)]
 #[collect(no_drop)]
 pub struct String<'gc>(Gc<'gc, StringInner>);
@@ -164,29 +161,37 @@ fn str_hash(s: &[u8]) -> u64 {
     state.finish()
 }
 
-impl<'gc> fmt::Debug for String<'gc> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "String({:?})", self.debug_lossy())
-    }
-}
-
 impl<'gc> String<'gc> {
     pub fn len(self) -> u16 {
         self.as_bytes().len().try_into().unwrap()
     }
 
-    pub fn to_str(self) -> Result<&'gc str, Utf8Error> {
-        str::from_utf8(self.as_bytes())
+    pub fn to_string(self) -> alloc::string::String {
+        p8scii::to_iter(self.as_bytes()).collect()
     }
+}
 
-    /// Display a potentially non-utf8 `String` in a lossy way.
-    pub fn display_lossy(self) -> impl fmt::Display + 'gc {
-        display_utf8_lossy(self.as_bytes())
+impl<'gc> fmt::Display for String<'gc> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        for char in p8scii::to_iter(self.as_bytes()) {
+            write!(fmt, "{}", char)?;
+        }
+        
+        Ok(())
     }
+}
 
-    /// Debug a potentially non-utf8 `String` in a lossy way.
-    pub fn debug_lossy(self) -> impl fmt::Debug + 'gc {
-        debug_utf8_lossy(self.as_bytes())
+impl<'gc> fmt::Debug for String<'gc> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "\"")?;
+        
+        for char in p8scii::to_iter(p8scii::escape(self.as_bytes().iter().copied())) {
+            write!(fmt, "{}", char)?;
+        }
+        
+        write!(fmt, "\"")?;
+        
+        Ok(())
     }
 }
 

@@ -68,6 +68,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartridgeParseError> {
 		cart::load_cartridge(self, source)
 	}
+	
 	pub fn run(&mut self) -> Pico8VMRunResult {
 		self.run_fuel(1024*1024)
 	}

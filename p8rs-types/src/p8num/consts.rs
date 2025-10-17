@@ -1,3 +1,5 @@
+//! Selected mathematical constants.
+
 use super::P8Num;
 
 /// Archimedes' constant (π)

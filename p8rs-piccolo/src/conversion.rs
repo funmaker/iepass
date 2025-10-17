@@ -1,4 +1,4 @@
-use alloc::{borrow::ToOwned, string::String as StdString, vec::Vec};
+use alloc::{string::String as StdString, vec::Vec};
 use core::{array, iter, ops};
 use p8rs_types::p8num::P8Num;
 use crate::{
@@ -336,11 +336,7 @@ impl<'gc> FromValue<'gc> for String<'gc> {
 impl<'gc> FromValue<'gc> for StdString {
     fn from_value(ctx: Context<'gc>, value: Value<'gc>) -> Result<Self, TypeError> {
         let str = String::from_value(ctx, value)?;
-        let str = str.to_str().map_err(|_| TypeError {
-            expected: "UTF-8 String",
-            found: "non-UTF-8 String",
-        })?;
-        Ok(str.to_owned())
+        Ok(str.to_string())
     }
 }
 
