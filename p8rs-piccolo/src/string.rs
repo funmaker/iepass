@@ -162,8 +162,8 @@ fn str_hash(s: &[u8]) -> u64 {
 }
 
 impl<'gc> String<'gc> {
-    pub fn len(self) -> u16 {
-        self.as_bytes().len().try_into().unwrap()
+    pub fn len(self) -> usize {
+        self.as_bytes().len()
     }
 
     pub fn to_string(self) -> alloc::string::String {

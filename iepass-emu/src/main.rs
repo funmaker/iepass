@@ -45,9 +45,7 @@ impl EmulatorApp {
 		let mut fb_pool = FramebufferPool::new(128, 128);
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
 		
-		
 		let mut pico8 = Pico8VM::new().unwrap();
-		
 		
 		let load_result = pico8.load_cartridge(b"asdasdasdqweqweqweasdasdasdqweqweqwe---\n__lua__\nprinth('Test!!!')\n\r\n\r\n\n");
 		pico8.load(include_bytes!("../../lua/hello.lua"));
@@ -88,7 +86,6 @@ impl eframe::App for EmulatorApp {
 			}
 			
 			self.requested_fps = if run_result.stopped { 10 } else { run_result.requested_fps.max(1) };
-			// println!("Target FPS {}, since last frame: {:.1} ({:.1} fps)", self.requested_fps, elapsed.as_secs_f32() * 1000f32, 1f32/elapsed.as_secs_f32());
 			
 			if run_result.stopped {
 				self.running = false;
@@ -109,7 +106,7 @@ impl eframe::App for EmulatorApp {
 						.memory
 						.screen()
 						.iter()
-						.map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
+						.map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
 						.flatten()
 						.map(|color| {
 							let (r, g, b) = color.rgb();

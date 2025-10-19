@@ -1,6 +1,3 @@
-function flip()
-  __flip()
-end
 
 function dec(val)
   if val == "0" then return 0
@@ -25,9 +22,10 @@ end
 function pokes(pos, str)
   for _ = 1, 1 do -- simulate non-trivial work
       for col = 1, #str - 1, 2 do
-        hi = dec(sub(str, col, col + 1));
-        lo = dec(sub(str, col + 1, col + 2));
+        hi = dec(sub(str, col + 1, col + 1));
+        lo = dec(sub(str, col, col));
         val = hi * 16 + lo;
+        --printh("col = "..col .. " hi = "..hi .. " lo = "..lo .. " val = " .. val)
         poke(pos + (col - 1) / 2, val);
       end
   end
@@ -125,5 +123,4 @@ pokes(0x7d40, "00000000000000000990000000000000000000000000000000000094000000000
 pokes(0x7d80, "000000000000000000950000000000000000000000000000000000900000000000");
 pokes(0x7dc0, "000000000000000000040000000000000000000000000000000000400000000000");
 
-__stop("Bye!")
 printh("Done!")

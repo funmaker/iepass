@@ -1,34 +1,35 @@
 use alloc::rc::Rc;
 use core::alloc::Allocator;
 use core::cell::RefCell;
-use p8rs_piccolo::{Context, RuntimeError, Table, Value, Variadic};
-use p8rs_types::p8num::P8Num;
+use p8rs_piccolo::{Context, RuntimeError, Variadic};
 
-use super::{set_global_callback_ctx_env, set_global_callback_env, EnvHandle};
+use super::{set_global_callback_env, EnvHandle};
 use crate::pico8::env::Env;
 
 pub fn install_pico8_memory<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context) {
-	set_global_callback_ctx_env("peek", ctx, env.clone(), peek);
+	set_global_callback_env("peek", ctx, env.clone(), peek);
 	set_global_callback_env("poke", ctx, env.clone(), poke);
 }
 
-pub fn poke<A: Allocator + Clone + 'static>(env: EnvHandle<A>,  (addr, mut bytes): (u32, Variadic<alloc::vec::Vec<u8>>)) -> Result<(), RuntimeError> {
+pub fn poke<A: Allocator + Clone + 'static>(env: EnvHandle<A>, (addr, bytes): (i16, Variadic<Vec<u8>>)) -> Result<(), RuntimeError> {
 	let mut env = env.borrow_mut();
-	if bytes.is_empty() { bytes.push(0) }
-	for (pos, byte) in bytes.into_iter().enumerate() {
-		env.memory[addr as usize + pos] = byte;
+	let addr = addr.cast_unsigned() as usize;
+	
+	if bytes.is_empty() {
+		env.memory[addr] = 0;
+	} else {
+		env.memory[addr..addr+bytes.len()].copy_from_slice(bytes.as_slice());
 	}
+	
 	Ok(())
 }
 
-pub fn peek<A: Allocator + Clone + 'static>(ctx: Context, env: EnvHandle<A>,  (addr, n): (u32, Option<u32>)) -> Result<Value, RuntimeError> {
+pub fn peek<A: Allocator + Clone + 'static>(env: EnvHandle<A>, (addr, n): (i16, Option<i16>)) -> Result<Variadic<Vec<u8>>, RuntimeError> {
 	let env = env.borrow();
-	let n = n.unwrap_or(1);
-	if n == 1 { return Ok(Value::Number(P8Num::from(env.memory[addr as usize]))); }
+	let addr = addr.cast_unsigned() as usize;
+	let n = n.map(|v| if v.is_negative() { 0 } else { v as usize }).unwrap_or(1);
 	
-	let table = Table::new(&ctx);
-	for (pos, byte) in env.memory[addr as usize .. (addr + n) as usize].iter().enumerate() {
-		table.set(ctx, (pos as i16).wrapping_add(1), byte)?;
-	}
-	Ok(Value::Table(table))
+	let bytes = env.memory.iter().skip(addr).take(n).copied().collect();
+	
+	Ok(Variadic(bytes))
 }

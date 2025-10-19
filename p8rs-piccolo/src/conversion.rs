@@ -76,6 +76,7 @@ impl_copy_into!(
     i16,
     f32,
     f64,
+    P8Num,
     String<'gc>,
     Table<'gc>,
     Function<'gc>,
@@ -218,14 +219,7 @@ macro_rules! impl_int_from {
                     value: Value<'gc>,
                 ) -> Result<Self, TypeError> {
                     if let Some(i) = value.to_number() {
-                        if let Ok(i) = <$i>::try_from(i) {
-                            Ok(i)
-                        } else {
-                            Err(TypeError {
-                                expected: stringify!($i),
-                                found: "integer out of range",
-                            })
-                        }
+                            Ok(i.to_integer() as $i)
                     } else {
                         Err(TypeError {
                             expected: stringify!($i),
@@ -286,6 +280,7 @@ macro_rules! impl_from {
 }
 impl_from! {
     [Boolean bool],
+    [Number P8Num],
     [Table Table<'gc>],
     [Function Function<'gc>],
     [Thread Thread<'gc>],

@@ -400,7 +400,7 @@ pub fn len<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, 
     }
 
     match v {
-        Value::String(s) => Ok(MetaResult::Value(s.len().cast_signed().into())),
+        Value::String(s) => Ok(MetaResult::Value((s.len() as i16).into())),
         Value::Table(t) => Ok(MetaResult::Value(t.length().cast_signed().into())),
         f => Err(MetaOperatorError::Unary(MetaMethod::Len, f.type_name())),
     }
