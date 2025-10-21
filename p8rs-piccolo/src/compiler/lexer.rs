@@ -41,16 +41,38 @@ pub enum Token<S> {
     Div,
     IDiv,
     Pow,
-    Mod,
     Len,
+    Peek,
+    ModPeek2,
+    Peek4,
     BitNotXor,
     BitAnd,
     BitOr,
-    ShiftRight,
+    BitXor,
+    ShiftRightArithmetic,
+    ShiftRightLogical,
     ShiftLeft,
+    RotateRight,
+    RotateLeft,
     Concat,
     Dots,
     Assign,
+    AssignAdd,
+    AssignSub,
+    AssignMul,
+    AssignDiv,
+    AssignIDiv,
+    AssignMod,
+    AssignPow,
+    AssignBitAnd,
+    AssignBitOr,
+    AssignBitXor,
+    AssignShiftRightArithmetic,
+    AssignShiftRightLogical,
+    AssignShiftLeft,
+    AssignRotateRight,
+    AssignRotateLeft,
+    AssignConcat,
     LessThan,
     LessEqual,
     GreaterThan,
@@ -104,16 +126,38 @@ impl<S: AsRef<[u8]>> PartialEq for Token<S> {
             (Token::Div, Token::Div) => true,
             (Token::IDiv, Token::IDiv) => true,
             (Token::Pow, Token::Pow) => true,
-            (Token::Mod, Token::Mod) => true,
             (Token::Len, Token::Len) => true,
+            (Token::Peek, Token::Peek) => true,
+            (Token::ModPeek2, Token::ModPeek2) => true,
+            (Token::Peek4, Token::Peek4) => true,
             (Token::BitNotXor, Token::BitNotXor) => true,
             (Token::BitAnd, Token::BitAnd) => true,
             (Token::BitOr, Token::BitOr) => true,
-            (Token::ShiftRight, Token::ShiftRight) => true,
+            (Token::BitXor, Token::BitXor) => true,
+            (Token::ShiftRightArithmetic, Token::ShiftRightArithmetic) => true,
+            (Token::ShiftRightLogical, Token::ShiftRightLogical) => true,
             (Token::ShiftLeft, Token::ShiftLeft) => true,
+            (Token::RotateRight, Token::RotateRight) => true,
+            (Token::RotateLeft, Token::RotateLeft) => true,
             (Token::Concat, Token::Concat) => true,
             (Token::Dots, Token::Dots) => true,
             (Token::Assign, Token::Assign) => true,
+            (Token::AssignAdd, Token::AssignAdd) => true,
+            (Token::AssignSub, Token::AssignSub) => true,
+            (Token::AssignMul, Token::AssignMul) => true,
+            (Token::AssignDiv, Token::AssignDiv) => true,
+            (Token::AssignIDiv, Token::AssignIDiv) => true,
+            (Token::AssignMod, Token::AssignMod) => true,
+            (Token::AssignPow, Token::AssignPow) => true,
+            (Token::AssignBitAnd, Token::AssignBitAnd) => true,
+            (Token::AssignBitOr, Token::AssignBitOr) => true,
+            (Token::AssignBitXor, Token::AssignBitXor) => true,
+            (Token::AssignShiftRightArithmetic, Token::AssignShiftRightArithmetic) => true,
+            (Token::AssignShiftRightLogical, Token::AssignShiftRightLogical) => true,
+            (Token::AssignShiftLeft, Token::AssignShiftLeft) => true,
+            (Token::AssignRotateRight, Token::AssignRotateRight) => true,
+            (Token::AssignRotateLeft, Token::AssignRotateLeft) => true,
+            (Token::AssignConcat, Token::AssignConcat) => true,
             (Token::LessThan, Token::LessThan) => true,
             (Token::LessEqual, Token::LessEqual) => true,
             (Token::GreaterThan, Token::GreaterThan) => true,
@@ -170,16 +214,38 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::Div => write!(f, "Div"),
             Token::IDiv => write!(f, "IDiv"),
             Token::Pow => write!(f, "Pow"),
-            Token::Mod => write!(f, "Mod"),
             Token::Len => write!(f, "Len"),
+            Token::Peek => write!(f, "Peek"),
+            Token::ModPeek2 => write!(f, "ModPeek2"),
+            Token::Peek4 => write!(f, "Peek4"),
             Token::BitNotXor => write!(f, "BitNotXor"),
             Token::BitAnd => write!(f, "BitAnd"),
             Token::BitOr => write!(f, "BitOr"),
-            Token::ShiftRight => write!(f, "ShiftRight"),
+            Token::BitXor => write!(f, "BitXor"),
+            Token::ShiftRightArithmetic => write!(f, "ShiftRightArithmetic"),
+            Token::ShiftRightLogical => write!(f, "ShiftRightLogical"),
             Token::ShiftLeft => write!(f, "ShiftLeft"),
+            Token::RotateRight => write!(f, "RotateRight"),
+            Token::RotateLeft => write!(f, "RotateLeft"),
             Token::Concat => write!(f, "Concat"),
             Token::Dots => write!(f, "Dots"),
             Token::Assign => write!(f, "Assign"),
+            Token::AssignAdd => write!(f, "AssignAdd"),
+            Token::AssignSub => write!(f, "AssignSub"),
+            Token::AssignMul => write!(f, "AssignMul"),
+            Token::AssignDiv => write!(f, "AssignDiv"),
+            Token::AssignIDiv => write!(f, "AssignIDiv"),
+            Token::AssignMod => write!(f, "AssignMod"),
+            Token::AssignPow => write!(f, "AssignPow"),
+            Token::AssignBitAnd => write!(f, "AssignBitAnd"),
+            Token::AssignBitOr => write!(f, "AssignBitOr"),
+            Token::AssignBitXor => write!(f, "AssignBitXor"),
+            Token::AssignShiftRightArithmetic => write!(f, "AssignShiftRight"),
+            Token::AssignShiftRightLogical => write!(f, "AssignShiftRightLogical"),
+            Token::AssignShiftLeft => write!(f, "AssignShiftLeft"),
+            Token::AssignRotateRight => write!(f, "AssignRotateRight"),
+            Token::AssignRotateLeft => write!(f, "AssignRotateLeft"),
+            Token::AssignConcat => write!(f, "AssignConcat"),
             Token::LessThan => write!(f, "LessThan"),
             Token::LessEqual => write!(f, "LessEqual"),
             Token::GreaterThan => write!(f, "GreaterThan"),
@@ -335,13 +401,109 @@ where
                     b' ' | b'\t' | VERTICAL_TAB | FORM_FEED | b'\n' | b'\r' => {
                         unreachable!("whitespace should have been skipped");
                     }
+                    
+                    b'+' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignAdd
+                        } else {
+                            Token::Add
+                        }
+                    }
 
                     b'-' => {
-                        if self.peek(1)? != Some(b'-') {
+                        let next = self.peek(1)?;
+                        if next == Some(b'=') {
+                            self.advance(2);
+                            Token::AssignSub
+                        } else if next != Some(b'-') {
                             self.advance(1);
                             Token::Minus
                         } else {
                             unreachable!("whitespace should have been skipped");
+                        }
+                    }
+                    
+                    b'*' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignMul
+                        } else {
+                            Token::Mul
+                        }
+                    }
+                    
+                    b'/' => {
+                        let next = self.peek(1)?;
+                        if next == Some(b'=') {
+                            self.advance(2);
+                            Token::AssignDiv
+                        } else if next != Some(b'/') {
+                            self.advance(1);
+                            Token::Div
+                        } else {
+                            unreachable!("whitespace should have been skipped");
+                        }
+                    }
+                    
+                    b'\\' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignIDiv
+                        } else {
+                            Token::IDiv
+                        }
+                    }
+                    
+                    b'%' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignMod
+                        } else {
+                            Token::ModPeek2
+                        }
+                    }
+                    
+                    b'^' => {
+                        self.advance(1);
+                        let next = self.peek(0)?;
+                        if next == Some(b'^') {
+                            self.advance(1);
+                            if self.peek(0)? == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignBitXor
+                            } else {
+                                Token::BitXor
+                            }
+                        } else if next == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignPow
+                        } else {
+                            Token::Pow
+                        }
+                    }
+                    
+                    b'&' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignBitAnd
+                        } else {
+                            Token::BitAnd
+                        }
+                    }
+                    
+                    b'|' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignBitOr
+                        } else {
+                            Token::BitOr
                         }
                     }
 
@@ -369,12 +531,26 @@ where
                     b'<' => {
                         self.advance(1);
                         let next = self.peek(0)?;
-                        if next == Some(b'=') {
+                        if next == Some(b'<') {
+                            self.advance(1);
+                            let next = self.peek(0)?;
+                            if next == Some(b'>') {
+                                self.advance(1);
+                                if self.peek(0)? == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignRotateLeft
+                                } else {
+                                    Token::RotateLeft
+                                }
+                            } else if next == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignShiftLeft
+                            } else {
+                                Token::ShiftLeft
+                            }
+                        } else if next == Some(b'=') {
                             self.advance(1);
                             Token::LessEqual
-                        } else if next == Some(b'<') {
-                            self.advance(1);
-                            Token::ShiftLeft
                         } else {
                             Token::LessThan
                         }
@@ -383,24 +559,36 @@ where
                     b'>' => {
                         self.advance(1);
                         let next = self.peek(0)?;
-                        if next == Some(b'=') {
+                        if next == Some(b'>') {
+                            self.advance(1);
+                            let next = self.peek(0)?;
+                            if next == Some(b'>') {
+                                self.advance(1);
+                                if self.peek(0)? == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignShiftRightLogical
+                                } else {
+                                    Token::ShiftRightLogical
+                                }
+                            } else if next == Some(b'<') {
+                                self.advance(1);
+                                if self.peek(0)? == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignRotateRight
+                                } else {
+                                    Token::RotateRight
+                                }
+                            } else if next == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignShiftRightArithmetic
+                            } else {
+                                Token::ShiftRightArithmetic
+                            }
+                        } else if next == Some(b'=') {
                             self.advance(1);
                             Token::GreaterEqual
-                        } else if next == Some(b'>') {
-                            self.advance(1);
-                            Token::ShiftRight
                         } else {
                             Token::GreaterThan
-                        }
-                    }
-
-                    b'/' => {
-                        self.advance(1);
-                        if self.peek(0)? == Some(b'/') {
-                            self.advance(1);
-                            Token::IDiv
-                        } else {
-                            Token::Div
                         }
                     }
 
@@ -411,6 +599,16 @@ where
                             Token::NotEqual
                         } else {
                             Token::BitNotXor
+                        }
+                    }
+                    
+                    b'!' => {
+                        self.advance(1);
+                        if self.peek(0)? == Some(b'=') {
+                            self.advance(1);
+                            Token::NotEqual
+                        } else {
+                            return Err(LexError::UnexpectedCharacter(c));
                         }
                     }
 
@@ -431,9 +629,13 @@ where
 
                     b'.' => {
                         if self.peek(1)? == Some(b'.') {
-                            if self.peek(2)? == Some(b'.') {
+                            let next = self.peek(2)?;
+                            if next == Some(b'.') {
                                 self.advance(3);
                                 Token::Dots
+                            } else if next == Some(b'=') {
+                                self.advance(3);
+                                Token::AssignConcat
                             } else {
                                 self.advance(2);
                                 Token::Concat
@@ -826,16 +1028,11 @@ where
 
 fn get_char_token<S>(c: u8) -> Option<Token<S>> {
     match c {
-        b'-' => Some(Token::Minus),
-        b'+' => Some(Token::Add),
-        b'*' => Some(Token::Mul),
-        b'^' => Some(Token::Pow),
-        b'%' => Some(Token::Mod),
-        b'&' => Some(Token::BitAnd),
-        b'|' => Some(Token::BitOr),
         b',' => Some(Token::Comma),
         b';' => Some(Token::SemiColon),
         b'#' => Some(Token::Len),
+        b'@' => Some(Token::Peek),
+        b'$' => Some(Token::Peek4),
         b'(' => Some(Token::LeftParen),
         b')' => Some(Token::RightParen),
         b']' => Some(Token::RightBracket),
@@ -1040,11 +1237,11 @@ mod tests {
             ],
         );
     }
-
+    
     #[test]
     fn ops() {
         test_tokens(
-            r#"- + * / // ^ % & ~ | , ; >> << . .. ... = < <= > >= == ~= : :: # ( ) [ ] { }"#,
+            r#"- + * / \ ^ , ; . .. ... < <= > >= == ~= != : :: # @ % $ ( ) [ ] { }"#,
             &[
                 Token::Minus,
                 Token::Add,
@@ -1052,33 +1249,74 @@ mod tests {
                 Token::Div,
                 Token::IDiv,
                 Token::Pow,
-                Token::Mod,
-                Token::BitAnd,
-                Token::BitNotXor,
-                Token::BitOr,
                 Token::Comma,
                 Token::SemiColon,
-                Token::ShiftRight,
-                Token::ShiftLeft,
                 Token::Dot,
                 Token::Concat,
                 Token::Dots,
-                Token::Assign,
                 Token::LessThan,
                 Token::LessEqual,
                 Token::GreaterThan,
                 Token::GreaterEqual,
                 Token::Equal,
                 Token::NotEqual,
+                Token::NotEqual,
                 Token::Colon,
                 Token::DoubleColon,
                 Token::Len,
+                Token::Peek,
+                Token::ModPeek2,
+                Token::Peek4,
                 Token::LeftParen,
                 Token::RightParen,
                 Token::LeftBracket,
                 Token::RightBracket,
                 Token::LeftBrace,
                 Token::RightBrace,
+            ],
+        );
+    }
+    
+    #[test]
+    fn bit_ops() {
+        test_tokens(
+            r#"~ & | ^^ >> >>> << >>< <<>"#,
+            &[
+                Token::BitNotXor,
+                Token::BitAnd,
+                Token::BitOr,
+                Token::BitXor,
+                Token::ShiftRightArithmetic,
+                Token::ShiftRightLogical,
+                Token::ShiftLeft,
+                Token::RotateRight,
+                Token::RotateLeft,
+            ],
+        );
+    }
+    
+    #[test]
+    fn assigns() {
+        test_tokens(
+            r#"= += -= *= /= \= %= ^= &= |= ^^= >>= >>>= <<= >><= <<>= ..="#,
+            &[
+                Token::Assign,
+                Token::AssignAdd,
+                Token::AssignSub,
+                Token::AssignMul,
+                Token::AssignDiv,
+                Token::AssignIDiv,
+                Token::AssignMod,
+                Token::AssignPow,
+                Token::AssignBitAnd,
+                Token::AssignBitOr,
+                Token::AssignBitXor,
+                Token::AssignShiftRightArithmetic,
+                Token::AssignShiftRightLogical,
+                Token::AssignShiftLeft,
+                Token::AssignRotateRight,
+                Token::AssignRotateLeft,
+                Token::AssignConcat,
             ],
         );
     }
