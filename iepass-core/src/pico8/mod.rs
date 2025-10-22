@@ -15,7 +15,7 @@ pub mod cart;
 mod numeric;
 mod api;
 
-use crate::pico8::api::install_pico8_apis;
+use crate::pico8::api::{install_pico8_apis, EnvHandle};
 use env::Env;
 use crate::pico8::cart::CartridgeParseError;
 
@@ -30,7 +30,7 @@ pub struct Pico8VMRunResult {
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
-	env: Rc<RefCell<Env<A>>>,
+	env: EnvHandle<A>,
 	executor: Option<StashedExecutor>,
 }
 

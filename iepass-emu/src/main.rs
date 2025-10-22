@@ -47,8 +47,8 @@ impl EmulatorApp {
 		
 		let mut pico8 = Pico8VM::new().unwrap();
 		
-		let load_result = pico8.load_cartridge(b"asdasdasdqweqweqweasdasdasdqweqweqwe---\n__lua__\nprinth('Test!!!')\n\r\n\r\n\n");
-		pico8.load(include_bytes!("../../lua/hello.lua"));
+		let load_result = pico8.load_cartridge(include_bytes!("../../lua/hello.p8"));
+		// pico8.load(include_bytes!("../../lua/hello.lua"));
 		
 		match load_result {
 			Ok(_) => { println!("Successfully loaded cartridge."); },
