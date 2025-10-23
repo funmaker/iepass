@@ -1,39 +1,3 @@
-/*!
- * Pico-8 Cartridge Loading
- * 
- * This module implements parsing and loading of Pico-8 cartridge (.p8) files.
- * 
- * ## Cartridge Format
- * 
- * A Pico-8 cartridge file starts with a header and contains multiple sections:
- * 
- * ```text
- * pico-8 cartridge // http://www.pico-8.com
- * version 8
- * 
- * __lua__
- * [Lua source code]
- * 
- * __gfx__
- * [Graphics data as hexadecimal]
- * 
- * __map__
- * [Map/tilemap data as hexadecimal]
- * 
- * __sfx__
- * [Sound effects data]
- * 
- * __music__
- * [Music pattern data]
- * ```
- * 
- * ## Usage
- * 
- * ```rust
- *  // todo
- * ```
- */
-
 use core::alloc::Allocator;
 use thiserror::Error;
 
@@ -42,15 +6,15 @@ use crate::pico8::Pico8VM;
 #[derive(Debug)]
 pub struct SectionIterator<'a, Lines> {
 	pub cart: &'a [u8],
-	lines: Lines,
+	header_lines: Lines,
 	last_header: Option<&'a [u8]>,
 }
 
 pub fn section_iterator<'a>(cart: &'a [u8]) -> Result<SectionIterator<'a, impl Iterator<Item=&'a [u8]> + 'a>, CartridgeParseError> {
-	let mut lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
-	                    .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
+	let mut header_lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
+	                           .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
 	
-	let last_header = lines.next();
+	let last_header = header_lines.next();
 	
 	if last_header.is_none() {
 		return Err(CartridgeParseError::NoDataSection);
@@ -67,7 +31,7 @@ pub fn section_iterator<'a>(cart: &'a [u8]) -> Result<SectionIterator<'a, impl I
 	
 	Ok(SectionIterator {
 		cart,
-		lines,
+		header_lines,
 		last_header,
 	})
 }
@@ -85,7 +49,7 @@ where Lines: Iterator<Item=&'a [u8]> + 'a {
 		
 		let header = header.unwrap();
 		
-		let next_header = self.lines.next();
+		let next_header = self.header_lines.next();
 		
 		let body_start = self.cart.subslice_range(header).unwrap().end;
 		let body_end = next_header.and_then(|header| self.cart.subslice_range(header))
@@ -101,62 +65,95 @@ where Lines: Iterator<Item=&'a [u8]> + 'a {
 	}
 }
 
-pub fn load_cartridge<A: Allocator + Clone + 'static>(_vm: &mut Pico8VM<A>, cartridge: &[u8]) -> Result<(), CartridgeParseError> {
-	let section_iter = section_iterator(cartridge);
+pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartridge: &[u8]) -> Result<(), CartridgeParseError> {
+	let section_iter = section_iterator(cartridge)?;
 	
-	match section_iter {
-		Ok(section_iter) => {
-			for (name, body) in section_iter {
-				let name_str = core::str::from_utf8(name).unwrap_or("<invalid utf8>"); 
-				debug!("load_cartridge: Loading cartridge section {} (len: {})", name_str, body.len());
-				match name {
-					b"__gfx__" => {
-						load_gfx_section(_vm, body)?;
-					},
-					b"__lua__" => {
-						let lua_text = core::str::from_utf8(body);
-						match lua_text {
-							Ok(lua_text) => {
-								_vm.load(lua_text.as_bytes());
-								debug!("load_cartridge: Loaded lua text (len: {})", lua_text.len());
-							}
-							Err(_) => {
-								return Err(CartridgeParseError::InvalidLuaUnicode);
-							}
-						}
-					},
-					_ => {
-						info!("load_cartridge: Unknown section name {}", name_str);
-					}
-				}
-			}
-			Ok(())
-		},
-		Err(e) => {
-			Err(e)
+	for (name, body) in section_iter {
+		let name_str = core::str::from_utf8(name).unwrap_or("<invalid utf8>");
+		debug!("load_cartridge: Loading cartridge section {} (len: {})", name_str, body.len());
+		match name {
+			b"__lua__" => { load_lua_section(vm, body)?; },
+			b"__gfx__" => { load_gfx_section(vm, body)?; },
+			b"__map__" => { load_map_section(vm, body)?; },
+			_ => { info!("load_cartridge: Unknown section name {}", name_str); }
 		}
 	}
+	Ok(())
+}
+
+fn load_lua_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8]) -> Result<(), CartridgeParseError> {
+	let lua_text = core::str::from_utf8(data);
+	match lua_text {
+		Ok(lua_text) => {
+			vm.load(lua_text.as_bytes());
+			debug!("load_cartridge: Loaded lua text (len: {})", lua_text.len());
+		}
+		Err(_) => {
+			return Err(CartridgeParseError::InvalidLuaUnicode);
+		}
+	}
+	Ok(())
+}
+
+fn hex_char_to_nibble(hex_char: u8) -> Option<u8> {
+	match hex_char {
+		b'0'..=b'9' => Some(hex_char - b'0'),
+		b'a'..=b'f' => Some(hex_char - b'a' + 10),
+		b'A'..=b'F' => Some(hex_char - b'A' + 10),
+		_ => None,
+	}
+}
+
+fn split_nonempty_lines(data: &[u8], max_lines: usize) -> impl Iterator<Item=(usize, &[u8])> {
+	data.split(|&b| b == b'\n' || b == b'\r')
+	    .filter(|line| !line.is_empty()).take(max_lines).enumerate()
+}
+
+fn nibble_chunks(text: &[u8]) -> impl Iterator<Item=(u8, u8)> + '_ {
+	text.chunks(2).map(|chunk| (chunk[0], chunk.get(1).copied().unwrap_or(b'0')))
 }
 
 fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8]) -> Result<(), CartridgeParseError> {
 	let gfx_base_addr = vm.env().memory.base_addr_gfx() as usize;
-	let memory_offset = 0; // sprite sheet
+	let mut max_offset = 0;
 	
-	let lines = data.split(|&b| b == b'\n' || b == b'\r');
-	
-	for (line_idx, line) in lines.enumerate() {
-		if line.is_empty() { continue; }
-		
-		// todo: implement
-		
-		if line_idx < 5 || line_idx % 32 == 0 {
-			debug!("GFX line {}", line_idx);
-		}
+	for (offset, byte) in split_nonempty_lines(data, 128)
+		.flat_map(|(line_idx, line)|
+			nibble_chunks(line).take(64).map(|(h, l)| (hex_char_to_nibble(l).unwrap_or(0) << 4) | hex_char_to_nibble(h).unwrap_or(0))
+			                   .enumerate().map(move |(col_idx, byte)| (line_idx * 64 + col_idx, byte))
+		)
+	{
+		vm.env().memory[gfx_base_addr + offset] = byte;
+		if offset > max_offset { max_offset = offset; }
 	}
 	
-	debug!("GFX section loaded: {} bytes written to memory starting at 0x{:04x}", memory_offset, gfx_base_addr);
+	debug!("load_cartridge: GFX section loaded: {} bytes written to memory starting at 0x{:04x}", max_offset, gfx_base_addr);
 	Ok(())
 }
+
+fn load_map_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8]) -> Result<(), CartridgeParseError> {
+	let map_base_addr = vm.env().memory.base_addr_map() as usize;
+	let mut max_offset = 0;
+	
+	for (offset, byte) in split_nonempty_lines(data, 32)
+		.flat_map(|(line_idx, line)|
+			nibble_chunks(line).take(128).map(|(h, l)| {
+				if let (Some(h), Some(l)) = (hex_char_to_nibble(h), hex_char_to_nibble(l)) {
+					(h << 4) | l
+				}else{
+					0
+				}
+			}).enumerate().map(move |(col_idx, byte)| (line_idx * 128 + col_idx, byte))
+		)
+	{
+		vm.env().memory[map_base_addr + offset] = byte;
+		if offset > max_offset { max_offset = offset; }
+	}
+	
+	debug!("load_cartridge: MAP section loaded: {} bytes written starting at 0x{:04x}", max_offset, map_base_addr);
+	Ok(())
+}
+
 
 
 #[derive(Debug, Clone)]

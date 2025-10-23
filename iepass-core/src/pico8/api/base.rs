@@ -14,6 +14,7 @@ pub fn install_pico8_base(ctx: Context) {
 	
 	set_global_callback_simple("tonum", ctx, tonum);
 	set_global_callback_simple("printh", ctx, printh);
+	set_global_callback_simple("print", ctx, print);
 }
 
 pub fn tonum<'gc>((val, opts): (String, Option<u8>)) -> Result<Option<Value<'gc>>, RuntimeError> {
@@ -32,6 +33,12 @@ pub fn printh((text, filename, _overwrite, _save_to_desktop): (String, Option<St
 	} else {
 		info!("[printh] {}", text);
 	}
+	Ok(())
+}
+
+pub fn print((text, _x, _y, _color): (String, Option<i16>, Option<i16>, Option<u8>)) -> Result<(), RuntimeError> {
+	info!("[print] {}", text);
+	// todo: implement on-screen printing
 	Ok(())
 }
 

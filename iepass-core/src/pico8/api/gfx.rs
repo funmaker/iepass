@@ -1,12 +1,9 @@
 use super::{set_global_callback_env, EnvHandle};
-use crate::pico8::env::Env;
-use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
-use core::cell::RefCell;
 use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
 
-pub fn install_pico8_gfx<A: Allocator + Clone + 'static>(env_orig: Rc<RefCell<Env<A>>>, ctx: Context) {
+pub fn install_pico8_gfx<A: Allocator + Clone + 'static>(env_orig: EnvHandle<A>, ctx: Context) {
 	set_global_callback_env("camera", ctx, env_orig.clone(), camera);
 	set_global_callback_env("color", ctx, env_orig.clone(), color);
 	set_global_callback_env("clip", ctx, env_orig.clone(), clip);

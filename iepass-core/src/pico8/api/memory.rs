@@ -6,7 +6,7 @@ use p8rs_piccolo::{Context, RuntimeError, Variadic};
 use super::{set_global_callback_env, EnvHandle};
 use crate::pico8::env::Env;
 
-pub fn install_pico8_memory<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context) {
+pub fn install_pico8_memory<A: Allocator + Clone + 'static>(env: EnvHandle<A>, ctx: Context) {
 	set_global_callback_env("peek", ctx, env.clone(), peek);
 	set_global_callback_env("poke", ctx, env.clone(), poke);
 }

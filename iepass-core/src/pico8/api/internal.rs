@@ -1,15 +1,12 @@
 use alloc::format;
-use alloc::rc::Rc;
 use alloc::string::String;
 use core::alloc::Allocator;
-use core::cell::RefCell;
 use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, RuntimeError};
 
 use super::{set_global_callback_env, EnvHandle};
 use crate::pico8::api::base::printh;
-use crate::pico8::env::Env;
 
-pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context) {
+pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: EnvHandle<A>, ctx: Context) {
 	set_global_callback_env("_set_fps", ctx, env.clone(), _set_fps);
 	
 	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));

@@ -15,7 +15,7 @@ use crate::pico8::env::Env;
 
 pub type EnvHandle<A> = Rc<RefCell<Env<A>>>;
 
-pub fn install_pico8_apis<A: Allocator + Clone + 'static>(env: Rc<RefCell<Env<A>>>, ctx: Context)
+pub fn install_pico8_apis<A: Allocator + Clone + 'static>(env: EnvHandle<A>, ctx: Context)
 {
 	base::install_pico8_base(ctx);
 	math::install_pico8_math(ctx);
