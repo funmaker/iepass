@@ -7,9 +7,10 @@
 #![feature(bigint_helper_methods)]
 #![feature(ascii_char)]
 #![feature(ascii_char_variants)]
-#![feature(allocator_api)]
 
 //! This crate provides an implementation of Pico-8's numeric type and string encoding (P8SCII).
+
+extern crate alloc;
 
 pub mod p8scii;
 pub mod p8num;

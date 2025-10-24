@@ -19,25 +19,9 @@ script = { file = "./scripts/font_gen.rs" }
 
 # Testing
 [tasks.test]
-dependencies = [
-    "test-core",
-    "test-types",
-    "test-piccolo",
-]
-
-[tasks.test-core]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--package", "iepass-core", "--features", "std", "${@}"]
-
-[tasks.test-types]
-command = "cargo"
-args = ["test", "--package", "p8rs-types", "${@}"]
-
-[tasks.test-piccolo]
-command = "cargo"
-args = ["test", "--package", "p8rs-piccolo", "${@}"]
-
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "${@}"]
 
 # Running
 [tasks.run]

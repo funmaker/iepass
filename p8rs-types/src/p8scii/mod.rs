@@ -10,13 +10,17 @@
 
 mod char_source;
 mod encoder;
+mod decoder;
 mod escape;
 mod unescape;
+mod utils;
 
 pub use char_source::IntoByteIterator;
-pub use encoder::{to_char, from_char, to_iter, from_iter, from_str, FromCharError, FromStrError};
+pub use encoder::{from_char, from_iter, from_str, from_utf8, FromCharError};
+pub use decoder::{to_char, to_iter};
 pub use escape::escape;
-pub use unescape::unescape;
+pub use unescape::{unescape, UnescapeError};
+pub use utils::LossyIteratorEx;
 
 /// Character table mapping P8SCII characters to their Unicode counterparts.
 /// 

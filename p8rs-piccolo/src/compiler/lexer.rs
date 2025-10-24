@@ -1,10 +1,10 @@
 use alloc::vec::Vec;
 use core::{char, fmt};
-
 use gc_arena::Collect;
 use thiserror::Error;
 use p8rs_types::p8num::P8Num;
-use crate::compiler::string_utils::{from_digit, from_hex_digit, is_bin_digit, is_hex_digit, is_space, ALERT_BEEP, BACKSPACE};
+use p8rs_types::p8scii::{self, LossyIteratorEx};
+use crate::compiler::string_utils::{is_bin_digit, is_hex_digit};
 
 use super::{
     string_utils::{debug_utf8_lossy, is_alpha, is_digit, is_newline, FORM_FEED, VERTICAL_TAB},
@@ -728,165 +728,55 @@ where
         let start_quote = self.peek(0).unwrap().unwrap();
         assert!(start_quote == b'\'' || start_quote == b'"');
         self.advance(1);
-
+        
         self.string_buffer.clear();
-
+        
+        let mut pos = 0;
         loop {
-            let c = if let Some(c) = self.peek(0)? {
-                c
-            } else {
-                return Err(LexError::UnfinishedShortString(start_quote));
-            };
+            let c = self.peek(pos)?
+                .ok_or(LexError::UnfinishedShortString(start_quote))?;
 
             if is_newline(c) {
                 return Err(LexError::UnfinishedShortString(start_quote));
             }
 
-            self.advance(1);
-            if c == b'\\' {
-                match self
-                    .peek(0)?
-                    .ok_or_else(|| LexError::UnfinishedShortString(start_quote))?
-                {
-                    b'a' => {
-                        self.advance(1);
-                        self.string_buffer.push(ALERT_BEEP);
-                    }
-
-                    b'b' => {
-                        self.advance(1);
-                        self.string_buffer.push(BACKSPACE);
-                    }
-
-                    b'f' => {
-                        self.advance(1);
-                        self.string_buffer.push(FORM_FEED);
-                    }
-
-                    b'n' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\n');
-                    }
-
-                    b'r' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\r');
-                    }
-
-                    b't' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\t');
-                    }
-
-                    b'v' => {
-                        self.advance(1);
-                        self.string_buffer.push(VERTICAL_TAB);
-                    }
-
-                    b'\\' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\\');
-                    }
-
-                    b'\'' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\'');
-                    }
-
-                    b'"' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'"');
-                    }
-
-                    b'\n' | b'\r' => {
-                        self.read_line_end(true)?;
-                    }
-
-                    b'x' => {
-                        self.advance(1);
-                        let first = self
-                            .peek(0)?
-                            .and_then(from_hex_digit)
-                            .ok_or(LexError::HexDigitExpected)?;
-                        let second = self
-                            .peek(1)?
-                            .and_then(from_hex_digit)
-                            .ok_or(LexError::HexDigitExpected)?;
-                        self.string_buffer.push(first << 4 | second);
-                        self.advance(2);
-                    }
-
-                    b'u' => {
-                        if self.peek(1)? != Some(b'{') {
-                            return Err(LexError::EscapeUnicodeStart);
-                        }
-                        self.advance(2);
-
-                        let mut u: u32 = 0;
-                        loop {
-                            if let Some(c) = self.peek(0)? {
-                                if c == b'}' {
-                                    self.advance(1);
-                                    break;
-                                } else if let Some(h) = from_hex_digit(c) {
-                                    u = (u << 4) | h as u32;
-                                    self.advance(1);
-                                } else {
-                                    return Err(LexError::EscapeUnicodeEnd);
-                                }
-                            } else {
-                                return Err(LexError::EscapeUnicodeEnd);
-                            }
-                        }
-
-                        let c = char::from_u32(u).ok_or(LexError::EscapeUnicodeInvalid)?;
-                        let mut buf = [0; 4];
-                        for &b in c.encode_utf8(&mut buf).as_bytes() {
-                            self.string_buffer.push(b);
-                        }
-                    }
-
-                    b'z' => {
-                        self.advance(1);
-                        while let Some(c) = self.peek(0)? {
-                            if is_newline(c) {
-                                self.read_line_end(false)?;
-                            } else if is_space(c) {
-                                self.advance(1);
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-
-                    c => {
-                        if is_digit(c) {
-                            let mut u: u16 = 0;
-                            for _ in 0..3 {
-                                if let Some(d) = self.peek(0)?.and_then(from_digit) {
-                                    u = 10 * u + d as u16;
-                                    self.advance(1);
-                                } else {
-                                    break;
-                                }
-                            }
-                            if u > 255 {
-                                return Err(LexError::EscapeDecimalTooLarge);
-                            }
-
-                            self.string_buffer.push(u as u8);
-                        } else {
-                            return Err(LexError::InvalidEscape);
-                        }
-                    }
-                }
-            } else if c == start_quote {
+            if c == start_quote {
+                self.read_escaped_string(pos)?;
+                self.advance(1);
                 break;
+            } else if c == b'\\' {
+                let next = self
+                    .peek(pos + 1)?
+                    .ok_or(LexError::UnfinishedShortString(start_quote))?;
+                
+                if is_newline(next) {
+                    self.read_escaped_string(pos)?;
+                    self.advance(1);
+                    pos = 0;
+                    self.read_line_end(true)?;
+                } else {
+                    pos += 2;
+                }
             } else {
-                self.string_buffer.push(c);
+                pos += 1;
             }
         }
 
+        Ok(())
+    }
+    
+    // Reads count number of bytes, encodes as p8scii, unescapes and writes into the string buffer.
+    fn read_escaped_string(&mut self, count: usize) -> Result<(), LexError> {
+        let chars = p8scii::unescape(p8scii::from_utf8(&self.source[0..count]).lossy());
+        for c in chars {
+            match c {
+                Ok(char) => self.string_buffer.push(char),
+                Err(p8scii::UnescapeError::InvalidEscapeSeq(..)) => return Err(LexError::InvalidEscape),
+                Err(p8scii::UnescapeError::DecimalTooLarge(..)) => return Err(LexError::EscapeDecimalTooLarge),
+            }
+        }
+        self.advance(count);
+        
         Ok(())
     }
 
@@ -913,50 +803,51 @@ where
 
         if matches!(self.peek(0)?, Some(b'\n' | b'\r')) {
             // If the long string starts imediately with a newline, we read it and do *not* put it
-            // into the string buffer, matching the behavior of PUC-Rio Lua.
+            // into the string buffer, matching the behavior of PUC-Rio Lua. (and PICO-8 too!)
             self.read_line_end(false)?;
         }
+        
+        if into_string {
+            self.string_buffer.clear();
+        }
+        
+        let mut pos = 0;
+        let mut close_sep_length = None;
 
         loop {
-            let c = if let Some(c) = self.peek(0)? {
-                c
-            } else {
-                return Err(LexError::UnfinishedLongString);
-            };
+            let c = self.peek(pos)?
+                .ok_or(LexError::UnfinishedLongString)?;
 
             match c {
                 b'\n' | b'\r' => {
+                    if into_string {
+                        self.string_buffer.extend(p8scii::from_utf8(&self.source[0..pos]).lossy());
+                    }
+                    self.advance(pos);
+                    pos = 0;
+                    close_sep_length = None;
                     self.read_line_end(into_string)?;
                 }
 
                 b']' => {
-                    let mut close_sep_length = 0;
-                    self.advance(1);
-                    while self.peek(0)? == Some(b'=') {
-                        self.advance(1);
-                        close_sep_length += 1;
-                    }
-
-                    if open_sep_length == close_sep_length && self.peek(0)? == Some(b']') {
-                        self.advance(1);
+                    if close_sep_length == Some(open_sep_length) {
+                        self.string_buffer.extend(p8scii::from_utf8(&self.source[0..pos-open_sep_length-1]).lossy());
+                        self.advance(pos + 1);
                         break;
-                    } else {
-                        // If it turns out this is not a valid long string close delimiter, we need
-                        // to add the invalid close delimiter to the string.
-                        if into_string {
-                            self.string_buffer.push(b']');
-                            for _ in 0..close_sep_length {
-                                self.string_buffer.push(b'=');
-                            }
-                        }
                     }
+                    
+                    close_sep_length = Some(0);
+                    pos += 1;
+                }
+                
+                b'=' => {
+                    close_sep_length = close_sep_length.map(|i| i + 1);
+                    pos += 1;
                 }
 
-                c => {
-                    if into_string {
-                        self.string_buffer.push(c);
-                    }
-                    self.advance(1);
+                _ => {
+                    close_sep_length = None;
+                    pos += 1;
                 }
             }
         }
@@ -1108,11 +999,11 @@ mod tests {
     }
 
     fn str_token(s: &str) -> Token<Rc<[u8]>> {
-        Token::String(s.as_bytes().to_vec().into_boxed_slice().into())
+        Token::String(p8scii::from_str(s).lossy().collect::<Vec<_>>().into_boxed_slice().into())
     }
 
     fn name_token(s: &str) -> Token<Rc<[u8]>> {
-        Token::Name(s.as_bytes().to_vec().into_boxed_slice().into())
+        Token::Name(p8scii::from_str(s).lossy().collect::<Vec<_>>().into_boxed_slice().into())
     }
 
     #[test]
@@ -1145,10 +1036,14 @@ mod tests {
             r#"
                 [====[ [==[ this is a [[]] long string ]== ]==] ]====]
                 [[ [=] [==] another long string [==] [=] ]]
+                [[ \t\r\x escape codes are ignored \1\2\3 ]]
+                [[ ️⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
             "#,
             &[
                 str_token(" [==[ this is a [[]] long string ]== ]==] "),
                 str_token(" [=] [==] another long string [==] [=] "),
+                str_token(" \\t\\r\\x escape codes are ignored \\1\\2\\3 "),
+                str_token(" ⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ "),
             ],
         );
 
@@ -1164,19 +1059,21 @@ mod tests {
             r#"
                 "\\ \" '"
                 '\n \t "'
-                "begin \z
-                end"
-                'state\u{2e}'
+                "begin \
+end"
                 "question\x3f"
                 "exclaim\33"
+                "\0\1\2\3"
+                "⬆️⬇️⬅️➡️"
             "#,
             &[
                 (str_token("\\ \" '"), 1),
                 (str_token("\n \t \""), 2),
-                (str_token("begin end"), 3),
-                (str_token("state."), 5),
-                (str_token("question?"), 6),
-                (str_token("exclaim!"), 7),
+                (str_token("begin \nend"), 3),
+                (str_token("question?"), 5),
+                (str_token("exclaim!"), 6),
+                (Token::String(vec![0, 1, 2, 3].into()), 7),
+                (str_token("⬆️⬇️⬅️➡️"), 8),
             ],
         );
     }

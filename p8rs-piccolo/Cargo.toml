@@ -16,6 +16,7 @@ gc-arena.workspace = true
 hashbrown.workspace = true
 thiserror.workspace = true
 p8rs-macros.workspace = true
+arrayvec.workspace = true
 p8rs-types = { workspace = true, features = ["gc-arena"] }
 
 rand = { workspace = true, optional = true }
