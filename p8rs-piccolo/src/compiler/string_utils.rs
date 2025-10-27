@@ -303,22 +303,17 @@ pub fn read_neg(s: &[u8]) -> (bool, &[u8]) {
     }
 }
 
-pub const ALERT_BEEP: u8 = 0x07;
-pub const BACKSPACE: u8 = 0x08;
-pub const VERTICAL_TAB: u8 = 0x0b;
-pub const FORM_FEED: u8 = 0x0c;
-
 pub fn is_newline(c: u8) -> bool {
     c == b'\n' || c == b'\r'
 }
 
 pub fn is_space(c: u8) -> bool {
-    c == b' ' || c == b'\t' || c == VERTICAL_TAB || c == FORM_FEED || is_newline(c)
+    c == b' ' || c == b'\t' || is_newline(c)
 }
 
-/// Is this character a Lua alpha, which is A-Z, a-z, and _
+/// Is this character a Pico-8 alpha, which is A-Z, a-z, _, (han)dakuten and all wide symbols
 pub fn is_alpha(c: u8) -> bool {
-    (c >= b'a' && c <= b'z') || (c >= b'A' && c <= b'Z') || c == b'_'
+    matches!(c, b'a'..=b'z' | b'A'..=b'Z' | b'_' | 30 | 31 | 127..=255)
 }
 
 pub fn from_digit(c: u8) -> Option<u8> {

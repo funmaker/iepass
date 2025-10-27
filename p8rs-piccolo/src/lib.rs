@@ -1,3 +1,4 @@
+#![feature(type_alias_impl_trait)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
@@ -29,6 +30,7 @@ pub mod thread;
 pub mod types;
 pub mod userdata;
 pub mod value;
+pub mod peek_nth;
 
 #[cfg(feature = "std")]
 pub mod io;

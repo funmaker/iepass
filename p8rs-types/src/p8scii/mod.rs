@@ -19,8 +19,8 @@ pub use char_source::IntoByteIterator;
 pub use encoder::{from_char, from_iter, from_str, from_utf8, FromCharError};
 pub use decoder::{to_char, to_iter};
 pub use escape::escape;
-pub use unescape::{unescape, UnescapeError};
-pub use utils::LossyIteratorEx;
+pub use unescape::{unescape, unescape_in_place, UnescapeError};
+pub use utils::{LossyIteratorEx, Printable};
 
 /// Character table mapping P8SCII characters to their Unicode counterparts.
 /// 

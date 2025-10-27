@@ -7,6 +7,25 @@ pub fn unescape(iter: impl IntoByteIterator) -> impl Iterator<Item = Result<u8, 
 	Unescape::new(iter.into_iter())
 }
 
+pub fn unescape_in_place(buf: &mut [u8]) -> Result<usize, UnescapeError> {
+	let buf = core::cell::RefCell::new(buf);
+	
+	let mut read_pos = 0;
+	let mut write_pos = 0;
+	let chars = Unescape::new(core::iter::from_fn(|| {
+		let val = buf.borrow().get(read_pos).copied();
+		read_pos += 1;
+		val
+	}));
+	
+	for ch in chars {
+		buf.borrow_mut()[write_pos] = ch?;
+		write_pos += 1;
+	}
+	
+	Ok(write_pos)
+}
+
 struct Unescape<I: Iterator> {
 	iter: Peekable<I>,
 }

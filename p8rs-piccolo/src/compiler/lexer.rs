@@ -1,13 +1,13 @@
 use alloc::vec::Vec;
-use core::{char, fmt};
+use core::fmt;
 use gc_arena::Collect;
 use thiserror::Error;
 use p8rs_types::p8num::P8Num;
 use p8rs_types::p8scii::{self, LossyIteratorEx};
 use crate::compiler::string_utils::{is_bin_digit, is_hex_digit};
-
+use crate::peek_nth::{IteratorExt, PeekableNth};
 use super::{
-    string_utils::{debug_utf8_lossy, is_alpha, is_digit, is_newline, FORM_FEED, VERTICAL_TAB},
+    string_utils::{is_alpha, is_digit, is_newline},
     StringInterner,
 };
 
@@ -264,21 +264,17 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::LeftBrace => write!(f, "LeftBrace"),
             Token::RightBrace => write!(f, "RightBrace"),
             Token::Number(d) => write!(f, "{:?}", d),
-            Token::Name(n) => write!(f, "Name({:?})", debug_utf8_lossy(n.as_ref())),
-            Token::String(s) => write!(f, "String({:?})", debug_utf8_lossy(s.as_ref())),
+            Token::Name(n) => write!(f, "Name({})", p8scii::Printable(n.as_ref())),
+            Token::String(s) => write!(f, "String(\"{:?}\")", p8scii::Printable(s.as_ref())),
         }
     }
 }
 
-fn print_char(c: u8) -> char {
-    char::from_u32(c as u32).unwrap_or(char::REPLACEMENT_CHARACTER)
-}
-
 #[derive(Debug, Error)]
 pub enum LexError {
-    #[error("short string not finished, expected matching {}", print_char(*.0))]
+    #[error("short string not finished, expected matching {}", p8scii::to_char(*.0))]
     UnfinishedShortString(u8),
-    #[error("unexpected character: {}", print_char(*.0))]
+    #[error("unexpected character: {}", p8scii::to_char(*.0))]
     UnexpectedCharacter(u8),
     #[error("hexadecimal digit expected")]
     HexDigitExpected,
@@ -311,10 +307,11 @@ impl fmt::Display for LineNumber {
     }
 }
 
+type LexerSource<'a> = PeekableNth<impl Iterator<Item = u8> + 'a, 4>;
+
 pub struct Lexer<'a, S> {
-    source: &'a [u8],
+    source: LexerSource<'a>,
     interner: S,
-    peek_count: usize,
     string_buffer: Vec<u8>,
     line_number: u64,
 }
@@ -323,16 +320,16 @@ impl<'a, S> Lexer<'a, S>
 where
     S: StringInterner,
 {
-    pub fn new(source: &'a [u8], interner: S) -> Lexer<'a, S> {
+    #[define_opaque(LexerSource)]
+    pub fn new(source: &[u8], interner: S) -> Lexer<'_, S> {
         Lexer {
-            source,
+            source: p8scii::from_utf8(source).lossy().peekable_nth(),
             interner,
-            peek_count: 0,
             string_buffer: Vec::new(),
             line_number: 0,
         }
     }
-
+    
     /// Current line number of the source file.
     pub fn line_number(&self) -> LineNumber {
         LineNumber(self.line_number)
@@ -340,9 +337,9 @@ where
 
     pub fn skip_whitespace(&mut self) -> Result<(), LexError> {
         let mut do_skip_whitespace = || {
-            while let Some(c) = self.peek(0)? {
+            while let Some(c) = self.peek(0) {
                 match c {
-                    b' ' | b'\t' | VERTICAL_TAB | FORM_FEED => {
+                    b' ' | b'\t' => {
                         self.advance(1);
                     }
 
@@ -351,25 +348,41 @@ where
                     }
 
                     b'-' => {
-                        if self.peek(1)? != Some(b'-') {
+                        if self.peek(1) != Some(b'-') {
                             break;
                         } else {
                             self.advance(2);
 
-                            match (self.peek(0)?, self.peek(1)?) {
+                            match (self.peek(0), self.peek(1)) {
                                 (Some(b'['), Some(b'=')) | (Some(b'['), Some(b'[')) => {
                                     // long comment
                                     self.read_long_string(false)?;
                                 }
                                 _ => {
                                     // Short comment, read until end of line
-                                    while let Some(c) = self.peek(0)? {
+                                    while let Some(c) = self.peek(0) {
                                         if is_newline(c) {
                                             break;
                                         } else {
                                             self.advance(1);
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    b'/' => {
+                        if self.peek(1) != Some(b'/') {
+                            break;
+                        } else {
+                            self.advance(2);
+                            
+                            while let Some(c) = self.peek(0) {
+                                if is_newline(c) {
+                                    break;
+                                } else {
+                                    self.advance(1);
                                 }
                             }
                         }
@@ -396,15 +409,15 @@ where
         self.skip_whitespace()?;
 
         let mut do_read_token = || {
-            if let Some(c) = self.peek(0)? {
+            if let Some(c) = self.peek(0) {
                 Ok(Some(match c {
-                    b' ' | b'\t' | VERTICAL_TAB | FORM_FEED | b'\n' | b'\r' => {
+                    b' ' | b'\t' | b'\n' | b'\r' => {
                         unreachable!("whitespace should have been skipped");
                     }
                     
                     b'+' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignAdd
                         } else {
@@ -413,7 +426,7 @@ where
                     }
 
                     b'-' => {
-                        let next = self.peek(1)?;
+                        let next = self.peek(1);
                         if next == Some(b'=') {
                             self.advance(2);
                             Token::AssignSub
@@ -427,7 +440,7 @@ where
                     
                     b'*' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignMul
                         } else {
@@ -436,7 +449,7 @@ where
                     }
                     
                     b'/' => {
-                        let next = self.peek(1)?;
+                        let next = self.peek(1);
                         if next == Some(b'=') {
                             self.advance(2);
                             Token::AssignDiv
@@ -450,7 +463,7 @@ where
                     
                     b'\\' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignIDiv
                         } else {
@@ -460,7 +473,7 @@ where
                     
                     b'%' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignMod
                         } else {
@@ -470,10 +483,10 @@ where
                     
                     b'^' => {
                         self.advance(1);
-                        let next = self.peek(0)?;
+                        let next = self.peek(0);
                         if next == Some(b'^') {
                             self.advance(1);
-                            if self.peek(0)? == Some(b'=') {
+                            if self.peek(0) == Some(b'=') {
                                 self.advance(1);
                                 Token::AssignBitXor
                             } else {
@@ -489,7 +502,7 @@ where
                     
                     b'&' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignBitAnd
                         } else {
@@ -499,7 +512,7 @@ where
                     
                     b'|' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::AssignBitOr
                         } else {
@@ -508,7 +521,7 @@ where
                     }
 
                     b'[' => {
-                        let next = self.peek(1)?;
+                        let next = self.peek(1);
                         if next == Some(b'=') || next == Some(b'[') {
                             self.read_long_string(true)?;
                             Token::String(self.take_string())
@@ -520,7 +533,7 @@ where
 
                     b'=' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::Equal
                         } else {
@@ -530,13 +543,13 @@ where
 
                     b'<' => {
                         self.advance(1);
-                        let next = self.peek(0)?;
+                        let next = self.peek(0);
                         if next == Some(b'<') {
                             self.advance(1);
-                            let next = self.peek(0)?;
+                            let next = self.peek(0);
                             if next == Some(b'>') {
                                 self.advance(1);
-                                if self.peek(0)? == Some(b'=') {
+                                if self.peek(0) == Some(b'=') {
                                     self.advance(1);
                                     Token::AssignRotateLeft
                                 } else {
@@ -558,13 +571,13 @@ where
 
                     b'>' => {
                         self.advance(1);
-                        let next = self.peek(0)?;
+                        let next = self.peek(0);
                         if next == Some(b'>') {
                             self.advance(1);
-                            let next = self.peek(0)?;
+                            let next = self.peek(0);
                             if next == Some(b'>') {
                                 self.advance(1);
-                                if self.peek(0)? == Some(b'=') {
+                                if self.peek(0) == Some(b'=') {
                                     self.advance(1);
                                     Token::AssignShiftRightLogical
                                 } else {
@@ -572,7 +585,7 @@ where
                                 }
                             } else if next == Some(b'<') {
                                 self.advance(1);
-                                if self.peek(0)? == Some(b'=') {
+                                if self.peek(0) == Some(b'=') {
                                     self.advance(1);
                                     Token::AssignRotateRight
                                 } else {
@@ -594,7 +607,7 @@ where
 
                     b'~' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::NotEqual
                         } else {
@@ -604,7 +617,7 @@ where
                     
                     b'!' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::NotEqual
                         } else {
@@ -614,7 +627,7 @@ where
 
                     b':' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b':') {
+                        if self.peek(0) == Some(b':') {
                             self.advance(1);
                             Token::DoubleColon
                         } else {
@@ -628,8 +641,8 @@ where
                     }
 
                     b'.' => {
-                        if self.peek(1)? == Some(b'.') {
-                            let next = self.peek(2)?;
+                        if self.peek(1) == Some(b'.') {
+                            let next = self.peek(2);
                             if next == Some(b'.') {
                                 self.advance(3);
                                 Token::Dots
@@ -640,7 +653,7 @@ where
                                 self.advance(2);
                                 Token::Concat
                             }
-                        } else if self.peek(1)?.map(is_digit).unwrap_or(false) {
+                        } else if self.peek(1).map(is_digit).unwrap_or(false) {
                             self.read_numeral()?
                         } else {
                             self.advance(1);
@@ -659,7 +672,7 @@ where
                             self.string_buffer.push(c);
                             self.advance(1);
 
-                            while let Some(c) = self.peek(0)? {
+                            while let Some(c) = self.peek(0) {
                                 if is_alpha(c) || is_digit(c) {
                                     self.string_buffer.push(c);
                                     self.advance(1);
@@ -668,8 +681,7 @@ where
                                 }
                             }
 
-                            if let Some(t) = get_reserved_word_token(self.string_buffer.as_slice())
-                            {
+                            if let Some(t) = get_reserved_word_token(self.string_buffer.as_slice()) {
                                 t
                             } else {
                                 Token::Name(self.take_string())
@@ -695,15 +707,14 @@ where
 
     // End of stream encountered, clear any input handles and temp buffers
     fn reset(&mut self) {
-        self.source = &[];
-        self.peek_count = 0;
+        // self.source = &[]; // Is this needed?
         self.string_buffer.clear();
     }
 
     // Read any of "\n", "\r", "\n\r", or "\r\n" as a single newline, and increment the current line
     // number. If `append_buffer` is true, then appends the read newline to the string buffer.
     fn read_line_end(&mut self, append_string: bool) -> Result<(), LexError> {
-        let newline = self.peek(0).unwrap().unwrap();
+        let newline = self.peek(0).unwrap();
         assert!(is_newline(newline));
         self.advance(1);
         // We always append a single plain `\n` character for any newline characters, matching the
@@ -712,7 +723,7 @@ where
             self.string_buffer.push(b'\n');
         }
 
-        if let Some(next_newline) = self.peek(0)? {
+        if let Some(next_newline) = self.peek(0) {
             if is_newline(next_newline) && next_newline != newline {
                 self.advance(1);
             }
@@ -725,65 +736,51 @@ where
     // Read a string on a single line delimited by ' or " that allows for \ escaping of certain
     // characters. Always reads the contained string into the string buffer.
     fn read_short_string(&mut self) -> Result<(), LexError> {
-        let start_quote = self.peek(0).unwrap().unwrap();
+        let start_quote = self.peek(0).unwrap();
         assert!(start_quote == b'\'' || start_quote == b'"');
         self.advance(1);
         
         self.string_buffer.clear();
         
-        let mut pos = 0;
         loop {
-            let c = self.peek(pos)?
-                .ok_or(LexError::UnfinishedShortString(start_quote))?;
+            let c = self.peek(0).ok_or(LexError::UnfinishedShortString(start_quote))?;
 
             if is_newline(c) {
                 return Err(LexError::UnfinishedShortString(start_quote));
             }
 
             if c == start_quote {
-                self.read_escaped_string(pos)?;
                 self.advance(1);
                 break;
-            } else if c == b'\\' {
-                let next = self
-                    .peek(pos + 1)?
-                    .ok_or(LexError::UnfinishedShortString(start_quote))?;
-                
-                if is_newline(next) {
-                    self.read_escaped_string(pos)?;
-                    self.advance(1);
-                    pos = 0;
-                    self.read_line_end(true)?;
-                } else {
-                    pos += 2;
-                }
             } else {
-                pos += 1;
+                self.string_buffer.push(c);
+                self.advance(1);
+                
+                if c == b'\\' {
+                    let next = self.peek(0).ok_or(LexError::UnfinishedShortString(start_quote))?;
+                    if is_newline(next) {
+                        self.read_line_end(true)?;
+                    } else {
+                        self.string_buffer.push(next);
+                        self.advance(1);
+                    }
+                }
             }
+        }
+        
+        match p8scii::unescape_in_place(&mut self.string_buffer) {
+            Ok(len) => self.string_buffer.truncate(len),
+            Err(p8scii::UnescapeError::InvalidEscapeSeq(..)) => return Err(LexError::InvalidEscape),
+            Err(p8scii::UnescapeError::DecimalTooLarge(..)) => return Err(LexError::EscapeDecimalTooLarge),
         }
 
-        Ok(())
-    }
-    
-    // Reads count number of bytes, encodes as p8scii, unescapes and writes into the string buffer.
-    fn read_escaped_string(&mut self, count: usize) -> Result<(), LexError> {
-        let chars = p8scii::unescape(p8scii::from_utf8(&self.source[0..count]).lossy());
-        for c in chars {
-            match c {
-                Ok(char) => self.string_buffer.push(char),
-                Err(p8scii::UnescapeError::InvalidEscapeSeq(..)) => return Err(LexError::InvalidEscape),
-                Err(p8scii::UnescapeError::DecimalTooLarge(..)) => return Err(LexError::EscapeDecimalTooLarge),
-            }
-        }
-        self.advance(count);
-        
         Ok(())
     }
 
     // Read a [=*[...]=*] sequence with matching numbers of '='. If `into_string` is true, writes
     // the contained string into the string buffer.
     fn read_long_string(&mut self, into_string: bool) -> Result<(), LexError> {
-        assert_eq!(self.peek(0).unwrap().unwrap(), b'[');
+        assert_eq!(self.peek(0).unwrap(), b'[');
         self.advance(1);
 
         if into_string {
@@ -791,17 +788,17 @@ where
         }
 
         let mut open_sep_length = 0;
-        while self.peek(0)? == Some(b'=') {
+        while self.peek(0) == Some(b'=') {
             self.advance(1);
             open_sep_length += 1;
         }
 
-        if self.peek(0)? != Some(b'[') {
+        if self.peek(0) != Some(b'[') {
             return Err(LexError::InvalidLongStringDelimiter);
         }
         self.advance(1);
 
-        if matches!(self.peek(0)?, Some(b'\n' | b'\r')) {
+        if matches!(self.peek(0), Some(b'\n' | b'\r')) {
             // If the long string starts imediately with a newline, we read it and do *not* put it
             // into the string buffer, matching the behavior of PUC-Rio Lua. (and PICO-8 too!)
             self.read_line_end(false)?;
@@ -811,43 +808,42 @@ where
             self.string_buffer.clear();
         }
         
-        let mut pos = 0;
-        let mut close_sep_length = None;
-
         loop {
-            let c = self.peek(pos)?
-                .ok_or(LexError::UnfinishedLongString)?;
-
+            let c = self.peek(0).ok_or(LexError::UnfinishedLongString)?;
+            
             match c {
                 b'\n' | b'\r' => {
-                    if into_string {
-                        self.string_buffer.extend(p8scii::from_utf8(&self.source[0..pos]).lossy());
-                    }
-                    self.advance(pos);
-                    pos = 0;
-                    close_sep_length = None;
                     self.read_line_end(into_string)?;
                 }
-
+                
                 b']' => {
-                    if close_sep_length == Some(open_sep_length) {
-                        self.string_buffer.extend(p8scii::from_utf8(&self.source[0..pos-open_sep_length-1]).lossy());
-                        self.advance(pos + 1);
-                        break;
+                    let mut close_sep_length = 0;
+                    self.advance(1);
+                    while self.peek(0) == Some(b'=') {
+                        self.advance(1);
+                        close_sep_length += 1;
                     }
                     
-                    close_sep_length = Some(0);
-                    pos += 1;
+                    if open_sep_length == close_sep_length && self.peek(0) == Some(b']') {
+                        self.advance(1);
+                        break;
+                    } else {
+                        // If it turns out this is not a valid long string close delimiter, we need
+                        // to add the invalid close delimiter to the string.
+                        if into_string {
+                            self.string_buffer.push(b']');
+                            for _ in 0..close_sep_length {
+                                self.string_buffer.push(b'=');
+                            }
+                        }
+                    }
                 }
                 
-                b'=' => {
-                    close_sep_length = close_sep_length.map(|i| i + 1);
-                    pos += 1;
-                }
-
-                _ => {
-                    close_sep_length = None;
-                    pos += 1;
+                c => {
+                    if into_string {
+                        self.string_buffer.push(c);
+                    }
+                    self.advance(1);
                 }
             }
         }
@@ -858,12 +854,12 @@ where
     // Reads a binary, hex or decimal integer or floating point identifier. Allows decimal numbers (123.456),
     // hex numbers (0xdead.beef) and binary numbers (0b11110.10110)
     fn read_numeral(&mut self) -> Result<Token<S::String>, LexError> {
-        let p1 = self.peek(0).unwrap().unwrap();
+        let p1 = self.peek(0).unwrap();
         assert!(p1 == b'.' || is_digit(p1));
         
         self.string_buffer.clear();
         
-        let p2 = self.peek(1)?;
+        let p2 = self.peek(1);
         let is_hex = p1 == b'0' && (p2 == Some(b'x') || p2 == Some(b'X'));
         let is_bin = p1 == b'0' && (p2 == Some(b'b') || p2 == Some(b'B'));
         if is_hex || is_bin {
@@ -871,7 +867,7 @@ where
         }
         
         let mut has_radix = false;
-        while let Some(c) = self.peek(0)? {
+        while let Some(c) = self.peek(0) {
             if c == b'.' && !has_radix {
                 self.string_buffer.push(b'.');
                 has_radix = true;
@@ -896,18 +892,18 @@ where
         ))
     }
 
-    fn peek(&mut self, n: usize) -> Result<Option<u8>, LexError> {
-	    self.peek_count = (n + 1).max(self.peek_count).min(self.source.len());
-	    Ok(self.source.get(n).copied())
+    fn peek(&mut self, n: usize) -> Option<u8> {
+        self.source.peek_nth(n).copied()
     }
 
     fn advance(&mut self, n: usize) {
         assert!(
-            n <= self.peek_count,
+            n <= self.source.peek_len(),
             "cannot advance over un-peeked characters"
         );
-        self.peek_count -= n;
-        self.source = &self.source[n..];
+        for _ in 0..n {
+            self.source.next();
+        }
     }
 
     fn take_string(&mut self) -> S::String {
@@ -1104,7 +1100,6 @@ end"
             r#"
                 break do else elseif end function goto if in local nil for while repeat until return
                 then true false not and or
-                custom names
             "#,
             &[
                 Token::Break,
@@ -1129,8 +1124,25 @@ end"
                 Token::Not,
                 Token::And,
                 Token::Or,
+            ],
+        );
+    }
+
+    #[test]
+    fn names() {
+        test_tokens(
+            r#"
+                custom names
+                にほんこ゛
+                ⬅️⬇️⬆️➡️
+                █▒🐱😐
+            "#,
+            &[
                 name_token("custom"),
                 name_token("names"),
+                name_token("にほんこ゛"),
+                name_token("⬅️⬇️⬆️➡️"),
+                name_token("█▒🐱😐"),
             ],
         );
     }

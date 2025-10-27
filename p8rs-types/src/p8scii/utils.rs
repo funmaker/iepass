@@ -1,3 +1,4 @@
+use core::fmt::{Debug, Display, Formatter};
 use arrayvec::ArrayVec;
 use crate::p8scii::encoder::FromUtf8Error;
 
@@ -21,6 +22,30 @@ where T: Iterator<Item = Result<u8, E>>,
 				},
 			}
 		})
+	}
+}
+
+pub struct Printable<'s>(pub &'s [u8]);
+
+impl Debug for Printable<'_> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		let chars = super::escape(self.0.iter().copied()).map(super::to_char);
+		for ch in chars {
+			write!(f, "{}", ch)?;
+		}
+		
+		Ok(())
+	}
+}
+
+impl Display for Printable<'_> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		let chars = self.0.iter().copied().map(super::to_char);
+		for ch in chars {
+			write!(f, "{}", ch)?;
+		}
+		
+		Ok(())
 	}
 }
 
