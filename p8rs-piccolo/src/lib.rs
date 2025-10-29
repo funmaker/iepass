@@ -5,6 +5,7 @@ extern crate alloc;
 
 #[cfg(feature = "std")]
 extern crate std;
+extern crate core;
 
 pub mod any;
 pub mod async_callback;
@@ -31,6 +32,7 @@ pub mod types;
 pub mod userdata;
 pub mod value;
 pub mod peek_nth;
+pub mod runtime;
 
 #[cfg(feature = "std")]
 pub mod io;
@@ -57,4 +59,5 @@ pub use self::{
     thread::{Execution, Executor, ExecutorMode, Thread, ThreadMode},
     userdata::UserData,
     value::Value,
+    runtime::{Runtime, RuntimeRef},
 };

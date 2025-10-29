@@ -8,25 +8,25 @@ fn function_compose_bind() -> Result<(), ExternError> {
         let composed_functions = Function::compose(
             &ctx,
             [
-                Callback::from_fn(&ctx, |ctx, _, mut stack| {
+                Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                     let i: Variadic<Vec<i16>> = stack.consume(ctx)?;
                     stack.replace(ctx, i.into_iter().sum::<i16>());
                     Ok(CallbackReturn::Return)
                 })
                 .into(),
-                Callback::from_fn(&ctx, |ctx, _, mut stack| {
+                Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                     let i: i16 = stack.consume(ctx)?;
                     stack.replace(ctx, i * 2);
                     Ok(CallbackReturn::Return)
                 })
                 .into(),
-                Callback::from_fn(&ctx, |ctx, _, mut stack| {
+                Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                     let i: i16 = stack.consume(ctx)?;
                     stack.replace(ctx, i + 1);
                     Ok(CallbackReturn::Return)
                 })
                 .into(),
-                Callback::from_fn(&ctx, |ctx, _, mut stack| {
+                Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                     let i: i16 = stack.consume(ctx)?;
                     stack.replace(ctx, i * 3);
                     Ok(CallbackReturn::Return)
@@ -39,6 +39,6 @@ fn function_compose_bind() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, composed_functions, 1_i16)))
     })?;
 
-    assert_eq!(lua.execute::<i16>(&executor)?, 33);
+    assert_eq!(lua.execute::<i16>(&executor, &mut ())?, 33);
     Ok(())
 }

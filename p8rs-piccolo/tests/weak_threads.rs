@@ -25,7 +25,7 @@ fn weak_threads_close() -> Result<(), ExternError> {
 
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
-    lua.execute::<()>(&executor)?;
+    lua.execute::<()>(&executor, &mut ())?;
 
     for i in 1..4 {
         lua.gc_collect();
@@ -33,7 +33,7 @@ fn weak_threads_close() -> Result<(), ExternError> {
             let closure = Closure::load(ctx, None, format!("assert(closure() == {i})").as_bytes())?;
             Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
         })?;
-        lua.execute::<()>(&executor)?;
+        lua.execute::<()>(&executor, &mut ())?;
     }
 
     Ok(())
@@ -68,7 +68,7 @@ fn live_upvalues_not_dead() -> Result<(), ExternError> {
 
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
-    lua.execute::<()>(&executor)?;
+    lua.execute::<()>(&executor, &mut ())?;
 
     for i in 1..4 {
         lua.gc_collect();
@@ -76,7 +76,7 @@ fn live_upvalues_not_dead() -> Result<(), ExternError> {
             let closure = Closure::load(ctx, None, format!("assert(go() == {i})").as_bytes())?;
             Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
         })?;
-        lua.execute::<()>(&executor)?;
+        lua.execute::<()>(&executor, &mut ())?;
     }
 
     Ok(())

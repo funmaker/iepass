@@ -5,9 +5,9 @@ use clap::{crate_description, crate_name, crate_version, Arg, ArgAction, Command
 use rustyline::DefaultEditor;
 
 use p8rs_piccolo::{
-    compiler::{ParseError, ParseErrorKind},
-    io, meta_ops, Callback, CallbackReturn, Closure, Executor, ExternError, Function, Lua,
-    StashedExecutor,
+	compiler::{ParseError, ParseErrorKind},
+	io, meta_ops, Callback, CallbackReturn, Closure, Executor, ExternError, Function, Lua,
+	StashedExecutor,
 };
 
 fn run_code(lua: &mut Lua, executor: &StashedExecutor, code: &str) -> Result<(), ExternError> {
@@ -20,7 +20,7 @@ fn run_code(lua: &mut Lua, executor: &StashedExecutor, code: &str) -> Result<(),
             &ctx,
             [
                 closure.into(),
-                Callback::from_fn(&ctx, |ctx, _, stack| {
+                Callback::from_fn(&ctx, |ctx, _, stack, _| {
                     Ok(if stack.is_empty() {
                         CallbackReturn::Return
                     } else {
@@ -37,7 +37,7 @@ fn run_code(lua: &mut Lua, executor: &StashedExecutor, code: &str) -> Result<(),
         Ok(())
     })?;
 
-    lua.execute::<()>(executor)
+    lua.execute::<()>(executor, &mut ())
 }
 
 fn run_repl(lua: &mut Lua) -> Result<(), Box<dyn StdError>> {
@@ -117,7 +117,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.execute::<()>(&executor)?;
+    lua.execute::<()>(&executor, &mut ())?;
 
     if matches.get_flag("repl") {
         run_repl(&mut lua)?;

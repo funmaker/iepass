@@ -8,7 +8,7 @@ fn async_sequence_works() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |ctx, _, _| {
+        let callback = Callback::from_fn(&ctx, |ctx, _, _, _| {
             let seq = async_sequence(&ctx, |_, mut seq| async move {
                 let (table, length) = seq.try_enter(|ctx, locals, _, mut stack| {
                     let table: Table = stack.consume(ctx)?;
@@ -51,7 +51,7 @@ fn async_sequence_works() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    let v = lua.execute::<Variadic<Vec<i64>>>(&executor)?;
+    let v = lua.execute::<Variadic<Vec<i64>>>(&executor, &mut ())?;
 
     assert_eq!(&v.0, &[6, 7, 4, 5, 1, 2, 3]);
 

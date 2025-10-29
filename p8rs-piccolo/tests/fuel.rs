@@ -5,7 +5,7 @@ fn test_interrupt() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |_, mut exec, _| {
+        let callback = Callback::from_fn(&ctx, |_, mut exec, _, _| {
             exec.fuel().interrupt();
             Ok(CallbackReturn::Return)
         });
@@ -21,7 +21,7 @@ fn test_interrupt() -> Result<(), ExternError> {
     lua.enter(|ctx| {
         let executor = ctx.fetch(&executor);
         let mut fuel = Fuel::with(i32::MAX);
-        assert!(!executor.step(ctx, &mut fuel).unwrap());
+        assert!(!executor.step(ctx, &mut fuel, &mut ()).unwrap());
         assert!(fuel.is_interrupted());
         assert!(executor.mode() == ExecutorMode::Normal)
     });

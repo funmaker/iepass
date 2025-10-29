@@ -20,7 +20,7 @@ fn error_unwind() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.finish(&executor).unwrap();
+    lua.finish(&executor, &mut ()).unwrap();
     lua.try_enter(|ctx| {
         match ctx.fetch(&executor).take_result::<()>(ctx)? {
             Err(Error::Lua(LuaError(Value::String(s)))) => assert!(s == "test error"),
@@ -39,7 +39,7 @@ fn error_tostring() -> Result<(), ExternError> {
     struct TestError;
 
     let executor = lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |_, _, _| Err(TestError.into()));
+        let callback = Callback::from_fn(&ctx, |_, _, _, _| Err(TestError.into()));
         ctx.set_global("callback", callback);
 
         let closure = Closure::load(
@@ -55,5 +55,5 @@ fn error_tostring() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.execute(&executor)
+    lua.execute(&executor, &mut ())
 }

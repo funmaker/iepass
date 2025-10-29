@@ -4,12 +4,7 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, lock::RefLock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{
-    compiler::{FunctionRef, LineNumber},
-    thread::BadThreadMode,
-    CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, SequencePoll,
-    Stack, String, Thread, ThreadMode, Variadic,
-};
+use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
 
 use super::{
     thread::{Frame, LuaFrame, ThreadState},
@@ -183,7 +178,7 @@ impl<'gc> Executor<'gc> {
     /// This is considered "outside" of a normal Lua or Rust callback error since it cannot be
     /// triggered solely by Lua and likely indicates a bug in some Rust code, so this error is
     /// delivered through a separate channel than normal results and cannot be caught by Lua.
-    pub fn step(self, ctx: Context<'gc>, fuel: &mut Fuel) -> Result<bool, BadThreadMode> {
+    pub fn step<'rt>(self, ctx: Context<'gc>, fuel: &mut Fuel, rt: RuntimeRef) -> Result<bool, BadThreadMode> {
         let mut state = self.0.borrow_mut(&ctx);
         Ok(loop {
             let mut top_thread = state.thread_stack.last().copied().unwrap();
@@ -299,6 +294,7 @@ impl<'gc> Executor<'gc> {
                                 upper_frames: &top_state.frames,
                             },
                             Stack::new(&mut top_state.stack, bottom),
+                            rt,
                         ) {
                             Ok(CallbackReturn::Return) => {
                                 top_state.return_to(bottom);

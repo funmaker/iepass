@@ -9,8 +9,8 @@ use crate::pico8::api::base::printh;
 pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: EnvHandle<A>, ctx: Context) {
 	set_global_callback_env("_set_fps", ctx, env.clone(), _set_fps);
 	
-	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
-	ctx.set_global("stop", Callback::from_fn(&ctx, move |ctx, mut exec: Execution, mut stack| {
+	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
+	ctx.set_global("stop", Callback::from_fn(&ctx, move |ctx, mut exec: Execution, mut stack, _| {
 		let (message, _x, _y, _col): (Option<String>, Option<u16>, Option<u16>, Option<u8>) = stack.consume(ctx)
 		                .map_err(|err| format!("[stop]: {err}").into_value(ctx))?;
 		

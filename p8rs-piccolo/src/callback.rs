@@ -7,7 +7,7 @@ use core::{
 use allocator_api2::boxed;
 use gc_arena::{allocator_api::MetricsAlloc, Collect, Gc, Mutation};
 
-use crate::{Context, Error, Execution, Function, Stack, Thread};
+use crate::{Context, Error, Execution, Function, RuntimeRef, Stack, Thread};
 
 /// Describes the next action for an [`Executor`](crate::Executor) to take after a callback has
 /// returned.
@@ -76,6 +76,7 @@ pub trait CallbackFn<'gc>: Collect {
         ctx: Context<'gc>,
         exec: Execution<'gc, '_>,
         stack: Stack<'gc, '_>,
+        rt: RuntimeRef<'_>,
     ) -> Result<CallbackReturn<'gc>, Error<'gc>>;
 }
 
@@ -91,6 +92,7 @@ pub struct CallbackInner<'gc> {
         Context<'gc>,
         Execution<'gc, '_>,
         Stack<'gc, '_>,
+        RuntimeRef<'_>,
     ) -> Result<CallbackReturn<'gc>, Error<'gc>>,
 }
 
@@ -121,9 +123,9 @@ impl<'gc> Callback<'gc> {
             mc,
             HeaderCallback {
                 header: CallbackInner {
-                    call: |ptr, ctx, exec, stack| unsafe {
+                    call: |ptr, ctx, exec, stack, rt| unsafe {
                         let hc = ptr as *const HeaderCallback<C>;
-                        ((*hc).callback).call(ctx, exec, stack)
+                        ((*hc).callback).call(ctx, exec, stack, rt)
                     },
                 },
                 callback,
@@ -144,9 +146,10 @@ impl<'gc> Callback<'gc> {
                 Context<'gc>,
                 Execution<'gc, '_>,
                 Stack<'gc, '_>,
+                RuntimeRef<'_>,
             ) -> Result<CallbackReturn<'gc>, Error<'gc>>,
     {
-        Self::from_fn_with(mc, (), move |_, ctx, exec, stack| call(ctx, exec, stack))
+        Self::from_fn_with(mc, (), move |_, ctx, exec, stack, rt| call(ctx, exec, stack, rt))
     }
 
     /// Create a callback from a Rust function together with a GC object.
@@ -159,6 +162,7 @@ impl<'gc> Callback<'gc> {
                 Context<'gc>,
                 Execution<'gc, '_>,
                 Stack<'gc, '_>,
+                RuntimeRef<'_>,
             ) -> Result<CallbackReturn<'gc>, Error<'gc>>,
     {
         #[derive(Collect)]
@@ -178,6 +182,7 @@ impl<'gc> Callback<'gc> {
                     Context<'gc>,
                     Execution<'gc, '_>,
                     Stack<'gc, '_>,
+                    RuntimeRef<'_>,
                 ) -> Result<CallbackReturn<'gc>, Error<'gc>>,
         {
             fn call(
@@ -185,8 +190,9 @@ impl<'gc> Callback<'gc> {
                 ctx: Context<'gc>,
                 exec: Execution<'gc, '_>,
                 stack: Stack<'gc, '_>,
+                rt: RuntimeRef<'_>,
             ) -> Result<CallbackReturn<'gc>, Error<'gc>> {
-                (self.call)(&self.root, ctx, exec, stack)
+                (self.call)(&self.root, ctx, exec, stack, rt)
             }
         }
 
@@ -206,8 +212,9 @@ impl<'gc> Callback<'gc> {
         ctx: Context<'gc>,
         exec: Execution<'gc, '_>,
         stack: Stack<'gc, '_>,
+        rt: RuntimeRef<'_>,
     ) -> Result<CallbackReturn<'gc>, Error<'gc>> {
-        unsafe { (self.0.call)(Gc::as_ptr(self.0), ctx, exec, stack) }
+        unsafe { (self.0.call)(Gc::as_ptr(self.0), ctx, exec, stack, rt) }
     }
 }
 

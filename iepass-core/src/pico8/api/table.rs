@@ -2,7 +2,7 @@ use p8rs_piccolo::{Callback, CallbackReturn, Context, Table};
 
 pub fn install_pico8_table(ctx: Context) {
 	
-	ctx.set_global("pack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+	ctx.set_global("pack", Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
 		let t = Table::new(&ctx);
 		for i in 0..stack.len() {
 			t.set(ctx, (i as i16).wrapping_add(1), stack[i]).unwrap();
@@ -12,7 +12,7 @@ pub fn install_pico8_table(ctx: Context) {
 		Ok(CallbackReturn::Return)
 	}));
 	
-	ctx.set_global("unpack", Callback::from_fn(&ctx, |ctx, _, mut stack| {
+	ctx.set_global("unpack", Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
 		let (table, start, end): (Table, Option<i16>, Option<i16>) =
 			stack.consume(ctx)?;
 		let start = start.unwrap_or(1);
