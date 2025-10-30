@@ -42,14 +42,14 @@ where F: Fn(Context<'gc>, A) -> Result<R, RuntimeError> + 'static,
 	ctx.set_global(name, callback);
 }
 
-pub fn set_global_callback_ctx_env<'gc, F, A, R, Al>(name: &'static str, ctx: Context<'gc>, env: EnvHandle<Al>, f: F)
-where F: Fn(Context<'gc>, EnvHandle<Al>, A) -> Result<R, RuntimeError> + 'static,
-      A: FromMultiValue<'gc>,
-      R: IntoMultiValue<'gc>,
-      Al: Allocator + Clone + 'static
-{
-	set_global_callback_ctx(name, ctx, move |ctx, args| { f(ctx, env.clone(), args) });
-}
+// pub fn set_global_callback_ctx_env<'gc, F, A, R, Al>(name: &'static str, ctx: Context<'gc>, env: EnvHandle<Al>, f: F)
+// where F: Fn(Context<'gc>, EnvHandle<Al>, A) -> Result<R, RuntimeError> + 'static,
+//       A: FromMultiValue<'gc>,
+//       R: IntoMultiValue<'gc>,
+//       Al: Allocator + Clone + 'static
+// {
+// 	set_global_callback_ctx(name, ctx, move |ctx, args| { f(ctx, env.clone(), args) });
+// }
 
 pub fn set_global_callback_env<'gc, F, A, R, Al>(name: &'static str, ctx: Context<'gc>, env: EnvHandle<Al>, f: F)
 where F: Fn(EnvHandle<Al>, A) -> Result<R, RuntimeError> + 'static,

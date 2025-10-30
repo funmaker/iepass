@@ -117,7 +117,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 								ExecutorMode::Suspended => {
 									executor.resume(ctx, ()).unwrap();
 								},
-								ExecutorMode::Stopped => info!("Execution stopped. {:?}", format!("{:?}", value)),
+								ExecutorMode::Stopped => info!("Execution stopped. {}", format!("{:?}", value)),
 								mode => panic!("Unexpected executor mode: {}", format!("{:?}", mode)),
 							}
 							

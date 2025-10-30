@@ -47,6 +47,7 @@ impl EmulatorApp {
 		
 		let mut pico8 = Pico8VM::new().unwrap();
 		
+		// let load_result = pico8.load_cartridge(include_bytes!(r"C:\Users\sebi\AppData\Roaming\pico-8\carts\hello.p8"));
 		let load_result = pico8.load_cartridge(include_bytes!("../../lua/hello.p8"));
 		// pico8.load(include_bytes!("../../lua/hello.lua"));
 		

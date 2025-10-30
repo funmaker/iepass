@@ -3319,6 +3319,7 @@ name = "p8rs-types"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "bitflags 2.9.4",
  "defmt 1.0.1",
  "gc-arena",
  "thiserror 2.0.17",

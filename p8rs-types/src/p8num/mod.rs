@@ -4,6 +4,7 @@ use core::fmt::{Debug, Display, Formatter};
 use core::num::FpCategory;
 use core::ops::{Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
 use arrayvec::{ArrayVec, ArrayString};
+use bitflags::bitflags;
 
 pub mod consts;
 mod from_ascii;
@@ -217,29 +218,70 @@ impl P8Num {
 	/// assert_eq!(P8Num::MAX.to_ascii().as_ref().as_str(), "32768");
 	/// ```
 	pub fn to_ascii(&self) -> impl AsRef<[core::ascii::Char]> {
+		self.to_ascii_fmt(P8NumStringConversionFlags::empty())
+	}
+	
+	/// Formats `self` into an ASCII-byte slice.
+	///
+	/// See also [Self::to_ascii] and [P8NumStringConversionFlags].
+	///
+	/// # Examples
+	///
+	/// ```
+	/// #![feature(ascii_char)]
+	/// use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+	///
+	/// assert_eq!(P8Num::new(0.0).to_ascii_fmt(P8NumStringConversionFlags::HEX).as_ref().as_str(), "0x0000.0000");
+	/// assert_eq!(P8Num::new(0.125).to_ascii_fmt(P8NumStringConversionFlags::I32).as_ref().as_str(), "8192");
+	/// assert_eq!(P8Num::new(-0.5).to_ascii_fmt(P8NumStringConversionFlags::HEX).as_ref().as_str(), "0xffff.8000");
+	/// assert_eq!(P8Num::new(1.0).to_ascii_fmt(P8NumStringConversionFlags::HEX.union(P8NumStringConversionFlags::I32)).as_ref().as_str(), "0x00010000");
+	/// assert_eq!(P8Num::EPSILON.to_ascii_fmt(P8NumStringConversionFlags::HEX).as_ref().as_str(), "0x0000.0001");
+	/// assert_eq!((-P8Num::EPSILON).to_ascii_fmt(P8NumStringConversionFlags::HEX).as_ref().as_str(), "0xffff.ffff");
+	/// assert_eq!(P8Num::MAX.to_ascii_fmt(P8NumStringConversionFlags::HEX).as_ref().as_str(), "0x7fff.ffff");
+	/// ```
+	pub fn to_ascii_fmt(&self, format_flags: P8NumStringConversionFlags) -> impl AsRef<[core::ascii::Char]> {
 		use core::ascii::Char;
 		use core::fmt::Write;
 		
+		let is_hex = format_flags.contains(P8NumStringConversionFlags::HEX);
+		let is_i32 = format_flags.contains(P8NumStringConversionFlags::I32);
+		
 		let mut value = *self;
-		if !(P8Num::from_raw(0x0000_0007) ..= P8Num::from_raw(0x0000_FFF9)).contains(&value.fract()) {
+		if !is_hex && !is_i32 && !(P8Num::from_raw(0x0000_0007) ..= P8Num::from_raw(0x0000_FFF9)).contains(&value.fract()) {
 			value = value.round();
 		}
 		
-		let mut string = ArrayString::<11>::new_const();
-		if self.is_negative() {
+		let mut string = ArrayString::<16>::new_const();
+		if self.is_negative() && !is_hex {
 			write!(&mut string, "-").unwrap();
 		}
-		write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap();
-		
-		let mut buffer = ArrayVec::<_, 11>::new_const();
-		buffer.extend(string.as_ascii().unwrap().iter().copied());
-		
-		while let Some(Char::Digit0) = buffer.last() {
-			buffer.pop();
+		if is_i32 {
+			if is_hex {
+				write!(&mut string, "0x{:08x}", value.to_raw()).unwrap();
+			}else{
+				write!(&mut string, "{}", value.to_raw()).unwrap();
+			}
+		}else{
+			if is_hex {
+				// write!(&mut string, "0x{:04x}.{:04x}", value.to_integer(), value.to_raw() & 0xFFFF).unwrap();
+				write!(&mut string, "0x{:04x}", value.to_integer()).unwrap();
+				write!(&mut string, ".{:04x}", value.to_raw() & 0xFFFF).unwrap();
+			}else{
+				write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap();
+			}
 		}
 		
-		if let Some(Char::FullStop) = buffer.last() {
-			buffer.pop();
+		let mut buffer = ArrayVec::<_, 16>::new_const();
+		buffer.extend(string.as_ascii().unwrap().iter().copied());
+		
+		if !is_hex && !is_i32 {
+			while let Some(Char::Digit0) = buffer.last() {
+				buffer.pop();
+			}
+			
+			if let Some(Char::FullStop) = buffer.last() {
+				buffer.pop();
+			}
 		}
 		
 		buffer
@@ -249,6 +291,13 @@ impl P8Num {
 	/// 
 	/// See [Self::to_ascii] for more info.
 	pub fn to_str(&self) -> impl AsRef<str> {
+		self.to_str_fmt(P8NumStringConversionFlags::empty())
+	}
+	
+	/// Formats `self` into a &str with specified format flags.
+	///
+	/// See [Self::to_ascii_fmt] and [P8NumStringConversionFlags] for more info.
+	pub fn to_str_fmt(&self, format_flags: P8NumStringConversionFlags) -> impl AsRef<str> {
 		use core::ascii::Char;
 		
 		struct CharToStr<T: AsRef<[Char]>>(T);
@@ -258,7 +307,7 @@ impl P8Num {
 			}
 		}
 		
-		CharToStr(self.to_ascii())
+		CharToStr(self.to_ascii_fmt(format_flags))
 	}
 	
 	/// Constructs new value from raw i32 value.
@@ -2350,6 +2399,16 @@ pub enum TryFromError {
 pub enum FromAsciiError {
 	/// The string contains an unexpected character
 	UnexpectedChar(u8),
+}
+
+bitflags! {
+    pub struct P8NumStringConversionFlags: u8 {
+		/// Forces 0-padded hex format like 0x0012.3456 or 0x00123456
+        const HEX = 1 << 0;
+		
+		/// Shift the value left 16 bits to create a 32-bit signed integer.
+        const I32 = 1 << 1;
+    }
 }
 
 macro_rules! impl_int_conv {
