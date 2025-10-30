@@ -15,7 +15,3 @@ where T: IntoIterator<Item = I>,
 		self.into_iter().map(|b| *b.borrow())
 	}
 }
-
-
-
-

@@ -32,7 +32,7 @@ mod collected_print {
     pub fn print_callback<'gc>(ctx: p8rs_piccolo::Context<'gc>, tx: Sender<Vec<u8>>) -> Callback<'gc> {
         Callback::from_fn(
             &ctx,
-            move |ctx: Context<'_>, _: Execution<'_, '_>, mut stack: Stack<'_, '_>| {
+            move |ctx: Context<'_>, _: Execution<'_, '_>, mut stack: Stack<'_, '_>, _| {
                 stack[..].reverse();
 
                 Ok(CallbackReturn::Sequence(BoxSequence::new(
@@ -185,7 +185,7 @@ fn test_goldenscripts() {
                 let closure = ctx.fetch(&closure);
                 Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
             })
-            .and_then(|executor| lua.execute::<()>(&executor))
+            .and_then(|executor| lua.execute::<()>(&executor, &mut ()))
         });
         let run_error = run_result.map(|r| r.err()).flatten();
 

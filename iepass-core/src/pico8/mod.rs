@@ -16,8 +16,8 @@ mod numeric;
 mod api;
 
 use crate::pico8::api::{install_pico8_apis, EnvHandle};
-use env::Env;
 use crate::pico8::cart::CartridgeParseError;
+use env::Env;
 
 const ENABLE_STEP_DEBUG: bool = false;
 
@@ -55,8 +55,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	
 	pub fn load(&mut self, source: &[u8]) {
 		let ex = self.lua.try_enter(|ctx| {
-			let env = ctx.globals();
-			let closure = Closure::load_with_env(ctx, None, source, env)?;
+			let closure = Closure::load(ctx, None, source)?;
 			let ex = Executor::start(ctx, closure.into(), ());
 			
 			Ok(ctx.stash(ex))
@@ -88,7 +87,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 				let executor = ctx.fetch(executor);
 				
 				loop {
-					if !executor.step(ctx, &mut fuel).unwrap() {
+					if !executor.step(ctx, &mut fuel, &mut ()).unwrap() {
 						if fuel.is_interrupted() {
 							if ENABLE_STEP_DEBUG { debug!("[step] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode()); }
 						}else {
@@ -212,7 +211,7 @@ mod test {
 		}).unwrap();
 		
 		error!("Test!"); // todo: show test output
-		vm.lua.finish(&ex).unwrap();
+		vm.lua.finish(&ex, &mut ()).unwrap();
 		
 		let res = vm.lua.try_enter(|ctx| {
 			let exec = ctx.fetch(&ex);

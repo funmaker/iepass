@@ -1,13 +1,13 @@
 use alloc::vec::Vec;
-use core::{char, fmt};
-
+use core::fmt;
 use gc_arena::Collect;
 use thiserror::Error;
 use p8rs_types::p8num::P8Num;
-use crate::compiler::string_utils::{from_digit, from_hex_digit, is_bin_digit, is_hex_digit, is_space, ALERT_BEEP, BACKSPACE};
-
+use p8rs_types::p8scii::{self, LossyIteratorEx};
+use crate::compiler::string_utils::{is_bin_digit, is_hex_digit};
+use crate::peek_nth::{IteratorExt, PeekableNth};
 use super::{
-    string_utils::{debug_utf8_lossy, is_alpha, is_digit, is_newline, FORM_FEED, VERTICAL_TAB},
+    string_utils::{is_alpha, is_digit, is_newline},
     StringInterner,
 };
 
@@ -41,16 +41,38 @@ pub enum Token<S> {
     Div,
     IDiv,
     Pow,
-    Mod,
     Len,
+    Peek,
+    ModPeek2,
+    Peek4,
     BitNotXor,
     BitAnd,
     BitOr,
-    ShiftRight,
+    BitXor,
+    ShiftRightArithmetic,
+    ShiftRightLogical,
     ShiftLeft,
+    RotateRight,
+    RotateLeft,
     Concat,
     Dots,
     Assign,
+    AssignAdd,
+    AssignSub,
+    AssignMul,
+    AssignDiv,
+    AssignIDiv,
+    AssignMod,
+    AssignPow,
+    AssignBitAnd,
+    AssignBitOr,
+    AssignBitXor,
+    AssignShiftRightArithmetic,
+    AssignShiftRightLogical,
+    AssignShiftLeft,
+    AssignRotateRight,
+    AssignRotateLeft,
+    AssignConcat,
     LessThan,
     LessEqual,
     GreaterThan,
@@ -104,16 +126,38 @@ impl<S: AsRef<[u8]>> PartialEq for Token<S> {
             (Token::Div, Token::Div) => true,
             (Token::IDiv, Token::IDiv) => true,
             (Token::Pow, Token::Pow) => true,
-            (Token::Mod, Token::Mod) => true,
             (Token::Len, Token::Len) => true,
+            (Token::Peek, Token::Peek) => true,
+            (Token::ModPeek2, Token::ModPeek2) => true,
+            (Token::Peek4, Token::Peek4) => true,
             (Token::BitNotXor, Token::BitNotXor) => true,
             (Token::BitAnd, Token::BitAnd) => true,
             (Token::BitOr, Token::BitOr) => true,
-            (Token::ShiftRight, Token::ShiftRight) => true,
+            (Token::BitXor, Token::BitXor) => true,
+            (Token::ShiftRightArithmetic, Token::ShiftRightArithmetic) => true,
+            (Token::ShiftRightLogical, Token::ShiftRightLogical) => true,
             (Token::ShiftLeft, Token::ShiftLeft) => true,
+            (Token::RotateRight, Token::RotateRight) => true,
+            (Token::RotateLeft, Token::RotateLeft) => true,
             (Token::Concat, Token::Concat) => true,
             (Token::Dots, Token::Dots) => true,
             (Token::Assign, Token::Assign) => true,
+            (Token::AssignAdd, Token::AssignAdd) => true,
+            (Token::AssignSub, Token::AssignSub) => true,
+            (Token::AssignMul, Token::AssignMul) => true,
+            (Token::AssignDiv, Token::AssignDiv) => true,
+            (Token::AssignIDiv, Token::AssignIDiv) => true,
+            (Token::AssignMod, Token::AssignMod) => true,
+            (Token::AssignPow, Token::AssignPow) => true,
+            (Token::AssignBitAnd, Token::AssignBitAnd) => true,
+            (Token::AssignBitOr, Token::AssignBitOr) => true,
+            (Token::AssignBitXor, Token::AssignBitXor) => true,
+            (Token::AssignShiftRightArithmetic, Token::AssignShiftRightArithmetic) => true,
+            (Token::AssignShiftRightLogical, Token::AssignShiftRightLogical) => true,
+            (Token::AssignShiftLeft, Token::AssignShiftLeft) => true,
+            (Token::AssignRotateRight, Token::AssignRotateRight) => true,
+            (Token::AssignRotateLeft, Token::AssignRotateLeft) => true,
+            (Token::AssignConcat, Token::AssignConcat) => true,
             (Token::LessThan, Token::LessThan) => true,
             (Token::LessEqual, Token::LessEqual) => true,
             (Token::GreaterThan, Token::GreaterThan) => true,
@@ -170,16 +214,38 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::Div => write!(f, "Div"),
             Token::IDiv => write!(f, "IDiv"),
             Token::Pow => write!(f, "Pow"),
-            Token::Mod => write!(f, "Mod"),
             Token::Len => write!(f, "Len"),
+            Token::Peek => write!(f, "Peek"),
+            Token::ModPeek2 => write!(f, "ModPeek2"),
+            Token::Peek4 => write!(f, "Peek4"),
             Token::BitNotXor => write!(f, "BitNotXor"),
             Token::BitAnd => write!(f, "BitAnd"),
             Token::BitOr => write!(f, "BitOr"),
-            Token::ShiftRight => write!(f, "ShiftRight"),
+            Token::BitXor => write!(f, "BitXor"),
+            Token::ShiftRightArithmetic => write!(f, "ShiftRightArithmetic"),
+            Token::ShiftRightLogical => write!(f, "ShiftRightLogical"),
             Token::ShiftLeft => write!(f, "ShiftLeft"),
+            Token::RotateRight => write!(f, "RotateRight"),
+            Token::RotateLeft => write!(f, "RotateLeft"),
             Token::Concat => write!(f, "Concat"),
             Token::Dots => write!(f, "Dots"),
             Token::Assign => write!(f, "Assign"),
+            Token::AssignAdd => write!(f, "AssignAdd"),
+            Token::AssignSub => write!(f, "AssignSub"),
+            Token::AssignMul => write!(f, "AssignMul"),
+            Token::AssignDiv => write!(f, "AssignDiv"),
+            Token::AssignIDiv => write!(f, "AssignIDiv"),
+            Token::AssignMod => write!(f, "AssignMod"),
+            Token::AssignPow => write!(f, "AssignPow"),
+            Token::AssignBitAnd => write!(f, "AssignBitAnd"),
+            Token::AssignBitOr => write!(f, "AssignBitOr"),
+            Token::AssignBitXor => write!(f, "AssignBitXor"),
+            Token::AssignShiftRightArithmetic => write!(f, "AssignShiftRight"),
+            Token::AssignShiftRightLogical => write!(f, "AssignShiftRightLogical"),
+            Token::AssignShiftLeft => write!(f, "AssignShiftLeft"),
+            Token::AssignRotateRight => write!(f, "AssignRotateRight"),
+            Token::AssignRotateLeft => write!(f, "AssignRotateLeft"),
+            Token::AssignConcat => write!(f, "AssignConcat"),
             Token::LessThan => write!(f, "LessThan"),
             Token::LessEqual => write!(f, "LessEqual"),
             Token::GreaterThan => write!(f, "GreaterThan"),
@@ -198,21 +264,17 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::LeftBrace => write!(f, "LeftBrace"),
             Token::RightBrace => write!(f, "RightBrace"),
             Token::Number(d) => write!(f, "{:?}", d),
-            Token::Name(n) => write!(f, "Name({:?})", debug_utf8_lossy(n.as_ref())),
-            Token::String(s) => write!(f, "String({:?})", debug_utf8_lossy(s.as_ref())),
+            Token::Name(n) => write!(f, "Name({})", p8scii::Printable(n.as_ref())),
+            Token::String(s) => write!(f, "String(\"{:?}\")", p8scii::Printable(s.as_ref())),
         }
     }
 }
 
-fn print_char(c: u8) -> char {
-    char::from_u32(c as u32).unwrap_or(char::REPLACEMENT_CHARACTER)
-}
-
 #[derive(Debug, Error)]
 pub enum LexError {
-    #[error("short string not finished, expected matching {}", print_char(*.0))]
+    #[error("short string not finished, expected matching {}", p8scii::to_char(*.0))]
     UnfinishedShortString(u8),
-    #[error("unexpected character: {}", print_char(*.0))]
+    #[error("unexpected character: {}", p8scii::to_char(*.0))]
     UnexpectedCharacter(u8),
     #[error("hexadecimal digit expected")]
     HexDigitExpected,
@@ -245,10 +307,11 @@ impl fmt::Display for LineNumber {
     }
 }
 
+type LexerSource<'a> = PeekableNth<impl Iterator<Item = u8> + 'a, 4>;
+
 pub struct Lexer<'a, S> {
-    source: &'a [u8],
+    source: LexerSource<'a>,
     interner: S,
-    peek_count: usize,
     string_buffer: Vec<u8>,
     line_number: u64,
 }
@@ -257,16 +320,16 @@ impl<'a, S> Lexer<'a, S>
 where
     S: StringInterner,
 {
-    pub fn new(source: &'a [u8], interner: S) -> Lexer<'a, S> {
+    #[define_opaque(LexerSource)]
+    pub fn new(source: &[u8], interner: S) -> Lexer<'_, S> {
         Lexer {
-            source,
+            source: p8scii::from_utf8(source).lossy().peekable_nth(),
             interner,
-            peek_count: 0,
             string_buffer: Vec::new(),
             line_number: 0,
         }
     }
-
+    
     /// Current line number of the source file.
     pub fn line_number(&self) -> LineNumber {
         LineNumber(self.line_number)
@@ -274,9 +337,9 @@ where
 
     pub fn skip_whitespace(&mut self) -> Result<(), LexError> {
         let mut do_skip_whitespace = || {
-            while let Some(c) = self.peek(0)? {
+            while let Some(c) = self.peek(0) {
                 match c {
-                    b' ' | b'\t' | VERTICAL_TAB | FORM_FEED => {
+                    b' ' | b'\t' => {
                         self.advance(1);
                     }
 
@@ -285,25 +348,41 @@ where
                     }
 
                     b'-' => {
-                        if self.peek(1)? != Some(b'-') {
+                        if self.peek(1) != Some(b'-') {
                             break;
                         } else {
                             self.advance(2);
 
-                            match (self.peek(0)?, self.peek(1)?) {
+                            match (self.peek(0), self.peek(1)) {
                                 (Some(b'['), Some(b'=')) | (Some(b'['), Some(b'[')) => {
                                     // long comment
                                     self.read_long_string(false)?;
                                 }
                                 _ => {
                                     // Short comment, read until end of line
-                                    while let Some(c) = self.peek(0)? {
+                                    while let Some(c) = self.peek(0) {
                                         if is_newline(c) {
                                             break;
                                         } else {
                                             self.advance(1);
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    b'/' => {
+                        if self.peek(1) != Some(b'/') {
+                            break;
+                        } else {
+                            self.advance(2);
+                            
+                            while let Some(c) = self.peek(0) {
+                                if is_newline(c) {
+                                    break;
+                                } else {
+                                    self.advance(1);
                                 }
                             }
                         }
@@ -330,23 +409,119 @@ where
         self.skip_whitespace()?;
 
         let mut do_read_token = || {
-            if let Some(c) = self.peek(0)? {
+            if let Some(c) = self.peek(0) {
                 Ok(Some(match c {
-                    b' ' | b'\t' | VERTICAL_TAB | FORM_FEED | b'\n' | b'\r' => {
+                    b' ' | b'\t' | b'\n' | b'\r' => {
                         unreachable!("whitespace should have been skipped");
+                    }
+                    
+                    b'+' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignAdd
+                        } else {
+                            Token::Add
+                        }
                     }
 
                     b'-' => {
-                        if self.peek(1)? != Some(b'-') {
+                        let next = self.peek(1);
+                        if next == Some(b'=') {
+                            self.advance(2);
+                            Token::AssignSub
+                        } else if next != Some(b'-') {
                             self.advance(1);
                             Token::Minus
                         } else {
                             unreachable!("whitespace should have been skipped");
                         }
                     }
+                    
+                    b'*' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignMul
+                        } else {
+                            Token::Mul
+                        }
+                    }
+                    
+                    b'/' => {
+                        let next = self.peek(1);
+                        if next == Some(b'=') {
+                            self.advance(2);
+                            Token::AssignDiv
+                        } else if next != Some(b'/') {
+                            self.advance(1);
+                            Token::Div
+                        } else {
+                            unreachable!("whitespace should have been skipped");
+                        }
+                    }
+                    
+                    b'\\' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignIDiv
+                        } else {
+                            Token::IDiv
+                        }
+                    }
+                    
+                    b'%' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignMod
+                        } else {
+                            Token::ModPeek2
+                        }
+                    }
+                    
+                    b'^' => {
+                        self.advance(1);
+                        let next = self.peek(0);
+                        if next == Some(b'^') {
+                            self.advance(1);
+                            if self.peek(0) == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignBitXor
+                            } else {
+                                Token::BitXor
+                            }
+                        } else if next == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignPow
+                        } else {
+                            Token::Pow
+                        }
+                    }
+                    
+                    b'&' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignBitAnd
+                        } else {
+                            Token::BitAnd
+                        }
+                    }
+                    
+                    b'|' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::AssignBitOr
+                        } else {
+                            Token::BitOr
+                        }
+                    }
 
                     b'[' => {
-                        let next = self.peek(1)?;
+                        let next = self.peek(1);
                         if next == Some(b'=') || next == Some(b'[') {
                             self.read_long_string(true)?;
                             Token::String(self.take_string())
@@ -358,7 +533,7 @@ where
 
                     b'=' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::Equal
                         } else {
@@ -368,13 +543,27 @@ where
 
                     b'<' => {
                         self.advance(1);
-                        let next = self.peek(0)?;
-                        if next == Some(b'=') {
+                        let next = self.peek(0);
+                        if next == Some(b'<') {
+                            self.advance(1);
+                            let next = self.peek(0);
+                            if next == Some(b'>') {
+                                self.advance(1);
+                                if self.peek(0) == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignRotateLeft
+                                } else {
+                                    Token::RotateLeft
+                                }
+                            } else if next == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignShiftLeft
+                            } else {
+                                Token::ShiftLeft
+                            }
+                        } else if next == Some(b'=') {
                             self.advance(1);
                             Token::LessEqual
-                        } else if next == Some(b'<') {
-                            self.advance(1);
-                            Token::ShiftLeft
                         } else {
                             Token::LessThan
                         }
@@ -382,41 +571,63 @@ where
 
                     b'>' => {
                         self.advance(1);
-                        let next = self.peek(0)?;
-                        if next == Some(b'=') {
+                        let next = self.peek(0);
+                        if next == Some(b'>') {
+                            self.advance(1);
+                            let next = self.peek(0);
+                            if next == Some(b'>') {
+                                self.advance(1);
+                                if self.peek(0) == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignShiftRightLogical
+                                } else {
+                                    Token::ShiftRightLogical
+                                }
+                            } else if next == Some(b'<') {
+                                self.advance(1);
+                                if self.peek(0) == Some(b'=') {
+                                    self.advance(1);
+                                    Token::AssignRotateRight
+                                } else {
+                                    Token::RotateRight
+                                }
+                            } else if next == Some(b'=') {
+                                self.advance(1);
+                                Token::AssignShiftRightArithmetic
+                            } else {
+                                Token::ShiftRightArithmetic
+                            }
+                        } else if next == Some(b'=') {
                             self.advance(1);
                             Token::GreaterEqual
-                        } else if next == Some(b'>') {
-                            self.advance(1);
-                            Token::ShiftRight
                         } else {
                             Token::GreaterThan
                         }
                     }
 
-                    b'/' => {
-                        self.advance(1);
-                        if self.peek(0)? == Some(b'/') {
-                            self.advance(1);
-                            Token::IDiv
-                        } else {
-                            Token::Div
-                        }
-                    }
-
                     b'~' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b'=') {
+                        if self.peek(0) == Some(b'=') {
                             self.advance(1);
                             Token::NotEqual
                         } else {
                             Token::BitNotXor
                         }
                     }
+                    
+                    b'!' => {
+                        self.advance(1);
+                        if self.peek(0) == Some(b'=') {
+                            self.advance(1);
+                            Token::NotEqual
+                        } else {
+                            return Err(LexError::UnexpectedCharacter(c));
+                        }
+                    }
 
                     b':' => {
                         self.advance(1);
-                        if self.peek(0)? == Some(b':') {
+                        if self.peek(0) == Some(b':') {
                             self.advance(1);
                             Token::DoubleColon
                         } else {
@@ -430,15 +641,19 @@ where
                     }
 
                     b'.' => {
-                        if self.peek(1)? == Some(b'.') {
-                            if self.peek(2)? == Some(b'.') {
+                        if self.peek(1) == Some(b'.') {
+                            let next = self.peek(2);
+                            if next == Some(b'.') {
                                 self.advance(3);
                                 Token::Dots
+                            } else if next == Some(b'=') {
+                                self.advance(3);
+                                Token::AssignConcat
                             } else {
                                 self.advance(2);
                                 Token::Concat
                             }
-                        } else if self.peek(1)?.map(is_digit).unwrap_or(false) {
+                        } else if self.peek(1).map(is_digit).unwrap_or(false) {
                             self.read_numeral()?
                         } else {
                             self.advance(1);
@@ -457,7 +672,7 @@ where
                             self.string_buffer.push(c);
                             self.advance(1);
 
-                            while let Some(c) = self.peek(0)? {
+                            while let Some(c) = self.peek(0) {
                                 if is_alpha(c) || is_digit(c) {
                                     self.string_buffer.push(c);
                                     self.advance(1);
@@ -466,8 +681,7 @@ where
                                 }
                             }
 
-                            if let Some(t) = get_reserved_word_token(self.string_buffer.as_slice())
-                            {
+                            if let Some(t) = get_reserved_word_token(self.string_buffer.as_slice()) {
                                 t
                             } else {
                                 Token::Name(self.take_string())
@@ -493,15 +707,14 @@ where
 
     // End of stream encountered, clear any input handles and temp buffers
     fn reset(&mut self) {
-        self.source = &[];
-        self.peek_count = 0;
+        // self.source = &[]; // Is this needed?
         self.string_buffer.clear();
     }
 
     // Read any of "\n", "\r", "\n\r", or "\r\n" as a single newline, and increment the current line
     // number. If `append_buffer` is true, then appends the read newline to the string buffer.
     fn read_line_end(&mut self, append_string: bool) -> Result<(), LexError> {
-        let newline = self.peek(0).unwrap().unwrap();
+        let newline = self.peek(0).unwrap();
         assert!(is_newline(newline));
         self.advance(1);
         // We always append a single plain `\n` character for any newline characters, matching the
@@ -510,7 +723,7 @@ where
             self.string_buffer.push(b'\n');
         }
 
-        if let Some(next_newline) = self.peek(0)? {
+        if let Some(next_newline) = self.peek(0) {
             if is_newline(next_newline) && next_newline != newline {
                 self.advance(1);
             }
@@ -523,166 +736,42 @@ where
     // Read a string on a single line delimited by ' or " that allows for \ escaping of certain
     // characters. Always reads the contained string into the string buffer.
     fn read_short_string(&mut self) -> Result<(), LexError> {
-        let start_quote = self.peek(0).unwrap().unwrap();
+        let start_quote = self.peek(0).unwrap();
         assert!(start_quote == b'\'' || start_quote == b'"');
         self.advance(1);
-
+        
         self.string_buffer.clear();
-
+        
         loop {
-            let c = if let Some(c) = self.peek(0)? {
-                c
-            } else {
-                return Err(LexError::UnfinishedShortString(start_quote));
-            };
+            let c = self.peek(0).ok_or(LexError::UnfinishedShortString(start_quote))?;
 
             if is_newline(c) {
                 return Err(LexError::UnfinishedShortString(start_quote));
             }
 
-            self.advance(1);
-            if c == b'\\' {
-                match self
-                    .peek(0)?
-                    .ok_or_else(|| LexError::UnfinishedShortString(start_quote))?
-                {
-                    b'a' => {
-                        self.advance(1);
-                        self.string_buffer.push(ALERT_BEEP);
-                    }
-
-                    b'b' => {
-                        self.advance(1);
-                        self.string_buffer.push(BACKSPACE);
-                    }
-
-                    b'f' => {
-                        self.advance(1);
-                        self.string_buffer.push(FORM_FEED);
-                    }
-
-                    b'n' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\n');
-                    }
-
-                    b'r' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\r');
-                    }
-
-                    b't' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\t');
-                    }
-
-                    b'v' => {
-                        self.advance(1);
-                        self.string_buffer.push(VERTICAL_TAB);
-                    }
-
-                    b'\\' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\\');
-                    }
-
-                    b'\'' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'\'');
-                    }
-
-                    b'"' => {
-                        self.advance(1);
-                        self.string_buffer.push(b'"');
-                    }
-
-                    b'\n' | b'\r' => {
-                        self.read_line_end(true)?;
-                    }
-
-                    b'x' => {
-                        self.advance(1);
-                        let first = self
-                            .peek(0)?
-                            .and_then(from_hex_digit)
-                            .ok_or(LexError::HexDigitExpected)?;
-                        let second = self
-                            .peek(1)?
-                            .and_then(from_hex_digit)
-                            .ok_or(LexError::HexDigitExpected)?;
-                        self.string_buffer.push(first << 4 | second);
-                        self.advance(2);
-                    }
-
-                    b'u' => {
-                        if self.peek(1)? != Some(b'{') {
-                            return Err(LexError::EscapeUnicodeStart);
-                        }
-                        self.advance(2);
-
-                        let mut u: u32 = 0;
-                        loop {
-                            if let Some(c) = self.peek(0)? {
-                                if c == b'}' {
-                                    self.advance(1);
-                                    break;
-                                } else if let Some(h) = from_hex_digit(c) {
-                                    u = (u << 4) | h as u32;
-                                    self.advance(1);
-                                } else {
-                                    return Err(LexError::EscapeUnicodeEnd);
-                                }
-                            } else {
-                                return Err(LexError::EscapeUnicodeEnd);
-                            }
-                        }
-
-                        let c = char::from_u32(u).ok_or(LexError::EscapeUnicodeInvalid)?;
-                        let mut buf = [0; 4];
-                        for &b in c.encode_utf8(&mut buf).as_bytes() {
-                            self.string_buffer.push(b);
-                        }
-                    }
-
-                    b'z' => {
-                        self.advance(1);
-                        while let Some(c) = self.peek(0)? {
-                            if is_newline(c) {
-                                self.read_line_end(false)?;
-                            } else if is_space(c) {
-                                self.advance(1);
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-
-                    c => {
-                        if is_digit(c) {
-                            let mut u: u16 = 0;
-                            for _ in 0..3 {
-                                if let Some(d) = self.peek(0)?.and_then(from_digit) {
-                                    u = 10 * u + d as u16;
-                                    self.advance(1);
-                                } else {
-                                    break;
-                                }
-                            }
-                            if u > 255 {
-                                return Err(LexError::EscapeDecimalTooLarge);
-                            }
-
-                            self.string_buffer.push(u as u8);
-                        } else {
-                            return Err(LexError::InvalidEscape);
-                        }
-                    }
-                }
-            } else if c == start_quote {
+            if c == start_quote {
+                self.advance(1);
                 break;
             } else {
                 self.string_buffer.push(c);
+                self.advance(1);
+                
+                if c == b'\\' {
+                    let next = self.peek(0).ok_or(LexError::UnfinishedShortString(start_quote))?;
+                    if is_newline(next) {
+                        self.read_line_end(true)?;
+                    } else {
+                        self.string_buffer.push(next);
+                        self.advance(1);
+                    }
+                }
             }
+        }
+        
+        match p8scii::unescape_in_place(&mut self.string_buffer) {
+            Ok(len) => self.string_buffer.truncate(len),
+            Err(p8scii::UnescapeError::InvalidEscapeSeq(..)) => return Err(LexError::InvalidEscape),
+            Err(p8scii::UnescapeError::DecimalTooLarge(..)) => return Err(LexError::EscapeDecimalTooLarge),
         }
 
         Ok(())
@@ -691,7 +780,7 @@ where
     // Read a [=*[...]=*] sequence with matching numbers of '='. If `into_string` is true, writes
     // the contained string into the string buffer.
     fn read_long_string(&mut self, into_string: bool) -> Result<(), LexError> {
-        assert_eq!(self.peek(0).unwrap().unwrap(), b'[');
+        assert_eq!(self.peek(0).unwrap(), b'[');
         self.advance(1);
 
         if into_string {
@@ -699,43 +788,43 @@ where
         }
 
         let mut open_sep_length = 0;
-        while self.peek(0)? == Some(b'=') {
+        while self.peek(0) == Some(b'=') {
             self.advance(1);
             open_sep_length += 1;
         }
 
-        if self.peek(0)? != Some(b'[') {
+        if self.peek(0) != Some(b'[') {
             return Err(LexError::InvalidLongStringDelimiter);
         }
         self.advance(1);
 
-        if matches!(self.peek(0)?, Some(b'\n' | b'\r')) {
+        if matches!(self.peek(0), Some(b'\n' | b'\r')) {
             // If the long string starts imediately with a newline, we read it and do *not* put it
-            // into the string buffer, matching the behavior of PUC-Rio Lua.
+            // into the string buffer, matching the behavior of PUC-Rio Lua. (and PICO-8 too!)
             self.read_line_end(false)?;
         }
-
+        
+        if into_string {
+            self.string_buffer.clear();
+        }
+        
         loop {
-            let c = if let Some(c) = self.peek(0)? {
-                c
-            } else {
-                return Err(LexError::UnfinishedLongString);
-            };
-
+            let c = self.peek(0).ok_or(LexError::UnfinishedLongString)?;
+            
             match c {
                 b'\n' | b'\r' => {
                     self.read_line_end(into_string)?;
                 }
-
+                
                 b']' => {
                     let mut close_sep_length = 0;
                     self.advance(1);
-                    while self.peek(0)? == Some(b'=') {
+                    while self.peek(0) == Some(b'=') {
                         self.advance(1);
                         close_sep_length += 1;
                     }
-
-                    if open_sep_length == close_sep_length && self.peek(0)? == Some(b']') {
+                    
+                    if open_sep_length == close_sep_length && self.peek(0) == Some(b']') {
                         self.advance(1);
                         break;
                     } else {
@@ -749,7 +838,7 @@ where
                         }
                     }
                 }
-
+                
                 c => {
                     if into_string {
                         self.string_buffer.push(c);
@@ -765,12 +854,12 @@ where
     // Reads a binary, hex or decimal integer or floating point identifier. Allows decimal numbers (123.456),
     // hex numbers (0xdead.beef) and binary numbers (0b11110.10110)
     fn read_numeral(&mut self) -> Result<Token<S::String>, LexError> {
-        let p1 = self.peek(0).unwrap().unwrap();
+        let p1 = self.peek(0).unwrap();
         assert!(p1 == b'.' || is_digit(p1));
         
         self.string_buffer.clear();
         
-        let p2 = self.peek(1)?;
+        let p2 = self.peek(1);
         let is_hex = p1 == b'0' && (p2 == Some(b'x') || p2 == Some(b'X'));
         let is_bin = p1 == b'0' && (p2 == Some(b'b') || p2 == Some(b'B'));
         if is_hex || is_bin {
@@ -778,7 +867,7 @@ where
         }
         
         let mut has_radix = false;
-        while let Some(c) = self.peek(0)? {
+        while let Some(c) = self.peek(0) {
             if c == b'.' && !has_radix {
                 self.string_buffer.push(b'.');
                 has_radix = true;
@@ -803,18 +892,18 @@ where
         ))
     }
 
-    fn peek(&mut self, n: usize) -> Result<Option<u8>, LexError> {
-	    self.peek_count = (n + 1).max(self.peek_count).min(self.source.len());
-	    Ok(self.source.get(n).copied())
+    fn peek(&mut self, n: usize) -> Option<u8> {
+        self.source.peek_nth(n).copied()
     }
 
     fn advance(&mut self, n: usize) {
         assert!(
-            n <= self.peek_count,
+            n <= self.source.peek_len(),
             "cannot advance over un-peeked characters"
         );
-        self.peek_count -= n;
-        self.source = &self.source[n..];
+        for _ in 0..n {
+            self.source.next();
+        }
     }
 
     fn take_string(&mut self) -> S::String {
@@ -826,16 +915,11 @@ where
 
 fn get_char_token<S>(c: u8) -> Option<Token<S>> {
     match c {
-        b'-' => Some(Token::Minus),
-        b'+' => Some(Token::Add),
-        b'*' => Some(Token::Mul),
-        b'^' => Some(Token::Pow),
-        b'%' => Some(Token::Mod),
-        b'&' => Some(Token::BitAnd),
-        b'|' => Some(Token::BitOr),
         b',' => Some(Token::Comma),
         b';' => Some(Token::SemiColon),
         b'#' => Some(Token::Len),
+        b'@' => Some(Token::Peek),
+        b'$' => Some(Token::Peek4),
         b'(' => Some(Token::LeftParen),
         b')' => Some(Token::RightParen),
         b']' => Some(Token::RightBracket),
@@ -911,11 +995,11 @@ mod tests {
     }
 
     fn str_token(s: &str) -> Token<Rc<[u8]>> {
-        Token::String(s.as_bytes().to_vec().into_boxed_slice().into())
+        Token::String(p8scii::from_str(s).lossy().collect::<Vec<_>>().into_boxed_slice().into())
     }
 
     fn name_token(s: &str) -> Token<Rc<[u8]>> {
-        Token::Name(s.as_bytes().to_vec().into_boxed_slice().into())
+        Token::Name(p8scii::from_str(s).lossy().collect::<Vec<_>>().into_boxed_slice().into())
     }
 
     #[test]
@@ -948,10 +1032,14 @@ mod tests {
             r#"
                 [====[ [==[ this is a [[]] long string ]== ]==] ]====]
                 [[ [=] [==] another long string [==] [=] ]]
+                [[ \t\r\x escape codes are ignored \1\2\3 ]]
+                [[ ️⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
             "#,
             &[
                 str_token(" [==[ this is a [[]] long string ]== ]==] "),
                 str_token(" [=] [==] another long string [==] [=] "),
+                str_token(" \\t\\r\\x escape codes are ignored \\1\\2\\3 "),
+                str_token(" ⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ "),
             ],
         );
 
@@ -967,19 +1055,21 @@ mod tests {
             r#"
                 "\\ \" '"
                 '\n \t "'
-                "begin \z
-                end"
-                'state\u{2e}'
+                "begin \
+end"
                 "question\x3f"
                 "exclaim\33"
+                "\0\1\2\3"
+                "⬆️⬇️⬅️➡️"
             "#,
             &[
                 (str_token("\\ \" '"), 1),
                 (str_token("\n \t \""), 2),
-                (str_token("begin end"), 3),
-                (str_token("state."), 5),
-                (str_token("question?"), 6),
-                (str_token("exclaim!"), 7),
+                (str_token("begin \nend"), 3),
+                (str_token("question?"), 5),
+                (str_token("exclaim!"), 6),
+                (Token::String(vec![0, 1, 2, 3].into()), 7),
+                (str_token("⬆️⬇️⬅️➡️"), 8),
             ],
         );
     }
@@ -1010,7 +1100,6 @@ mod tests {
             r#"
                 break do else elseif end function goto if in local nil for while repeat until return
                 then true false not and or
-                custom names
             "#,
             &[
                 Token::Break,
@@ -1035,16 +1124,33 @@ mod tests {
                 Token::Not,
                 Token::And,
                 Token::Or,
-                name_token("custom"),
-                name_token("names"),
             ],
         );
     }
 
     #[test]
+    fn names() {
+        test_tokens(
+            r#"
+                custom names
+                にほんこ゛
+                ⬅️⬇️⬆️➡️
+                █▒🐱😐
+            "#,
+            &[
+                name_token("custom"),
+                name_token("names"),
+                name_token("にほんこ゛"),
+                name_token("⬅️⬇️⬆️➡️"),
+                name_token("█▒🐱😐"),
+            ],
+        );
+    }
+    
+    #[test]
     fn ops() {
         test_tokens(
-            r#"- + * / // ^ % & ~ | , ; >> << . .. ... = < <= > >= == ~= : :: # ( ) [ ] { }"#,
+            r#"- + * / \ ^ , ; . .. ... < <= > >= == ~= != : :: # @ % $ ( ) [ ] { }"#,
             &[
                 Token::Minus,
                 Token::Add,
@@ -1052,33 +1158,74 @@ mod tests {
                 Token::Div,
                 Token::IDiv,
                 Token::Pow,
-                Token::Mod,
-                Token::BitAnd,
-                Token::BitNotXor,
-                Token::BitOr,
                 Token::Comma,
                 Token::SemiColon,
-                Token::ShiftRight,
-                Token::ShiftLeft,
                 Token::Dot,
                 Token::Concat,
                 Token::Dots,
-                Token::Assign,
                 Token::LessThan,
                 Token::LessEqual,
                 Token::GreaterThan,
                 Token::GreaterEqual,
                 Token::Equal,
                 Token::NotEqual,
+                Token::NotEqual,
                 Token::Colon,
                 Token::DoubleColon,
                 Token::Len,
+                Token::Peek,
+                Token::ModPeek2,
+                Token::Peek4,
                 Token::LeftParen,
                 Token::RightParen,
                 Token::LeftBracket,
                 Token::RightBracket,
                 Token::LeftBrace,
                 Token::RightBrace,
+            ],
+        );
+    }
+    
+    #[test]
+    fn bit_ops() {
+        test_tokens(
+            r#"~ & | ^^ >> >>> << >>< <<>"#,
+            &[
+                Token::BitNotXor,
+                Token::BitAnd,
+                Token::BitOr,
+                Token::BitXor,
+                Token::ShiftRightArithmetic,
+                Token::ShiftRightLogical,
+                Token::ShiftLeft,
+                Token::RotateRight,
+                Token::RotateLeft,
+            ],
+        );
+    }
+    
+    #[test]
+    fn assigns() {
+        test_tokens(
+            r#"= += -= *= /= \= %= ^= &= |= ^^= >>= >>>= <<= >><= <<>= ..="#,
+            &[
+                Token::Assign,
+                Token::AssignAdd,
+                Token::AssignSub,
+                Token::AssignMul,
+                Token::AssignDiv,
+                Token::AssignIDiv,
+                Token::AssignMod,
+                Token::AssignPow,
+                Token::AssignBitAnd,
+                Token::AssignBitOr,
+                Token::AssignBitXor,
+                Token::AssignShiftRightArithmetic,
+                Token::AssignShiftRightLogical,
+                Token::AssignShiftLeft,
+                Token::AssignRotateRight,
+                Token::AssignRotateLeft,
+                Token::AssignConcat,
             ],
         );
     }

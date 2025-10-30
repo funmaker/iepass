@@ -32,7 +32,7 @@ where F: Fn(Context<'gc>, A) -> Result<R, RuntimeError> + 'static,
       A: FromMultiValue<'gc>,
       R: IntoMultiValue<'gc>,
 {
-	let callback = Callback::from_fn(&ctx, move |ctx, _, mut stack| {
+	let callback = Callback::from_fn(&ctx, move |ctx, _, mut stack, _| {
 		let args = stack.consume(ctx)
 		                .map_err(|err| format!("[{name}]: {err}").into_value(ctx))?;
 		let ret = f(ctx, args)?;

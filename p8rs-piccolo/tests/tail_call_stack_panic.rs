@@ -23,7 +23,7 @@ fn tail_call_stack_panic() {
     .expect("load closure");
 
     assert!(matches!(
-        lua.execute::<StdString>(&exec),
+        lua.execute::<StdString>(&exec, &mut ()),
         Err(err) if err.root_cause().downcast_ref::<MetaCallError>().is_some()
     ));
 }

@@ -1,3 +1,4 @@
+use core::borrow::BorrowMut;
 use core::ops;
 
 use gc_arena::{
@@ -6,15 +7,7 @@ use gc_arena::{
     Arena, Collect, Mutation, Rootable,
 };
 
-use crate::{
-    finalizers::Finalizers,
-    stash::{Fetchable, Stashable},
-    stdlib::{load_base, load_coroutine},
-    string::InternedStringSet,
-    thread::BadThreadMode,
-    Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError,
-    Singleton, StashedExecutor, String, Table, TypeError, Value,
-};
+use crate::{finalizers::Finalizers, stash::{Fetchable, Stashable}, stdlib::{load_base, load_coroutine}, string::InternedStringSet, thread::BadThreadMode, Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError, RuntimeRef, Singleton, StashedExecutor, String, Table, TypeError, Value};
 
 /// A value representing the main "execution context" of a Lua state.
 ///
@@ -267,13 +260,15 @@ impl Lua {
     ///
     /// This will periodically exit the arena in order to collect garbage concurrently with running
     /// Lua code.
-    pub fn finish(&mut self, executor: &StashedExecutor) -> Result<(), BadThreadMode> {
+    pub fn finish(&mut self, executor: &StashedExecutor, rt: RuntimeRef) -> Result<(), BadThreadMode> {
         const FUEL_PER_GC: i32 = 4096;
-
+        let rt = rt.borrow_mut();
+        
         loop {
             let mut fuel = Fuel::with(FUEL_PER_GC);
+            let rt = rt.reborrow();
 
-            if self.enter(|ctx| ctx.fetch(executor).step(ctx, &mut fuel))? {
+            if self.enter(|ctx| ctx.fetch(executor).step(ctx, &mut fuel, rt))? {
                 break;
             }
         }
@@ -288,8 +283,9 @@ impl Lua {
     pub fn execute<R: for<'gc> FromMultiValue<'gc>>(
         &mut self,
         executor: &StashedExecutor,
+        rt: RuntimeRef,
     ) -> Result<R, ExternError> {
-        self.finish(executor).map_err(RuntimeError::new)?;
+        self.finish(executor, rt).map_err(RuntimeError::new)?;
         self.try_enter(|ctx| ctx.fetch(executor).take_result::<R>(ctx)?)
     }
 }

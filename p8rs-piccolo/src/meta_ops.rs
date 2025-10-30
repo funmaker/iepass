@@ -251,7 +251,7 @@ pub fn index<'gc>(
     // performance benefit because a `BoxSequence` can avoid allocation when the sequence is a ZST.
     Ok(MetaResult::Call(match idx {
         table @ (Value::Table(_) | Value::UserData(_)) => MetaCall {
-            function: Callback::from_fn(&ctx, |ctx, _, mut stack| {
+            function: Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                 let table = stack.get(0);
                 let key = stack.get(1);
                 stack.clear();
@@ -332,7 +332,7 @@ pub fn new_index<'gc>(
 
     Ok(Some(match idx {
         table @ (Value::Table(_) | Value::UserData(_)) => MetaCall {
-            function: Callback::from_fn(&ctx, |ctx, _, mut stack| {
+            function: Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                 // NOTE: Potential for indexing loop here, see note in __index.
                 let (table, key, value): (Value, Value, Value) = stack.consume(ctx)?;
                 if let Some(call) = new_index(ctx, table, key, value)? {
@@ -370,7 +370,7 @@ pub fn call<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<Function<'gc>, Meta
             // NOTE: Potential for infinite or arbitrarily long chains here, see note in __index.
             //
             // Example: `t = {}; setmetatable(t, { __call = t }); t()`
-            Callback::from_fn_with(&ctx, (v, f), |&(v, f), ctx, _, mut stack| {
+            Callback::from_fn_with(&ctx, (v, f), |&(v, f), ctx, _, mut stack, _| {
                 stack.push_front(v);
                 Ok(CallbackReturn::Call {
                     function: call(ctx, f)?,
@@ -819,7 +819,7 @@ pub fn concat_many<'gc>(
     }
 
     // Fall back to a sequence-based implemenation to handle metamethods
-    let func = Callback::from_fn(&ctx, |ctx, _, stack| {
+    let func = Callback::from_fn(&ctx, |ctx, _, stack, _| {
         let args = stack.len();
         let s = async_sequence(&ctx, |_, mut seq| async move {
             for i in (1..args).into_iter().rev() {
@@ -893,7 +893,7 @@ pub fn concat_separated<'gc>(
     }
 
     // Fall back to a sequence-based implemenation to handle metamethods
-    let func = Callback::from_fn_with(&ctx, separator, move |&sep, ctx, _, stack| {
+    let func = Callback::from_fn_with(&ctx, separator, move |&sep, ctx, _, stack, _| {
         let args = stack.len();
         let b = async_sequence(&ctx, |locals, mut seq| {
             let sep = locals.stash(&ctx, sep);

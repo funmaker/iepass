@@ -44,6 +44,7 @@ impl<I: Iterator<Item = u8>> Iterator for Escape<I> {
 				15 => b"15",
 				b'"' => b"\"",
 				b'\'' => b"\'",
+				b'\\' => b"\\",
 				_ => b"",
 			};
 			

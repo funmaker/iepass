@@ -13,7 +13,7 @@ fn run_lua_code(name: &str, code: &[u8]) -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.execute::<()>(&exec)?;
+    lua.execute::<()>(&exec, &mut ())?;
 
     Ok(())
 }

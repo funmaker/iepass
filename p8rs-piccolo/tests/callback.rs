@@ -12,7 +12,7 @@ fn callback() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |_, _, mut stack| {
+        let callback = Callback::from_fn(&ctx, |_, _, mut stack, _| {
             stack.push_back(Value::Number(p8!(42)));
             Ok(CallbackReturn::Return)
         });
@@ -35,7 +35,7 @@ fn callback() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.execute::<()>(&executor)?;
+    lua.execute::<()>(&executor, &mut ())?;
     Ok(())
 }
 
@@ -44,7 +44,7 @@ fn tail_call_trivial_callback() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |_, _, mut stack| {
+        let callback = Callback::from_fn(&ctx, |_, _, mut stack, _| {
             stack.push_back(Value::Number(p8!(3)));
             Ok(CallbackReturn::Return)
         });
@@ -64,7 +64,7 @@ fn tail_call_trivial_callback() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    assert_eq!(lua.execute::<(i64, i64, i64)>(&executor)?, (1, 2, 3));
+    assert_eq!(lua.execute::<(i64, i64, i64)>(&executor, &mut ())?, (1, 2, 3));
     Ok(())
 }
 
@@ -73,7 +73,7 @@ fn loopy_callback() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |ctx, _, _| {
+        let callback = Callback::from_fn(&ctx, |ctx, _, _, _| {
             #[derive(Collect)]
             #[collect(require_static)]
             struct Cont(i16);
@@ -96,7 +96,7 @@ fn loopy_callback() -> Result<(), ExternError> {
             }
 
             Ok(CallbackReturn::Call {
-                function: Callback::from_fn(&ctx, |_, _, mut stack| {
+                function: Callback::from_fn(&ctx, |_, _, mut stack, _| {
                     stack.push_back(3.into());
                     Ok(CallbackReturn::Yield {
                         to_thread: None,
@@ -140,7 +140,7 @@ fn loopy_callback() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    assert!(lua.execute::<bool>(&executor)?);
+    assert!(lua.execute::<bool>(&executor, &mut ())?);
     Ok(())
 }
 
@@ -149,7 +149,7 @@ fn yield_sequence() -> Result<(), ExternError> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             #[derive(Collect)]
             #[collect(require_static)]
             struct Cont(i8);
@@ -225,7 +225,7 @@ fn yield_sequence() -> Result<(), ExternError> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.execute(&executor)
+    lua.execute(&executor, &mut ())
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn resume_with_err() {
     let mut lua = Lua::core();
 
     let executor = lua.enter(|ctx| {
-        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             #[derive(Collect)]
             #[collect(require_static)]
             struct Cont;
@@ -247,7 +247,7 @@ fn resume_with_err() {
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     stack.replace(ctx, 12_i16);
                     Ok(SequencePoll::Call {
-                        function: Callback::from_fn(&ctx, |ctx, _, _| {
+                        function: Callback::from_fn(&ctx, |ctx, _, _, _| {
                             Err("an error".into_value(ctx).into())
                         })
                         .into(),
@@ -286,7 +286,7 @@ fn resume_with_err() {
         ctx.stash(Executor::run(&ctx, thread).unwrap())
     });
 
-    lua.finish(&executor).unwrap();
+    lua.finish(&executor, &mut ()).unwrap();
 
     lua.enter(|ctx| {
         let executor = ctx.fetch(&executor);
@@ -294,7 +294,7 @@ fn resume_with_err() {
         executor.resume(ctx, ()).unwrap();
     });
 
-    lua.finish(&executor).unwrap();
+    lua.finish(&executor, &mut ()).unwrap();
 
     lua.enter(
         |ctx| match ctx.fetch(&executor).take_result::<()>(ctx).unwrap() {

@@ -15,7 +15,7 @@ fn userdata() -> Result<(), anyhow::Error> {
             MyUserData(Gc::new(&ctx, Lock::new(17))),
         );
         ctx.set_global("userdata", userdata);
-        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+        let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             match stack[0] {
                 Value::UserData(ud) => {
                     let ud = ud.downcast::<Rootable![MyUserData<'_>]>().unwrap();
@@ -43,7 +43,7 @@ fn userdata() -> Result<(), anyhow::Error> {
         Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
     })?;
 
-    lua.finish(&executor)?;
+    lua.finish(&executor, &mut ())?;
 
     lua.try_enter(|ctx| {
         let (ud, res) = ctx

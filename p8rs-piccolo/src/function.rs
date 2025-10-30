@@ -70,7 +70,7 @@ impl<'gc> Function<'gc> {
         Self::Callback(Callback::from_fn_with(
             mc,
             Gc::new(mc, functions),
-            |functions, ctx, _, _| {
+            |functions, ctx, _, _, _| {
                 if (**functions).as_ref().is_empty() {
                     Ok(CallbackReturn::Return)
                 } else {
@@ -94,14 +94,14 @@ impl<'gc> Function<'gc> {
         Self::Callback(Callback::from_fn_with(
             mc,
             (self, args),
-            |(f, args), ctx, exec, mut stack| {
+            |(f, args), ctx, exec, mut stack, rt| {
                 stack.into_front(ctx, args.clone());
                 match *f {
                     Function::Closure(c) => Ok(CallbackReturn::Call {
                         function: c.into(),
                         then: None,
                     }),
-                    Function::Callback(c) => c.call(ctx, exec, stack),
+                    Function::Callback(c) => c.call(ctx, exec, stack, rt),
                 }
             },
         ))

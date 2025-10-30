@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Use the `execute` helper to execute the lua script
-    lua.execute::<()>(&ex)?;
+    lua.execute::<()>(&ex, &mut ())?;
 
     // Enter a new context
     let ex = lua.try_enter(|ctx| {
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Get the return value
-    let result = lua.execute::<String>(&ex)?;
+    let result = lua.execute::<String>(&ex, &mut ())?;
 
     dbg!(result);
 
