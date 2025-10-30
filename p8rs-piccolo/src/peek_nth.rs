@@ -25,7 +25,7 @@
 //! }
 //!```
 
-use std::iter::{DoubleEndedIterator, ExactSizeIterator};
+use core::iter::{DoubleEndedIterator, ExactSizeIterator};
 
 use arrayvec::ArrayVec;
 
