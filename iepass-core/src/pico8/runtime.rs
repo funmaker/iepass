@@ -1,20 +1,21 @@
 use core::alloc::Allocator;
 use core::ops::{Div, Not};
+use core::any::Any;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
-
 use crate::pico8::memory::Memory;
 use crate::utils;
 
-pub struct Env<A: Allocator = Global> {
+pub struct Runtime<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Memory<A>,
 	pub buttons: Buttons,
 	pub fps: u16,
 }
 
-impl<A: Allocator + Clone> Env<A> {
-	pub fn new(alloc: A) -> Env<A> {
+impl<A> Runtime<A>
+where A: Allocator + Clone {
+	pub fn new(alloc: A) -> Runtime<A> {
 		Self {
 			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
 			memory: Memory::new(alloc),
@@ -32,6 +33,25 @@ impl<A: Allocator + Clone> Env<A> {
 		for i in 0..8 {
 			self.memory[0x5f4c + i] = buttons[i] & 0x3f;
 		}
+	}
+}
+
+impl<A> p8rs_piccolo::Runtime for Runtime<A>
+where A: Allocator + Clone + 'static {
+	fn as_any(&mut self) -> &mut dyn Any {
+		self
+	}
+	
+	fn peek(&mut self, addr: u16) -> u8 {
+		self.memory.read(addr)
+	}
+	
+	fn peek2(&mut self, addr: u16) -> u16 {
+		self.memory.read(addr)
+	}
+	
+	fn peek4(&mut self, addr: u16) -> u32 {
+		self.memory.read(addr)
 	}
 }
 
