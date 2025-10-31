@@ -362,9 +362,9 @@ impl<'gc> Executor<'gc> {
                             upper_frames: &top_state.frames,
                         };
                         let poll = if let Some(err) = pending_error {
-                            sequence.error(ctx, exec, err, Stack::new(&mut top_state.stack, bottom))
+                            sequence.error(ctx, exec, err, Stack::new(&mut top_state.stack, bottom), rt)
                         } else {
-                            sequence.poll(ctx, exec, Stack::new(&mut top_state.stack, bottom))
+                            sequence.poll(ctx, exec, Stack::new(&mut top_state.stack, bottom), rt)
                         };
 
                         match poll {

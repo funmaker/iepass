@@ -13,8 +13,8 @@ use gc_arena::{Collect, DynamicRootSet, Mutation};
 
 use crate::{
     stash::{Fetchable, Stashable},
-    BoxSequence, Context, Error, Execution, Function, Sequence, SequencePoll, Stack, StashedError,
-    StashedFunction, StashedThread, Thread,
+    BoxSequence, Context, Error, Execution, Function, RuntimeRef, Sequence, SequencePoll, 
+    Stack, StashedError, StashedFunction, StashedThread, Thread,
 };
 
 /// Create a [`Sequence`] impl from a [`Future`] that can suspend, call Lua functions, yield to Lua,
@@ -415,6 +415,7 @@ where
         ctx: Context<'gc>,
         exec: Execution<'gc, '_>,
         stack: Stack<'gc, '_>,
+        _rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         self.poll_fut(ctx, exec, stack, None)
     }
@@ -425,6 +426,7 @@ where
         exec: Execution<'gc, '_>,
         error: Error<'gc>,
         stack: Stack<'gc, '_>,
+        _rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         self.poll_fut(ctx, exec, stack, Some(error))
     }

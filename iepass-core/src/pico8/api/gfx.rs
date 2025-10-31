@@ -1,8 +1,8 @@
+use crate::pico8::memory::{MemoryDrawState, PrintAttributeFlags};
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
-use crate::pico8::memory::{MemoryDrawState};
 
 use crate::pico8::Runtime;
 
@@ -15,7 +15,20 @@ pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("cursor", cursor::callback::<A>(ctx));
 }
 
-fn set_cursor_color<A: Allocator>(draw_state: &mut MemoryDrawState<A>, x: Option<i16>, y: Option<i16>, color: Option<i16>) {
+pub fn draw_letter<A: Allocator>(_rt: &mut Runtime<A>, _flags: PrintAttributeFlags, letter: u8) -> Result<i16, RuntimeError> {
+	// let is_wide = flags.contains(PrintAttributeFlags::WIDE);
+	// let is_tall = flags.contains(PrintAttributeFlags::TALL);
+	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
+	// let is_dotty = flags.contains(PrintAttributeFlags::DOTTY);
+	// let use_custom_font = flags.contains(PrintAttributeFlags::CUSTOM_FONT);
+	//
+	// let font = if use_custom_font { Font::new((&rt.memory[0x5600..=0x5dff]).try_into()?) } else { Font::SYSTEM };
+	// todo: draw
+	debug!("[draw_letter] {} {}", letter, letter as char);
+	Ok(8)
+}
+
+pub fn set_cursor_color<A: Allocator>(draw_state: &mut MemoryDrawState<A>, x: Option<i16>, y: Option<i16>, color: Option<i16>) {
 	if let Some(x) = x {
 		*draw_state.cursor_home_x() = x as u8;
 		draw_state.cursor_position()[0] = x as u8;

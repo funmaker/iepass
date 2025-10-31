@@ -17,7 +17,6 @@ pub use runtime::Runtime;
 use api::install_pico8_apis;
 use cart::CartridgeParseError;
 
-const ENABLE_STEP_DEBUG: bool = false;
 
 #[derive(Debug)]
 pub struct Pico8VMRunResult {

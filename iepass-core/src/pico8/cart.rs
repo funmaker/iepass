@@ -70,7 +70,6 @@ struct CartLoadContext {
 	lua_code: Vec<u8>,
 	gfx_loaded: bool,
 	map_loaded: bool,
-	long_map_loaded: bool,
 }
 
 pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartridge: &[u8]) -> Result<(), CartridgeParseError> {
@@ -79,7 +78,6 @@ pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartr
 		lua_code: Vec::new(),
 		gfx_loaded: false,
 		map_loaded: false,
-		long_map_loaded: false,
 	};
 	
 	for (name, body) in section_iter {
@@ -156,7 +154,6 @@ fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &
 
 fn load_map_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8], load_ctx: &mut CartLoadContext) -> Result<(), CartridgeParseError> {
 	let map_base_addr = vm.runtime.memory.base_addr_map() as usize;
-	let gfx_base_addr = vm.runtime.memory.base_addr_gfx() as usize;
 	let mut max_offset = -1;
 	
 	if load_ctx.map_loaded {

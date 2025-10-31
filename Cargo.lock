@@ -2476,6 +2476,7 @@ dependencies = [
  "cfg-if",
  "defmt 1.0.1",
  "embedded-io",
+ "gc-arena",
  "log",
  "micromath",
  "p8rs-macros",

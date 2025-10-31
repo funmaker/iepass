@@ -179,6 +179,7 @@ impl<'a, A: Allocator> MemoryDrawState<'a, A> {
 
 
 bitflags! {
+	#[derive(Copy, Clone)]
     pub struct PrintAttributeFlags: u8 {
         const ENABLE        = 1 << 0;
         const PADDING       = 1 << 1;
