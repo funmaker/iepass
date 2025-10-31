@@ -1,4 +1,5 @@
 use core::alloc::Allocator;
+use alloc::vec::Vec;
 use thiserror::Error;
 
 use crate::pico8::Pico8VM;
@@ -8,32 +9,6 @@ pub struct SectionIterator<'a, Lines> {
 	pub cart: &'a [u8],
 	header_lines: Lines,
 	last_header: Option<&'a [u8]>,
-}
-
-pub fn section_iterator<'a>(cart: &'a [u8]) -> Result<SectionIterator<'a, impl Iterator<Item=&'a [u8]> + 'a>, CartridgeParseError> {
-	let mut header_lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
-	                           .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
-	
-	let last_header = header_lines.next();
-	
-	if last_header.is_none() {
-		return Err(CartridgeParseError::NoDataSection);
-	}
-	
-	let file_header = &cart[0..cart.subslice_range(last_header.unwrap()).unwrap().start];
-	
-	if file_header.len() < 25 {
-		info!("SectionIterator: File header too short");
-		return Err(CartridgeParseError::InvalidHeader);
-	}
-	
-	// todo: check header better
-	
-	Ok(SectionIterator {
-		cart,
-		header_lines,
-		last_header,
-	})
 }
 
 impl<'a, Lines> Iterator for SectionIterator<'a, Lines>
@@ -65,6 +40,32 @@ where Lines: Iterator<Item=&'a [u8]> + 'a {
 	}
 }
 
+pub fn section_iterator<'a>(cart: &'a [u8]) -> Result<SectionIterator<'a, impl Iterator<Item=&'a [u8]> + 'a>, CartridgeParseError> {
+	let mut header_lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
+	                           .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
+	
+	let last_header = header_lines.next();
+	
+	if last_header.is_none() {
+		return Err(CartridgeParseError::NoDataSection);
+	}
+	
+	let file_header = &cart[0..cart.subslice_range(last_header.unwrap()).unwrap().start];
+	
+	if file_header.len() < 25 {
+		info!("SectionIterator: File header too short");
+		return Err(CartridgeParseError::InvalidHeader);
+	}
+	
+	// todo: check header better
+	
+	Ok(SectionIterator {
+		cart,
+		header_lines,
+		last_header,
+	})
+}
+
 struct CartLoadContext {
 	lua_code: Vec<u8>,
 	gfx_loaded: bool,
@@ -84,25 +85,17 @@ pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartr
 	for (name, body) in section_iter {
 		let name_str = core::str::from_utf8(name).unwrap_or("<invalid utf8>");
 		debug!("load_cartridge: Loading cartridge section {} (len: {})", name_str, body.len());
+		
 		match name {
-			b"__lua__" => { load_lua_section(vm, body, &mut load_ctx)?; },
-			b"__gfx__" => { load_gfx_section(vm, body, &mut load_ctx)?; },
-			b"__map__" => { load_map_section(vm, body, &mut load_ctx)?; },
+			b"__lua__" => load_lua_section(vm, body, &mut load_ctx)?,
+			b"__gfx__" => load_gfx_section(vm, body, &mut load_ctx)?,
+			b"__map__" => load_map_section(vm, body, &mut load_ctx)?,
 			_ => { info!("load_cartridge: Unknown section name {}", name_str); }
 		}
 	}
 
 	if !load_ctx.lua_code.is_empty() {
-		let lua_text = core::str::from_utf8(&load_ctx.lua_code);
-		match lua_text {
-			Ok(lua_text) => {
-				vm.load(lua_text.as_bytes());
-				debug!("load_cartridge: Loaded lua text (len: {})", lua_text.len());
-			}
-			Err(_) => {
-				return Err(CartridgeParseError::InvalidLuaUnicode);
-			}
-		}
+		vm.load(&load_ctx.lua_code);
 	}
 
 	Ok(())
@@ -133,7 +126,7 @@ fn nibble_chunks(text: &[u8]) -> impl Iterator<Item=(u8, u8)> + '_ {
 }
 
 fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8], load_ctx: &mut CartLoadContext) -> Result<(), CartridgeParseError> {
-	let gfx_base_addr = vm.env().memory.base_addr_gfx() as usize;
+	let gfx_base_addr = vm.runtime.memory.base_addr_gfx() as usize;
 	let mut max_offset = -1;
 	
 	if load_ctx.gfx_loaded {
@@ -146,7 +139,7 @@ fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &
 			                   .enumerate().map(move |(col_idx, byte)| ((line_idx * 64 + col_idx) as i16, byte))
 		)
 	{
-		vm.env().memory[gfx_base_addr + offset as usize] = byte;
+		vm.runtime.memory[gfx_base_addr + offset as usize] = byte;
 		if offset > max_offset { max_offset = offset; }
 	}
 	
@@ -162,8 +155,8 @@ fn load_gfx_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &
 }
 
 fn load_map_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &[u8], load_ctx: &mut CartLoadContext) -> Result<(), CartridgeParseError> {
-	let map_base_addr = vm.env().memory.base_addr_map() as usize;
-	let gfx_base_addr = vm.env().memory.base_addr_gfx() as usize;
+	let map_base_addr = vm.runtime.memory.base_addr_map() as usize;
+	let gfx_base_addr = vm.runtime.memory.base_addr_gfx() as usize;
 	let mut max_offset = -1;
 	
 	if load_ctx.map_loaded {
@@ -183,7 +176,7 @@ fn load_map_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &
 	{
 		if offset >= 0x1000 { max_offset = 0x1000; break; }
 		let addr = map_base_addr + offset as usize;
-		vm.env().memory[addr] = byte;
+		vm.runtime.memory[addr] = byte;
 		if offset > max_offset { max_offset = offset; }
 	}
 
@@ -199,7 +192,7 @@ fn load_map_section<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, data: &
 	// 		debug!("Clearing extended GFX from 0x{:X}", max_offset);
 	// 		for offset in 0x1000..0x2000 {
 	// 			let addr = gfx_base_addr + offset;
-	// 			vm.env().memory[addr] = 0;
+	// 			vm.runtime.memory[addr] = 0;
 	// 		}
 	// 	}
 	// }
@@ -236,7 +229,6 @@ pub enum CartridgeParseError {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use alloc::vec::Vec;
 	
 	#[test]
 	fn test_load_cartridge() {
@@ -260,8 +252,7 @@ c0cc0000000000000000000000000000000000000000000000000000000000000000000000000000
 		let result = vm.run();
 		
 		
-		let env = vm.env.clone();
-		let mem = &env.borrow().memory;
+		let mem = &vm.runtime.memory;
 		
 		// test GFX loading
 		assert_eq!(mem[0x3e], 0x34);

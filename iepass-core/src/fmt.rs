@@ -147,8 +147,8 @@ macro_rules! trace {
                     ::defmt::trace!($s $(, $x)*);
                 } else if #[cfg(feature = "log-04")] {
                     ::log_04::trace!($s $(, $x)*);
-                } else if #[cfg(feature = "std")] {
-                    ::std::println!($s $(, $x)*);
+                // } else if #[cfg(feature = "std")] {
+                //     ::std::println!($s $(, $x)*);
                 } else {
                     let _ = ($( & $x ),*);
                 }

@@ -93,9 +93,9 @@ impl eframe::App for EmulatorApp {
 			}
 			
 			if !run_result.out_of_fuel {
-				let mut env = self.pico8.env();
+				let mut rt = self.pico8.runtime();
 				
-				let screen_palette = env.memory.palette(1);
+				let screen_palette = rt.memory.palette(1);
 				
 				let map_color = |color: u8| -> Color {
 					assert!(color < 16);
@@ -103,7 +103,7 @@ impl eframe::App for EmulatorApp {
 				};
 				
 				self.fb_tex.set(self.fb_pool.from_iter(
-					env
+					rt
 						.memory
 						.screen()
 						.iter()

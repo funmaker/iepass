@@ -16,7 +16,7 @@ use p8rs_types::p8scii;
 
 /// The Lua string type.
 ///
-/// Unlike Rust strings, p8rs-piccolo strings are PSCII encoded.
+/// Unlike Rust strings, p8rs-piccolo strings are P8SCII encoded.
 #[derive(Copy, Clone, Collect)]
 #[collect(no_drop)]
 pub struct String<'gc>(Gc<'gc, StringInner>);

@@ -1,8 +1,6 @@
 use alloc::alloc::Global;
 use alloc::format;
-use alloc::rc::Rc;
 use core::alloc::Allocator;
-use core::cell::{RefCell, RefMut};
 use p8rs_piccolo::table::InvalidTableKey;
 use p8rs_piccolo::{Closure, Context, Executor, ExecutorMode, Fuel, Lua, StashedExecutor, Value};
 use p8rs_types::p8num::P8Num;
@@ -10,14 +8,14 @@ use p8rs_types::p8num::P8Num;
 pub mod memory;
 pub mod palette;
 pub mod font;
-pub mod env;
+pub mod runtime;
 pub mod cart;
 mod numeric;
 mod api;
 
-use crate::pico8::api::{install_pico8_apis, EnvHandle};
-use crate::pico8::cart::CartridgeParseError;
-use env::Env;
+pub use runtime::Runtime;
+use api::install_pico8_apis;
+use cart::CartridgeParseError;
 
 const ENABLE_STEP_DEBUG: bool = false;
 
@@ -30,7 +28,7 @@ pub struct Pico8VMRunResult {
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
-	env: EnvHandle<A>,
+	runtime: Runtime<A>,
 	executor: Option<StashedExecutor>,
 }
 
@@ -43,12 +41,15 @@ impl Pico8VM<Global> {
 impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	pub fn new_in(alloc: A) -> Result<Pico8VM<A>, InvalidTableKey> {
 		let mut vm = Self {
-			env: Rc::new(RefCell::new(Env::new(alloc))),
 			lua: Lua::empty(),
+			runtime: Runtime::new(alloc),
 			executor: None,
 		};
 		
-		vm.install_pico8_lib()?;
+		vm.lua.enter(|ctx: Context| {
+			install_pico8_apis::<A>(ctx);
+			Ok(())
+		})?;
 		
 		Ok(vm)
 	}
@@ -87,11 +88,11 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 				let executor = ctx.fetch(executor);
 				
 				loop {
-					if !executor.step(ctx, &mut fuel, &mut ()).unwrap() {
+					if !executor.step(ctx, &mut fuel, &mut self.runtime).unwrap() {
 						if fuel.is_interrupted() {
-							if ENABLE_STEP_DEBUG { debug!("[step] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode()); }
+							trace!("[run_fuel] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode());
 						}else {
-							if ENABLE_STEP_DEBUG { debug!("[step] Out of fuel! {:?}", fuel); }
+							trace!("[run_fuel] Out of fuel! {:?}", fuel);
 							out_of_fuel = true;
 							break
 						}
@@ -99,18 +100,18 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 					
 					match executor.mode() {
 						ExecutorMode::Normal => {
-							if ENABLE_STEP_DEBUG { debug!("[step] Result - Normal {:?}", fuel); }
+							trace!("[run_fuel] Result - Normal {:?}", fuel);
 							continue
 						},
 						ExecutorMode::Stopped => {
-							if ENABLE_STEP_DEBUG { debug!("[step] Result - Stopped, {:?}", fuel); }
+							trace!("[run_fuel] Result - Stopped, {:?}", fuel);
 							stopped = true;
 							break
 						},
 						ExecutorMode::Result => {
 							let value = executor.take_result::<Value>(ctx);
 							
-							if ENABLE_STEP_DEBUG { debug!("[step] Result - Value: {:?}, fuel {:?}", value, fuel); }
+							trace!("[run_fuel] Result - Value: {:?}, fuel {:?}", value, fuel);
 							
 							match executor.mode() {
 								ExecutorMode::Suspended => {
@@ -129,30 +130,18 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		}
 		
 		let ret = Pico8VMRunResult {
-			requested_fps: self.env.borrow().fps,
+			requested_fps: self.runtime.fps,
 			stopped: stopped || fuel.is_interrupted(),
 			out_of_fuel,
 		};
 		
-		if ENABLE_STEP_DEBUG { debug!("[step] Step finished {:?}", ret); }
+		trace!("[run_fuel] Step finished {:?}", ret);
 		
 		ret
 	}
 	
-	pub fn env(&self) -> RefMut<'_, Env<A>> {
-		self.env.borrow_mut()
-	}
-	
-	fn install_pico8_lib(&mut self) -> Result<(), InvalidTableKey> {
-		self.lua.enter(|ctx: Context| {
-			let env = self.env.clone();
-			install_pico8_apis(env, ctx);
-			
-			Ok(())
-		})?;
-		
-		
-		Ok(())
+	pub fn runtime(&mut self) -> &mut Runtime<A> {
+		&mut self.runtime
 	}
 }
 

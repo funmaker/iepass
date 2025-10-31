@@ -14,5 +14,5 @@ proc-macro = true
 [dependencies]
 p8rs-types.workspace = true
 quote = "1.0.41"
-syn = "2.0.106"
+syn = { version = "2.0.106", features = ["full"] }
 proc-macro2 = "1.0.95"

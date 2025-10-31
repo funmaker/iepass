@@ -1,7 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(allocator_api)]
 #![feature(substr_range)]
+#![feature(int_from_ascii)]
+#![feature(slice_split_once)]
 extern crate alloc;
+extern crate core;
 
 // MUST be the first module
 mod fmt;

@@ -2,6 +2,7 @@ use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
 use alloc::alloc::Global;
 use alloc::boxed::Box;
+use p8rs_types::p8num::P8Num;
 use bitflags::bitflags;
 use crate::utils;
 
@@ -9,7 +10,7 @@ pub struct Memory<A: Allocator = Global> {
 	inner: Box<[u8; 0x10000], A>,
 }
 
-impl<A: Allocator + Clone> Memory<A> {
+impl<A: Allocator> Memory<A> {
 	pub fn new(alloc: A) -> Memory<A> {
 		let mut mem = Memory {
 			inner: utils::new_zeroed_box_in(alloc),
@@ -76,17 +77,12 @@ impl<A: Allocator + Clone> Memory<A> {
 		(self.inner[0x5F56] as u16).wrapping_shl(8)
 	}
 	
-	pub fn read_u16_le(&self, addr: u16) -> u16 {
-		assert!(addr < 0xffff, "Address out of bounds");
-		let addr = addr as usize;
-		((self.inner[addr] as u16) << 8) | self.inner[addr + 1] as u16
+	pub fn read<T: Serializable>(&self, addr: u16) -> T {
+		T::read(self, addr)
 	}
 	
-	pub fn write_u16_le(&mut self, addr: u16, val: u16) {
-		assert!(addr < 0xffff, "Address out of bounds");
-		let addr = addr as usize;
-		self.inner[addr] = (val >> 8) as u8;
-		self.inner[addr + 1] = val as u8;
+	pub fn write<T: Serializable>(&mut self, addr: u16, val: T) {
+		val.write(self, addr);
 	}
 }
 
@@ -120,9 +116,35 @@ impl<'a> DerefMut for MemoryScreen<'a> {
 	}
 }
 
-pub struct MemoryDrawState<'a, A: Allocator + Clone>(&'a mut Memory<A>);
+pub trait Serializable {
+	fn read<A: Allocator>(mem: &Memory<A>, addr: u16) -> Self;
+	fn write<A: Allocator>(self, mem: &mut Memory<A>, addr: u16);
+}
 
-impl<'a, A: Allocator + Clone> MemoryDrawState<'a, A> {
+macro_rules! impl_ser {
+	($T:ty $(, $( $rest:tt )*)?) => {
+		impl Serializable for $T {
+			fn read<A: Allocator>(mem: &Memory<A>, addr: u16) -> Self {
+				Self::from_le_bytes(core::array::from_fn(|pos| mem[addr.wrapping_add(pos as u16) as usize]))
+			}
+			fn write<A: Allocator>(self, mem: &mut Memory<A>, addr: u16) {
+				for (pos, byte) in self.to_le_bytes().iter().copied().enumerate() {
+					mem[addr.wrapping_add(pos as u16) as usize] = byte;
+				}
+			}
+		}
+		
+		$( impl_ser!($( $rest )*); )?
+	};
+	() => {};
+}
+
+impl_ser!(u8, i8, u16, i16, u32, i32, P8Num);
+
+
+pub struct MemoryDrawState<'a, A: Allocator>(&'a mut Memory<A>);
+
+impl<'a, A: Allocator> MemoryDrawState<'a, A> {
 	pub fn cursor_home_x(&mut self) -> &mut u8 {
 		&mut self.0[0x5f24]
 	}
@@ -143,15 +165,15 @@ impl<'a, A: Allocator + Clone> MemoryDrawState<'a, A> {
 	}
 	
 	pub fn get_camera_position(&self) -> [i16; 2] {
-		[ self.0.read_u16_le(0x5f28).cast_signed(), self.0.read_u16_le(0x5f2a).cast_signed() ]
+		[ self.0.read::<i16>(0x5f28), self.0.read::<i16>(0x5f2a) ]
 	}
 	
 	pub fn set_camera_x(&mut self, value: i16) {
-		self.0.write_u16_le(0x5f28, value.cast_unsigned());
+		self.0.write(0x5f28, value);
 	}
 	
 	pub fn set_camera_y(&mut self, value: i16) {
-		self.0.write_u16_le(0x5f2a, value.cast_unsigned());
+		self.0.write(0x5f2a, value);
 	}
 }
 
@@ -170,10 +192,10 @@ bitflags! {
 }
 
 
-pub struct MemoryHardwareState<'a, A: Allocator + Clone>(&'a mut Memory<A>);
+pub struct MemoryHardwareState<'a, A: Allocator>(&'a mut Memory<A>);
 
 // 0x5f40..0x5f80
-impl<'a, A: Allocator + Clone> MemoryHardwareState<'a, A> {
+impl<'a, A: Allocator> MemoryHardwareState<'a, A> {
 	pub fn get_print_defaults(&mut self) -> PrintAttributeFlags {
 		PrintAttributeFlags::from_bits_truncate(self.0[0x5f58])
 	}

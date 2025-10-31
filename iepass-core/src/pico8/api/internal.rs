@@ -1,13 +1,13 @@
 use alloc::format;
-use alloc::string::String;
 use core::alloc::Allocator;
-use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, RuntimeError};
+use p8rs_macros::api_callback;
+use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, String};
 
-use super::{set_global_callback_env, EnvHandle};
-use crate::pico8::api::base::printh;
+use crate::pico8::Runtime;
+use super::base::printh;
 
-pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: EnvHandle<A>, ctx: Context) {
-	set_global_callback_env("_set_fps", ctx, env.clone(), _set_fps);
+pub fn install_pico8_internal<A: Allocator + 'static>(ctx: Context) {
+	ctx.set_global("_set_fps", _set_fps::callback::<A>(ctx));
 	
 	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
 	ctx.set_global("stop", Callback::from_fn(&ctx, move |ctx, mut exec: Execution, mut stack, _| {
@@ -16,7 +16,7 @@ pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: EnvHandle<A>,
 		
 		if let Some(message) = message {
 			// todo: x, y, col
-			printh((message, Some("stop()".into()), None, None))?;
+			printh(message, Some(String::from_slice(&ctx, b"stop()")), None, None)?;
 		}
 		
 		stack.clear();
@@ -26,15 +26,16 @@ pub fn install_pico8_internal<A: Allocator + Clone + 'static>(env: EnvHandle<A>,
 	}));
 }
 
-pub fn _set_fps<A: Allocator + Clone + 'static>(env: EnvHandle<A>, new_fps: i16) -> Result<i16, RuntimeError> {
-	let mut env = env.borrow_mut();
-	let old_fps = env.fps;
+#[api_callback]
+pub fn _set_fps<A: Allocator + 'static>(rt: &mut Runtime<A>, new_fps: i16) -> i16 {
+	let old_fps = rt.fps;
 	if new_fps <= 0 {
-		env.fps = 30;
+		rt.fps = 30;
 	} else if new_fps > 1000 {
-		env.fps = 1000;
+		rt.fps = 1000;
 	} else {
-		env.fps = new_fps.cast_unsigned();
+		rt.fps = new_fps.cast_unsigned();
 	}
-	Ok(old_fps.cast_signed())
+	
+	old_fps.cast_signed()
 }
