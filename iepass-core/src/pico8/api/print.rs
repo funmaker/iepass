@@ -137,7 +137,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				let mut cursor_x = rt.memory.draw_state().cursor_position()[0] as i16;
 				if cursor_x < 128 {
 					// todo: verify pico-8 behaviour / add line wrapping
-					cursor_x += draw_letter(rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
+					cursor_x += draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
 				}
 				rt.memory.draw_state().cursor_position()[0] = cursor_x.min(255) as u8;
 			}

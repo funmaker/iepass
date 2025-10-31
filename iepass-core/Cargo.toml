@@ -22,6 +22,7 @@ p8rs-piccolo.workspace = true
 p8rs-types.workspace = true
 p8rs-macros.workspace = true
 gc-arena.workspace = true
+anyhow.workspace = true
 micromath.workspace = true
 bitflags.workspace = true
 thiserror.workspace = true

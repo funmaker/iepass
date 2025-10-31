@@ -21,6 +21,7 @@ impl<A: Allocator> Memory<A> {
 	}
 	
 	pub fn reset(&mut self) {
+		self.inner[0x5f25] = 6; // default pen color
 		self.inner[0x5F55] = 0x60; // default screen mapping
 		self.inner[0x5F56] = 0x20; // default map mapping
 		self.inner[0x5F57] = 128; // default map size
@@ -101,6 +102,36 @@ impl<A: Allocator> DerefMut for Memory<A> {
 }
 
 pub struct MemoryScreen<'a>(&'a mut [u8; 0x2000]);
+
+impl<'a> MemoryScreen<'a> {
+	fn get_addr(x: i16, y: i16) -> Result<(usize, bool), ()> {
+		if x < 0 || y < 0 || x >= 128 || y >= 128 { return Err(()) }
+		Ok((
+			((x / 2) + y * 64) as usize,
+			x & 1 == 0,
+		))
+	}
+	
+	pub fn get_pixel(&self, x: i16, y: i16) -> Result<u8, ()> {
+		let (addr, high) = Self::get_addr(x, y)?;
+		Ok(if high {
+			self.0[addr] & 0xF
+		}else{
+			self.0[addr] >> 4
+		})
+	}
+	
+	pub fn set_pixel(&mut self, x: i16, y: i16, value: u8) -> Result<(), ()> {
+		let (addr, high) = Self::get_addr(x, y)?;
+		let old = self.0[addr];
+		if high {
+			self.0[addr] = (old & 0xF0) | (value & 0xF);
+		}else{
+			self.0[addr] = (value << 4) | (old & 0xF);
+		}
+		Ok(())
+	}
+}
 
 impl<'a> Deref for MemoryScreen<'a> {
 	type Target = [u8; 0x2000];
