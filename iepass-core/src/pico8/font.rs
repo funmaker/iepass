@@ -7,6 +7,10 @@ pub struct Font<'a>(&'a [u8; 0x800]);
 impl<'a> Font<'a> {
 	pub const SYSTEM: Font<'static> = Font(&generated::SYSTEM_FONT);
 	
+	pub fn new(data: &'a [u8; 0x800]) -> Self {
+		Self(data)
+	}
+	
 	pub fn width(&self) -> u8 { self.0[0] }
 	pub fn width_ex(&self) -> u8 { self.0[1] }
 	pub fn width_tab(&self) -> u8 { self.0[6] }

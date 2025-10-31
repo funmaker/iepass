@@ -2,7 +2,7 @@ use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
 use alloc::alloc::Global;
 use alloc::boxed::Box;
-
+use bitflags::bitflags;
 use crate::utils;
 
 pub struct Memory<A: Allocator = Global> {
@@ -45,6 +45,14 @@ impl<A: Allocator + Clone> Memory<A> {
 			base = 0x6000; // default if custom base would cause to wrap memory
 		}
 		MemoryScreen((&mut self.inner[base.. base+0x2000]).try_into().unwrap())
+	}
+	
+	pub fn draw_state(&mut self) -> MemoryDrawState<'_, A> {
+		MemoryDrawState(self)
+	}
+	
+	pub fn hardware_state(&mut self) -> MemoryHardwareState<'_, A> {
+		MemoryHardwareState(self)
 	}
 	
 	pub fn base_addr_palette(&self, p_idx: u8) -> u16 {
@@ -109,5 +117,68 @@ impl<'a> Deref for MemoryScreen<'a> {
 impl<'a> DerefMut for MemoryScreen<'a> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut *self.0
+	}
+}
+
+pub struct MemoryDrawState<'a, A: Allocator + Clone>(&'a mut Memory<A>);
+
+impl<'a, A: Allocator + Clone> MemoryDrawState<'a, A> {
+	pub fn cursor_home_x(&mut self) -> &mut u8 {
+		&mut self.0[0x5f24]
+	}
+	
+	pub fn pen_color(&mut self) -> &mut u8 {
+		&mut self.0[0x5f25]
+	}
+	
+	pub fn cursor_position(&mut self) -> &mut [u8; 2] {
+		(&mut self.0[0x5f26..=0x5f27]).try_into().unwrap()
+	}
+	
+	/**
+	 * [x_begin, y_begin, x_end, y_end]
+	 */
+	pub fn clip_rect(&mut self) -> &mut [u8; 4] {
+		(&mut self.0[0x5f20..=0x5f23]).try_into().unwrap()
+	}
+	
+	pub fn get_camera_position(&self) -> [i16; 2] {
+		[ self.0.read_u16_le(0x5f28).cast_signed(), self.0.read_u16_le(0x5f2a).cast_signed() ]
+	}
+	
+	pub fn set_camera_x(&mut self, value: i16) {
+		self.0.write_u16_le(0x5f28, value.cast_unsigned());
+	}
+	
+	pub fn set_camera_y(&mut self, value: i16) {
+		self.0.write_u16_le(0x5f2a, value.cast_unsigned());
+	}
+}
+
+
+bitflags! {
+    pub struct PrintAttributeFlags: u8 {
+        const ENABLE        = 1 << 0;
+        const PADDING       = 1 << 1;
+        const WIDE          = 1 << 2;
+        const TALL          = 1 << 3;
+        const SOLID_BG      = 1 << 4;
+        const INVERT        = 1 << 5;
+        const DOTTY         = 1 << 6;
+        const CUSTOM_FONT   = 1 << 7;
+    }
+}
+
+
+pub struct MemoryHardwareState<'a, A: Allocator + Clone>(&'a mut Memory<A>);
+
+// 0x5f40..0x5f80
+impl<'a, A: Allocator + Clone> MemoryHardwareState<'a, A> {
+	pub fn get_print_defaults(&mut self) -> PrintAttributeFlags {
+		PrintAttributeFlags::from_bits_truncate(self.0[0x5f58])
+	}
+	
+	pub fn set_print_defaults(&mut self, flags: PrintAttributeFlags) {
+		self.0[0x5f58] = flags.bits();
 	}
 }
