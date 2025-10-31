@@ -13,6 +13,21 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
 	ctx.set_global("print", print::callback(ctx));
+	ctx.set_global("type", get_type::callback(ctx));
+}
+
+#[api_callback]
+pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError> {
+	Ok(Some(match val {
+		Value::Nil => "nil".into_value(ctx),
+		Value::Boolean(_) => "boolean".into_value(ctx),
+		Value::Number(_) => "number".into_value(ctx),
+		Value::String(_) => "string".into_value(ctx),
+		Value::Table(_) => "table".into_value(ctx),
+		Value::Function(_) => "function".into_value(ctx),
+		Value::Thread(_) => "thread".into_value(ctx),
+		Value::UserData(_) => "userdata".into_value(ctx),
+	}))
 }
 
 #[api_callback]
