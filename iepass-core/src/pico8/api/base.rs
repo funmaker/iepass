@@ -1,9 +1,12 @@
+use std::alloc::Allocator;
+use anyhow::anyhow;
 use crate::pico8::numeric::{number_from_ascii, NumberConversionFlags};
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, IntoValue, RuntimeError, Value, String};
-use p8rs_types::p8num::P8NumStringConversionFlags;
+use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+use crate::pico8::Runtime;
 
-pub fn install_pico8_base(ctx: Context) {
+pub fn install_pico8_base<A: Allocator + 'static>(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
@@ -12,8 +15,30 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
-	ctx.set_global("print", print::callback(ctx));
 	ctx.set_global("type", get_type::callback(ctx));
+	ctx.set_global("btn", btn::callback::<A>(ctx));
+	ctx.set_global("stat", stat::callback::<A>(ctx));
+}
+
+#[api_callback]
+pub fn stat<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError> {
+	Ok(match stat_cmd {
+		7 => { Some(Value::Number(P8Num::from(rt.fps.cast_signed()))) }
+		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
+	})
+}
+
+#[api_callback]
+pub fn btn<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError> {
+	match btn_idx {
+		None => Ok(Some(Value::Number(P8Num::from((rt.buttons.get_bits_for_player(0) as u16 | (rt.buttons.get_bits_for_player(1) as u16) << 8).cast_signed())))),
+		Some(button_idx) => {
+			let player_idx = player_idx.unwrap_or(0);
+			if player_idx < 0 || player_idx > 7 { return Ok(Some(Value::Boolean(false))) }
+			
+			Ok(Some(Value::Boolean(rt.buttons.is_down(player_idx as usize, button_idx as usize))))
+		}
+	}
 }
 
 #[api_callback]
@@ -70,13 +95,6 @@ pub fn printh(text: String, filename: Option<String>, _overwrite: Option<bool>, 
 	} else {
 		info!("[printh] {}", text);
 	}
-	Ok(())
-}
-
-#[api_callback]
-pub fn print(text: String, _x: Option<i16>, _y: Option<i16>, _color: Option<u8>) -> Result<(), RuntimeError> {
-	info!("[print] {}", text);
-	// todo: implement on-screen printing
 	Ok(())
 }
 

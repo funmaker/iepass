@@ -16,7 +16,7 @@ pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("cursor", cursor::callback::<A>(ctx));
 }
 
-pub fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: PrintAttributeFlags, letter: u8) -> Result<i16, RuntimeError> {
+pub fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: PrintAttributeFlags, letter: u8) -> Result<(i16, i16), RuntimeError> {
 	// let is_wide = flags.contains(PrintAttributeFlags::WIDE);
 	// let is_tall = flags.contains(PrintAttributeFlags::TALL);
 	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
@@ -48,9 +48,7 @@ pub fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: Prin
 		}
 	}
 	
-	
-	debug!("[draw_letter] {} - {char_width}x{char_height}", letter as char);
-	Ok(char_width as i16)
+	Ok((char_width as i16, char_height as i16))
 }
 
 pub fn set_cursor_color<A: Allocator>(draw_state: &mut MemoryDrawState<A>, x: Option<i16>, y: Option<i16>, color: Option<i16>) {

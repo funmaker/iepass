@@ -103,17 +103,17 @@ impl Buttons {
 		self.buttons.copy_from_slice(state);
 	}
 	
-	fn get_mask_for_player(&self, player: usize) -> u8 {
+	pub fn get_bits_for_player(&self, player: usize) -> u8 {
 		assert!(player < 8, "player idx > 8");
 		self.buttons[player]
 	}
 	
-	fn is_down(&self, player: usize, button: usize) -> bool {
+	pub fn is_down(&self, player: usize, button: usize) -> bool {
 		assert!(button < 8, "button idx > 8");
-		(self.get_mask_for_player(player) & (1 << button)) != 0
+		(self.get_bits_for_player(player) & (1 << button)) != 0
 	}
 	
-	fn is_just_pressed(&self, player: usize, button: usize) -> bool {
+	pub fn is_just_pressed(&self, player: usize, button: usize) -> bool {
 		self.is_down(player, button) && self.buttons_held_frames[player * 8 + button] == 1
 	}
 }

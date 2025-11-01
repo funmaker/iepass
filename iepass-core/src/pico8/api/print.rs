@@ -7,7 +7,7 @@ use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execut
 use std::pin::Pin;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("printx", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
+	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
 		let rt = rt.downcast::<Runtime>();
 		let (text, x, y, color): (Value, Option<i16>, Option<i16>, Option<i16>) = stack.consume(ctx).unwrap();
 		set_cursor_color(&mut rt.memory.draw_state(), x, y, color);
@@ -45,6 +45,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			next_char: None,
 			stopped: false,
 			flags: flags.bits(),
+			line_height: None,
 		})))
 	}));
 }
@@ -104,6 +105,7 @@ fn execute_escape_sequence<'gc, A: Allocator>(_ctx: Context<'gc>, _rt: &mut Runt
 #[collect(no_drop)]
 struct PrintSeq<'gc> {
 	text: TextEscapeIterator<'gc>,
+	line_height: Option<u8>,
 	/// number of frames that should be skipped right now
 	skip_frames: usize,
 	/// number of frames that should be skipped before every letter
@@ -124,22 +126,22 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		_stack: Stack<'gc, '_>,
 		rt: RuntimeRef<'_>,
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
+		let rt = rt.downcast::<Runtime>();
+		
 		if !self.stopped {
 			if self.skip_frames > 0 {
 				self.skip_frames -= 1;
 				return Ok(SequencePoll::Yield { to_thread: None, bottom: 0 })
 			}
 			
-			let rt = rt.downcast::<Runtime>();
-			
 			if let Some(char) = self.next_char {
 				self.next_char = None;
-				let mut cursor_x = rt.memory.draw_state().cursor_position()[0] as i16;
-				if cursor_x < 128 {
-					// todo: verify pico-8 behaviour / add line wrapping
-					cursor_x += draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
-				}
-				rt.memory.draw_state().cursor_position()[0] = cursor_x.min(255) as u8;
+				
+				// todo: verify pico-8 behaviour / add line wrapping
+				let (w, h) = draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
+				self.line_height = Some(h as u8);
+				
+				rt.memory.draw_state().cursor_position()[0] += w as u8;
 			}
 			
 			let part = self.text.next();
@@ -175,6 +177,12 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		}
 		
 		// no next part
+		if let Some(h) = self.line_height {
+			rt.memory.draw_state().cursor_position()[0] = *rt.memory.draw_state().cursor_home_x();
+			rt.memory.draw_state().cursor_position()[1] += h;
+		}
+
+		
 		// todo - return values
 		Ok(SequencePoll::Return)
 	}
