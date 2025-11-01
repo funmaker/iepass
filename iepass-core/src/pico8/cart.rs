@@ -40,7 +40,7 @@ where Lines: Iterator<Item=&'a [u8]> + 'a {
 	}
 }
 
-pub fn section_iterator<'a>(cart: &'a [u8]) -> Result<SectionIterator<'a, impl Iterator<Item=&'a [u8]> + 'a>, CartridgeParseError> {
+pub fn sections(cart: &[u8]) -> Result<impl Iterator<Item = (&[u8], &[u8])>, CartridgeParseError> {
 	let mut header_lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
 	                           .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
 	
@@ -74,7 +74,7 @@ struct CartLoadContext {
 }
 
 pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartridge: &[u8]) -> Result<(), CartridgeParseError> {
-	let section_iter = section_iterator(cartridge)?;
+	let section_iter = sections(cartridge)?;
 	let mut load_ctx = CartLoadContext {
 		lua_code: Vec::new(),
 		gfx_loaded: false,
