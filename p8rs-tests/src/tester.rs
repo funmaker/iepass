@@ -1,48 +1,73 @@
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::Once;
+
+use crate::{runner, TMP_DIR};
+use crate::runner::Log;
+use crate::utils::replace;
+
+static SETUP: Once = Once::new();
+fn setup() {
+	SETUP.call_once(|| {
+		match fs::remove_dir_all(TMP_DIR) {
+			Ok(_) => {},
+			Err(err) if err.kind() == ErrorKind::NotFound => {},
+			err => err.expect("Unable to remove tmp dir"),
+		}
+		fs::create_dir_all(TMP_DIR).expect("Unable to create tmp dir");
+	});
+}
 
 pub fn test_cartridge(path: impl AsRef<Path>) {
-	let path = path.as_ref();
-	fs::create_dir(
-		PathBuf::from(std::env::var("CARGO_TARGET_TMPDIR").expect("must be compiled as an test or benchmark"))
-			.join(path.as_os_str()
-			          .to_string_lossy()
-			          .replace(|c: char| c.is_ascii_alphanumeric(), "_"))
-	).expect("Unable to create tmp dir");
+	setup();
 	
-	let cart = fs::read(path).expect("Unable to read cart file");
+	let orig_cart_path = path.as_ref();
+	let cart = fs::read(orig_cart_path).expect("Unable to read cart file");
 	let cart = replace(
 		&cart,
-		b"\n__lua__\n",
+		b"__lua__",
 		concat!(
-			"\n__lua__\n",
+			"__lua__\n",
 			include_str!("polyfill.lua"),
 			"\n"
 		).as_bytes(),
 	);
-}
-
-fn replace(mut source: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
-	let mut out = Vec::with_capacity(source.len().saturating_sub(from.len()) + to.len());
+	let tmp_cart_path =
+		PathBuf::from(TMP_DIR)
+			.join(orig_cart_path.as_os_str()
+			                    .to_string_lossy()
+			                    .replace(|c: char| !c.is_ascii_alphanumeric(), "_") + ".p8");
 	
-	while let Some(pos) = source.windows(from.len())
-	                            .position(|window| window == from) {
-		out.extend_from_slice(&source[.. pos]);
-		out.extend_from_slice(to);
-		source = &source[pos + from.len() ..];
+	fs::write(&tmp_cart_path, &cart).expect("Unable to write tmp cart file");
+	
+	let pico8 = runner::pico8::run(&tmp_cart_path);
+	let p8rs = runner::p8rs::run(&cart);
+	
+	match (pico8.runtime_error, p8rs.runtime_error) {
+		(Some(pico8_err), None) => panic!("pico8 raised a runtime error, but p8rs did not.\n\tpico8 runtime error:\n\t\t{}\n\tp8rs runtime error:\n\t\tNone", pico8_err),
+		(None, Some(p8rs_err)) => panic!("p8rs raised a runtime error, but pico8 did not.\n\tpico8 runtime error:\n\t\tNone\n\tp8rs runtime error:\n\t\t{}", p8rs_err),
+		_ => {}
 	}
 	
-	out.extend_from_slice(source);
-	
-	out
-}
-
-#[cfg(test)]
-mod tests {
-	use crate::tester::replace;
-	
-	#[test]
-	fn replace_test() {
-		assert_eq!(replace(b"Test lel kek lel wew", b"lel", b"banana"), b"Test banana kek banana wew")
+	for i in 0..usize::max(pico8.logs.len(), p8rs.logs.len()) {
+		let pico8_log = pico8.logs.get(i);
+		let p8rs_log = p8rs.logs.get(i);
+		if pico8_log == p8rs_log {
+			continue
+		}
+		
+		let test_name = pico8_log.and_then(Log::name)
+		                         .or(p8rs_log.and_then(Log::name))
+		                         .map(|name| format!(" {}", name))
+		                         .unwrap_or("".into());
+		
+		match (pico8_log, p8rs_log) {
+			(Some(pico8_log), Some(p8rs_log)) => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\t{}\n\tp8rs log:\n\t\t{}", test_name, pico8_log, p8rs_log),
+			(Some(pico8_log), None)           => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\t{}\n\tp8rs log:\n\t\tNone", test_name, pico8_log),
+			(None, Some(p8rs_log))            => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\tNone\n\tp8rs log:\n\t\t{}", test_name, p8rs_log),
+			_ => unreachable!()
+		}
 	}
 }
+

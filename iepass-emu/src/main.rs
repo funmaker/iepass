@@ -7,7 +7,7 @@ use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
 use egui::{Color32, Event, Frame, ImageSource, RawInput};
 use egui::load::SizedTexture;
-use iepass_core::pico8::Pico8VM;
+use iepass_core::pico8::{Pico8VM, RunResult};
 use iepass_core::colors::Color;
 use iepass_core::pico8::palette::PALETTE;
 
@@ -35,7 +35,7 @@ struct EmulatorApp {
 	fb_tex: TextureHandle,
 	frame: usize,
 	last_frames: [Instant; 10],
-	requested_fps: u16,
+	target_fps: u16,
 	pico8: Pico8VM,
 	running: bool,
 }
@@ -61,7 +61,7 @@ impl EmulatorApp {
 			fb_tex,
 			frame: 0,
 			last_frames: [Instant::now().sub(Duration::from_millis(1000)); 10],
-			requested_fps: 30,
+			target_fps: 30,
 			pico8,
 			running: true,
 		}
@@ -75,24 +75,24 @@ impl eframe::App for EmulatorApp {
 		let elapsed = now - self.last_frames[0];
 		let previous_duration = self.last_frames[0] - self.last_frames[2];
 		
-		let requested_delay = 1f32 / self.requested_fps as f32;
+		let requested_delay = 1f32 / self.target_fps as f32;
 		let previous_error = previous_duration.as_secs_f32()/2f32 - requested_delay;
 		
 		let delta = requested_delay - elapsed.as_secs_f32() - 0.5f32*previous_error.clamp(-requested_delay*0.9f32, requested_delay*0.9f32);
 		
 		if delta < 0.001f32 && self.running {
-			let mut run_result = self.pico8.run_fuel(25000);
-			while run_result.out_of_fuel && (Instant::now() - now).as_secs_f32() < requested_delay {
-				run_result = self.pico8.run_fuel(25000);
+			let mut run_result = self.pico8.run_fuel(25000).unwrap();
+			while run_result == RunResult::OutOfFuel && (Instant::now() - now).as_secs_f32() < requested_delay {
+				run_result = self.pico8.run_fuel(25000).unwrap();
 			}
 			
-			self.requested_fps = if run_result.stopped { 10 } else { run_result.requested_fps.max(1) };
+			self.target_fps = if run_result == RunResult::Stop { 10 } else { self.pico8.runtime().target_fps.max(1) };
 			
-			if run_result.stopped {
+			if run_result == RunResult::Stop {
 				self.running = false;
 			}
 			
-			if !run_result.out_of_fuel {
+			if run_result != RunResult::OutOfFuel {
 				let rt = self.pico8.runtime();
 				
 				let screen_palette = rt.memory.palette(1);

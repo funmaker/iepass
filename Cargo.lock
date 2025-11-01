@@ -3320,6 +3320,10 @@ dependencies = [
 [[package]]
 name = "p8rs-tests"
 version = "0.1.0"
+dependencies = [
+ "iepass-core",
+ "p8rs-types",
+]
 
 [[package]]
 name = "p8rs-types"

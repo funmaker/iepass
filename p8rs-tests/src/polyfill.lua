@@ -1,6 +1,63 @@
 
 p8rs = p8rs or {}
 do
+	local stringify, stringifyTable
+	
+	-- https://pico-8.fandom.com/wiki/Qsort
+	function qsort(a,c,l,r)
+		c,l,r=c or function(a,b) return a<b end,l or 1,r or #a
+		if l<r then
+			if c(a[r],a[l]) then
+				a[l],a[r]=a[r],a[l]
+			end
+			local lp,k,rp,p,q=l+1,l+1,r-1,a[l],a[r]
+			while k<=rp do
+				local swaplp=c(a[k],p)
+				-- "if a or b then else"
+				-- saves a token versus
+				-- "if not (a or b) then"
+				if swaplp or c(a[k],q) then
+				else
+					while c(q,a[rp]) and k<rp do
+						rp=rp-1
+					end
+					a[k],a[rp],swaplp=a[rp],a[k],c(a[rp],p)
+					rp=rp-1
+				end
+				if swaplp then
+					a[k],a[lp]=a[lp],a[k]
+					lp=lp+1
+				end
+				k=k+1
+			end
+			lp=lp-1
+		rp=rp+1
+		-- sometimes lp==rp, so 
+		-- these two lines *must*
+		-- occur in sequence;
+		-- don't combine them to
+		-- save a token!
+		a[l],a[lp]=a[lp],a[l]
+		a[r],a[rp]=a[rp],a[r]
+		qsort(a,c,l,lp-1       )
+		qsort(a,c,  lp+1,rp-1  )
+		qsort(a,c,       rp+1,r)
+		end
+	end
+	
+	local function compareAny(a, b)
+		local atype = type(a)
+		local btype = type(b)
+		if atype ~= btype then return atype < btype
+		elseif atype == "nil" then return false
+		elseif atype == "string" then return a < b
+		elseif atype == "number" then return a < b
+		elseif atype == "boolean" then return (a and 1 or 0) < (b and 1 or 0)
+		elseif atype == "table" then return stringifyTable(a) < stringifyTable(b)
+		else assert(false, "Can't compare values of type " .. atype)
+		end
+	end
+	
 	local function escape(str)
 		local out = ""
 		for i = 1,#str do
@@ -28,26 +85,34 @@ do
 		return bytes
 	end
 	
-	local stringify
-	local function stringifyTable(t)
+	stringifyTable = function(t)
 		local out = ""
 		local first = true
-		local seq = 0
 		
+		for _, v in ipairs(t) do
+			if first then first = false
+			else out = out .. ", "
+			end
+			out = out .. stringify(v)
+		end
+		
+		local entries = {}
 		for k, v in pairs(t) do
+			if not (type(k) == "number" and k == flr(k) and k > 0 and k <= #t) then
+				add(entries, {k, v})
+			end
+		end
+		
+		qsort(entries, function(a, b) return compareAny(a[1], b[1]) end)
+		
+		for _, entry in ipairs(entries) do
 			if first then first = false
 			else out = out .. ", "
 			end
 			
-			if type(k) == "number" and type(seq) == "number" and k == seq + 1 then
-				seq = k
-			else
-				seq = nil
-				out = out .. "[" .. stringify(k) .. "] = "
-			end
-			
-			out = out .. stringify(v)
+			out = out .. "[" .. stringify(entry[1]) .. "] = " .. stringify(entry[2])
 		end
+		
 		return '{ ' .. out .. ' }'
 	end
 	
@@ -73,16 +138,14 @@ do
 	end
 	
 	p8rs.test_scr = function(name)
-		local row = 0
-		printh("SRC | " .. name .. " | pal | " .. stringifyMemory(0x5f10, 16))
-		for chunk = 0x6000,0x7fff,64 do
+		printh("SCR | " .. name .. " | pal | " .. stringifyMemory(0x5f10, 16))
+		for row = 0,127 do
 			local leftpad
 			if row < 10 then leftpad = "  "
 			elseif row < 100 then leftpad = " "
 			else leftpad = ""
 			end
-			printh("SRC | " .. name .. " | " .. leftpad .. row .. " | " .. stringifyMemory(chunk, 64))
-			row = row + 1
+			printh("SCR | " .. name .. " | " .. leftpad .. row .. " | " .. stringifyMemory(0x6000 + row * 64, 64))
 		end
 	end
 end

@@ -39,4 +39,4 @@ jobs:
 #      - name: 🔨 Build project
 #        run: cargo make build
       - name: 🧪 Run tests
-        run: cargo make test
+        run: cargo make test-ci

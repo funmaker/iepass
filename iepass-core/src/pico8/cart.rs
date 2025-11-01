@@ -1,69 +1,55 @@
 use core::alloc::Allocator;
+use core::iter::Peekable;
+use core::fmt::Debug;
 use alloc::vec::Vec;
 use thiserror::Error;
 
 use crate::pico8::Pico8VM;
 
+type LinesIter<'a> = impl Iterator<Item = &'a [u8]> + Debug;
+
 #[derive(Debug)]
-pub struct SectionIterator<'a, Lines> {
-	pub cart: &'a [u8],
-	header_lines: Lines,
-	last_header: Option<&'a [u8]>,
+pub struct SectionIterator<'a> {
+	cart: &'a [u8],
+	headers_iter: Peekable<LinesIter<'a>>,
 }
 
-impl<'a, Lines> Iterator for SectionIterator<'a, Lines>
-where Lines: Iterator<Item=&'a [u8]> + 'a {
+impl<'a> SectionIterator<'a> {
+	#[define_opaque(LinesIter)]
+	pub fn new(cart: &'a [u8]) -> Result<SectionIterator<'a>, CartridgeParseError> {
+		let headers_iter = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
+		                       .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"))
+		                       .peekable();
+		
+		if !cart.starts_with(b"pico-8 cartridge") {
+			info!("SectionIterator: Invalid file header");
+			return Err(CartridgeParseError::InvalidHeader);
+		}
+		
+		Ok(SectionIterator {
+			cart,
+			headers_iter,
+		})
+	}
+}
+
+impl<'a> Iterator for SectionIterator<'a> {
 	type Item = (&'a [u8], &'a [u8]);
 	
 	fn next(&mut self) -> Option<Self::Item> {
-		let header = self.last_header;
-		
-		if header.is_none() {
-			return None;
-		}
-		
-		let header = header.unwrap();
-		
-		let next_header = self.header_lines.next();
+		let header = self.headers_iter.next()?;
+		let next_header = self.headers_iter.peek();
 		
 		let body_start = self.cart.subslice_range(header).unwrap().end;
 		let body_end = next_header.and_then(|header| self.cart.subslice_range(header))
-		                               .map(|range| range.start)
-		                               .unwrap_or(self.cart.len());
-		
-		self.last_header = next_header;
+		                          .map(|range| range.start)
+		                          .unwrap_or(self.cart.len());
 		
 		Some((
 			header,
 			&self.cart[body_start..body_end],
 		))
 	}
-}
-
-pub fn sections(cart: &[u8]) -> Result<impl Iterator<Item = (&[u8], &[u8])>, CartridgeParseError> {
-	let mut header_lines = cart.split(|x: &u8| *x == b'\n' || *x == b'\r')
-	                           .filter(|line| line.starts_with(b"__") && line.ends_with(b"__"));
-	
-	let last_header = header_lines.next();
-	
-	if last_header.is_none() {
-		return Err(CartridgeParseError::NoDataSection);
-	}
-	
-	let file_header = &cart[0..cart.subslice_range(last_header.unwrap()).unwrap().start];
-	
-	if file_header.len() < 25 {
-		info!("SectionIterator: File header too short");
-		return Err(CartridgeParseError::InvalidHeader);
-	}
-	
-	// todo: check header better
-	
-	Ok(SectionIterator {
-		cart,
-		header_lines,
-		last_header,
-	})
 }
 
 struct CartLoadContext {
@@ -73,7 +59,7 @@ struct CartLoadContext {
 }
 
 pub fn load_cartridge<A: Allocator + Clone + 'static>(vm: &mut Pico8VM<A>, cartridge: &[u8]) -> Result<(), CartridgeParseError> {
-	let section_iter = sections(cartridge)?;
+	let section_iter = SectionIterator::new(cartridge)?;
 	let mut load_ctx = CartLoadContext {
 		lua_code: Vec::new(),
 		gfx_loaded: false,

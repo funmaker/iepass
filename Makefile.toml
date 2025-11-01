@@ -23,6 +23,11 @@ dependencies = ["build-assets"]
 command = "cargo"
 args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "${@}"]
 
+[tasks.test-ci]
+dependencies = ["build-assets"]
+command = "cargo"
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "--exclude", "p8rs-tests", "${@}"]
+
 # Running
 [tasks.run]
 dependencies = ["build-assets"]
