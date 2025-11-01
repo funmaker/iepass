@@ -3318,6 +3318,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "p8rs-tests"
+version = "0.1.0"
+
+[[package]]
 name = "p8rs-types"
 version = "0.1.0"
 dependencies = [
