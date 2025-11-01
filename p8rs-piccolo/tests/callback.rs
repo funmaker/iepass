@@ -4,7 +4,7 @@ use gc_arena::Collect;
 use p8rs_macros::p8;
 use p8rs_piccolo::{
     BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Execution, Executor,
-    ExternError, Function, IntoValue, Lua, Sequence, SequencePoll, Stack, String, Thread, Value,
+    ExternError, Function, IntoValue, Lua, RuntimeRef, Sequence, SequencePoll, Stack, String, Thread, Value
 };
 
 #[test]
@@ -84,6 +84,7 @@ fn loopy_callback() -> Result<(), ExternError> {
                     _ctx: Context<'gc>,
                     _exec: Execution<'gc, '_>,
                     mut stack: Stack<'gc, '_>,
+                    _rt: RuntimeRef<'_>,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     stack.push_back(self.0.into());
                     self.0 += 1;
@@ -160,6 +161,7 @@ fn yield_sequence() -> Result<(), ExternError> {
                     ctx: Context<'gc>,
                     _exec: Execution<'gc, '_>,
                     mut stack: Stack<'gc, '_>,
+                    _rt: RuntimeRef<'_>,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     match self.0 {
                         0 => {
@@ -244,6 +246,7 @@ fn resume_with_err() {
                     ctx: Context<'gc>,
                     _exec: Execution<'gc, '_>,
                     mut stack: Stack<'gc, '_>,
+                    _rt: RuntimeRef<'_>,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     stack.replace(ctx, 12_i16);
                     Ok(SequencePoll::Call {
@@ -261,6 +264,7 @@ fn resume_with_err() {
                     _exec: Execution<'gc, '_>,
                     error: Error<'gc>,
                     mut stack: Stack<'gc, '_>,
+                    _rt: RuntimeRef<'_>,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     assert_eq!(stack.consume::<i32>(ctx).unwrap(), 12);
                     Err(error)

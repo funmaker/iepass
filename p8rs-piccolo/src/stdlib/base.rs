@@ -6,7 +6,7 @@ use crate::{
     meta_ops::{self, MetaResult},
     table::NextValue,
     BoxSequence, Callback, CallbackReturn, Context, Error, Execution, IntoValue, MetaMethod,
-    Sequence, SequencePoll, Stack, String, Table, Value, Variadic,
+    RuntimeRef, Sequence, SequencePoll, Stack, String, Table, Value, Variadic,
 };
 
 pub fn load_base<'gc>(ctx: Context<'gc>) {
@@ -254,6 +254,7 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
                         _ctx: Context<'gc>,
                         _exec: Execution<'gc, '_>,
                         mut stack: Stack<'gc, '_>,
+                        _rt: RuntimeRef<'_>,
                     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                         if stack.len() > 3 {
                             stack.drain(3..);
@@ -353,6 +354,7 @@ impl<'gc> Sequence<'gc> for PCall {
         ctx: Context<'gc>,
         _exec: Execution<'gc, '_>,
         mut stack: Stack<'gc, '_>,
+        _rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         stack.into_front(ctx, true);
         Ok(SequencePoll::Return)
@@ -364,6 +366,7 @@ impl<'gc> Sequence<'gc> for PCall {
         _exec: Execution<'gc, '_>,
         error: Error<'gc>,
         mut stack: Stack<'gc, '_>,
+        _rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         stack.replace(ctx, (false, error));
         Ok(SequencePoll::Return)

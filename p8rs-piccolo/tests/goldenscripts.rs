@@ -20,8 +20,8 @@ mod collected_print {
     use gc_arena::Collect;
     use p8rs_piccolo::{
         meta_ops::{self, MetaResult},
-        BoxSequence, Callback, CallbackReturn, Context, Execution, Sequence, SequencePoll, Stack,
-        Value,
+        BoxSequence, Callback, CallbackReturn, Context, Execution, RuntimeRef, Sequence, SequencePoll,
+        Stack, Value,
     };
     use std::{
         io::{Cursor, Write},
@@ -61,6 +61,7 @@ mod collected_print {
             ctx: Context<'gc>,
             _exec: Execution<'gc, '_>,
             mut stack: Stack<'gc, '_>,
+            _rt: RuntimeRef<'_>,
         ) -> Result<SequencePoll<'gc>, p8rs_piccolo::Error<'gc>> {
             while let Some(value) = stack.pop_back() {
                 match meta_ops::tostring(ctx, value)? {

@@ -302,6 +302,7 @@ pub trait Sequence<'gc>: Collect {
         ctx: Context<'gc>,
         exec: Execution<'gc, '_>,
         stack: Stack<'gc, '_>,
+        rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>>;
 
     /// Called if triggered action has errored, allowing the `Sequence` to potentially handle the
@@ -315,6 +316,7 @@ pub trait Sequence<'gc>: Collect {
         _exec: Execution<'gc, '_>,
         error: Error<'gc>,
         _stack: Stack<'gc, '_>,
+        _rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         Err(error)
     }
@@ -357,8 +359,9 @@ impl<'gc> BoxSequence<'gc> {
         ctx: Context<'gc>,
         exec: Execution<'gc, '_>,
         stack: Stack<'gc, '_>,
+        rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
-        self.0.as_mut().poll(ctx, exec, stack)
+        self.0.as_mut().poll(ctx, exec, stack, rt)
     }
 
     pub fn error(
@@ -367,7 +370,8 @@ impl<'gc> BoxSequence<'gc> {
         exec: Execution<'gc, '_>,
         error: Error<'gc>,
         stack: Stack<'gc, '_>,
+        rt: RuntimeRef<'_>,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
-        self.0.as_mut().error(ctx, exec, error, stack)
+        self.0.as_mut().error(ctx, exec, error, stack, rt)
     }
 }

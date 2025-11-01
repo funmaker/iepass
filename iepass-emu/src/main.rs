@@ -93,7 +93,7 @@ impl eframe::App for EmulatorApp {
 			}
 			
 			if !run_result.out_of_fuel {
-				let mut rt = self.pico8.runtime();
+				let rt = self.pico8.runtime();
 				
 				let screen_palette = rt.memory.palette(1);
 				

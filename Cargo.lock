@@ -2472,10 +2472,12 @@ dependencies = [
 name = "iepass-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bitflags 2.9.4",
  "cfg-if",
  "defmt 1.0.1",
  "embedded-io",
+ "gc-arena",
  "log",
  "micromath",
  "p8rs-macros",

@@ -3,6 +3,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::alloc::Global;
 use alloc::boxed::Box;
 use p8rs_types::p8num::P8Num;
+use bitflags::bitflags;
 use crate::utils;
 
 pub struct Memory<A: Allocator = Global> {
@@ -20,6 +21,7 @@ impl<A: Allocator> Memory<A> {
 	}
 	
 	pub fn reset(&mut self) {
+		self.inner[0x5f25] = 6; // default pen color
 		self.inner[0x5F55] = 0x60; // default screen mapping
 		self.inner[0x5F56] = 0x20; // default map mapping
 		self.inner[0x5F57] = 128; // default map size
@@ -45,6 +47,14 @@ impl<A: Allocator> Memory<A> {
 			base = 0x6000; // default if custom base would cause to wrap memory
 		}
 		MemoryScreen((&mut self.inner[base.. base+0x2000]).try_into().unwrap())
+	}
+	
+	pub fn draw_state(&mut self) -> MemoryDrawState<'_, A> {
+		MemoryDrawState(self)
+	}
+	
+	pub fn hardware_state(&mut self) -> MemoryHardwareState<'_, A> {
+		MemoryHardwareState(self)
 	}
 	
 	pub fn base_addr_palette(&self, p_idx: u8) -> u16 {
@@ -93,6 +103,36 @@ impl<A: Allocator> DerefMut for Memory<A> {
 
 pub struct MemoryScreen<'a>(&'a mut [u8; 0x2000]);
 
+impl<'a> MemoryScreen<'a> {
+	fn get_addr(x: i16, y: i16) -> Result<(usize, bool), ()> {
+		if x < 0 || y < 0 || x >= 128 || y >= 128 { return Err(()) }
+		Ok((
+			((x / 2) + y * 64) as usize,
+			x & 1 == 0,
+		))
+	}
+	
+	pub fn get_pixel(&self, x: i16, y: i16) -> Result<u8, ()> {
+		let (addr, high) = Self::get_addr(x, y)?;
+		Ok(if high {
+			self.0[addr] & 0xF
+		}else{
+			self.0[addr] >> 4
+		})
+	}
+	
+	pub fn set_pixel(&mut self, x: i16, y: i16, value: u8) -> Result<(), ()> {
+		let (addr, high) = Self::get_addr(x, y)?;
+		let old = self.0[addr];
+		if high {
+			self.0[addr] = (old & 0xF0) | (value & 0xF);
+		}else{
+			self.0[addr] = (value << 4) | (old & 0xF);
+		}
+		Ok(())
+	}
+}
+
 impl<'a> Deref for MemoryScreen<'a> {
 	type Target = [u8; 0x2000];
 	
@@ -131,3 +171,68 @@ macro_rules! impl_ser {
 }
 
 impl_ser!(u8, i8, u16, i16, u32, i32, P8Num);
+
+
+pub struct MemoryDrawState<'a, A: Allocator>(&'a mut Memory<A>);
+
+impl<'a, A: Allocator> MemoryDrawState<'a, A> {
+	pub fn cursor_home_x(&mut self) -> &mut u8 {
+		&mut self.0[0x5f24]
+	}
+	
+	pub fn pen_color(&mut self) -> &mut u8 {
+		&mut self.0[0x5f25]
+	}
+	
+	pub fn cursor_position(&mut self) -> &mut [u8; 2] {
+		(&mut self.0[0x5f26..=0x5f27]).try_into().unwrap()
+	}
+	
+	/**
+	 * [x_begin, y_begin, x_end, y_end]
+	 */
+	pub fn clip_rect(&mut self) -> &mut [u8; 4] {
+		(&mut self.0[0x5f20..=0x5f23]).try_into().unwrap()
+	}
+	
+	pub fn get_camera_position(&self) -> [i16; 2] {
+		[ self.0.read::<i16>(0x5f28), self.0.read::<i16>(0x5f2a) ]
+	}
+	
+	pub fn set_camera_x(&mut self, value: i16) {
+		self.0.write(0x5f28, value);
+	}
+	
+	pub fn set_camera_y(&mut self, value: i16) {
+		self.0.write(0x5f2a, value);
+	}
+}
+
+
+bitflags! {
+	#[derive(Copy, Clone)]
+    pub struct PrintAttributeFlags: u8 {
+        const ENABLE        = 1 << 0;
+        const PADDING       = 1 << 1;
+        const WIDE          = 1 << 2;
+        const TALL          = 1 << 3;
+        const SOLID_BG      = 1 << 4;
+        const INVERT        = 1 << 5;
+        const DOTTY         = 1 << 6;
+        const CUSTOM_FONT   = 1 << 7;
+    }
+}
+
+
+pub struct MemoryHardwareState<'a, A: Allocator>(&'a mut Memory<A>);
+
+// 0x5f40..0x5f80
+impl<'a, A: Allocator> MemoryHardwareState<'a, A> {
+	pub fn get_print_defaults(&mut self) -> PrintAttributeFlags {
+		PrintAttributeFlags::from_bits_truncate(self.0[0x5f58])
+	}
+	
+	pub fn set_print_defaults(&mut self, flags: PrintAttributeFlags) {
+		self.0[0x5f58] = flags.bits();
+	}
+}
