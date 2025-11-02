@@ -18,7 +18,7 @@ mod api;
 pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
-use cart::CartridgeParseError;
+use cart::CartLoadError;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum RunResult {
@@ -54,7 +54,9 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		
 		Ok(vm)
 	}
-	
+}
+
+impl<A: Allocator + 'static> Pico8VM<A> {
 	pub fn load(&mut self, source: &[u8]) {
 		let ex = self.lua.try_enter(|ctx| {
 			let closure = Closure::load(ctx, None, source)?;
@@ -66,7 +68,7 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 		self.executor = Some(ex);
 	}
 	
-	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartridgeParseError> {
+	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartLoadError> {
 		cart::load_cartridge(self, source)
 	}
 	

@@ -41,7 +41,7 @@ where A: Allocator + Clone {
 }
 
 impl<A> p8rs_piccolo::Runtime for Runtime<A>
-where A: Allocator + Clone + 'static {
+where A: Allocator + 'static {
 	fn as_any(&mut self) -> &mut dyn Any {
 		self
 	}

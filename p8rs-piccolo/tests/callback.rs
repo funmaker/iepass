@@ -98,7 +98,7 @@ fn loopy_callback() -> Result<(), ExternError> {
 
             Ok(CallbackReturn::Call {
                 function: Callback::from_fn(&ctx, |_, _, mut stack, _| {
-                    stack.push_back(3.into());
+                    stack.push_back(3_i16.into());
                     Ok(CallbackReturn::Yield {
                         to_thread: None,
                         then: None,
