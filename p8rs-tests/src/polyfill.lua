@@ -61,7 +61,7 @@ do
 	local function escape(str)
 		local out = ""
 		for i = 1,#str do
-			local ch = chr(str, i)
+			local ch = ord(str, i)
 			if ch == 0 then out = out .. "\\0"
 			elseif ch == 9 then out = out .. "\\t"
 			elseif ch == 10 then out = out .. "\\n"

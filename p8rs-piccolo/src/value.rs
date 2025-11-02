@@ -193,6 +193,18 @@ impl<'gc> From<P8Num> for Value<'gc> {
     }
 }
 
+impl<'gc> From<u8> for Value<'gc> {
+    fn from(v: u8) -> Value<'gc> {
+        Value::Number(P8Num::from(v))
+    }
+}
+
+impl<'gc> From<i8> for Value<'gc> {
+    fn from(v: i8) -> Value<'gc> {
+        Value::Number(P8Num::from(v))
+    }
+}
+
 impl<'gc> From<i16> for Value<'gc> {
     fn from(v: i16) -> Value<'gc> {
         Value::Number(P8Num::from(v))

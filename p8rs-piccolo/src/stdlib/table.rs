@@ -3,16 +3,7 @@ use core::{mem, pin::Pin};
 use anyhow::Context as _;
 use gc_arena::Collect;
 
-use crate::{
-    async_callback::{AsyncSequence, Locals},
-    async_sequence,
-    fuel::count_fuel,
-    meta_ops::{self, concat_separated, ConcatMetaResult, MetaResult},
-    table::RawTable,
-    BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Execution, Function, IntoValue,
-    MetaMethod, Sequence, SequencePoll, SequenceReturn, Stack, StashedError, StashedFunction,
-    StashedTable, StashedValue, Table, Value,
-};
+use crate::{async_callback::{AsyncSequence, Locals}, async_sequence, fuel::count_fuel, meta_ops::{self, concat_separated, ConcatMetaResult, MetaResult}, table::RawTable, BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Execution, Function, IntoValue, MetaMethod, RuntimeRef, Sequence, SequencePoll, SequenceReturn, Stack, StashedError, StashedFunction, StashedTable, StashedValue, Table, Value};
 
 pub fn load_table<'gc>(ctx: Context<'gc>) {
     let table = Table::new(&ctx);
@@ -20,7 +11,7 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
     table.set_field(
         ctx,
         "pack",
-        Callback::from_fn(&ctx, |ctx, _, stack| {
+        Callback::from_fn(&ctx, |ctx, _, stack, _| {
             Ok(CallbackReturn::Sequence(BoxSequence::new(
                 &ctx,
                 Pack::SetLength {
@@ -31,7 +22,7 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    let unpack: Function<'gc> = Callback::from_fn(&ctx, |ctx, _, mut stack| {
+    let unpack: Function<'gc> = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
         let (table, start_arg, end_arg): (Value<'gc>, Option<i64>, Option<i64>) =
             stack.consume(ctx)?;
 
@@ -64,10 +55,10 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
     table.set_field(
         ctx,
         "concat",
-        Callback::from_fn_with(&ctx, unpack, move |unpack, ctx, _exec, mut stack| {
+        Callback::from_fn_with(&ctx, unpack, move |unpack, ctx, _exec, mut stack, _| {
             let sep = stack.remove(1).unwrap_or_default();
 
-            let then_impl = Callback::from_fn_with(&ctx, sep, |sep, ctx, _, mut stack| {
+            let then_impl = Callback::from_fn_with(&ctx, sep, |sep, ctx, _, mut stack, _| {
                 let values = &stack[..];
                 match concat_separated(ctx, values, *sep)? {
                     ConcatMetaResult::Value(v) => {
@@ -91,6 +82,7 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
                     _ctx: Context<'gc>,
                     _exec: Execution<'gc, '_>,
                     _stack: Stack<'gc, '_>,
+                    _rt: RuntimeRef,
                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
                     Ok(SequencePoll::TailCall(self.0))
                 }
@@ -107,6 +99,7 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
     table.set_field(ctx, "remove", Callback::from_fn(&ctx, table_remove_impl));
 
     table.set_field(ctx, "insert", Callback::from_fn(&ctx, table_insert_impl));
+    ctx.set_global("add", Callback::from_fn(&ctx, table_insert_impl)); // TODO: Move to p8rs
 
     let data = include_str!("table/sort.lua");
     let func = Closure::load(ctx, Some("table/sort.lua"), data.as_bytes()).unwrap();
@@ -145,7 +138,7 @@ async fn index_helper(
 ) -> Result<(), StashedError> {
     let call = seq.try_enter(|ctx, locals, _, stack| {
         let table = locals.fetch(table);
-        let call = meta_ops::index(ctx, Value::Table(table), Value::Integer(key))?;
+        let call = meta_ops::index(ctx, Value::Table(table), Value::Number((key as i16).into()))?;
         Ok(prep_metaop_call(ctx, stack, locals, call))
     })?;
     if let Some(call) = call {
@@ -167,7 +160,7 @@ async fn index_set_helper(
     let call = seq.try_enter(|ctx, locals, _, mut stack| {
         let table = locals.fetch(table);
         let value = locals.fetch(&value);
-        let call = meta_ops::new_index(ctx, Value::Table(table), Value::Integer(key), value)?;
+        let call = meta_ops::new_index(ctx, Value::Table(table), Value::Number((key as i16).into()), value)?;
         match call {
             None => Ok(None),
             Some(call) => {
@@ -193,6 +186,7 @@ fn table_remove_impl<'gc>(
     ctx: Context<'gc>,
     mut exec: Execution<'gc, '_>,
     mut stack: Stack<'gc, '_>,
+    _rt: RuntimeRef,
 ) -> Result<CallbackReturn<'gc>, Error<'gc>> {
     let (table, index): (Table, Option<i64>) = stack.consume(ctx)?;
     let length;
@@ -303,10 +297,11 @@ fn table_remove_impl<'gc>(
     Ok(CallbackReturn::Sequence(s))
 }
 
-fn table_insert_impl<'gc>(
+pub fn table_insert_impl<'gc>(
     ctx: Context<'gc>,
     mut exec: Execution<'gc, '_>,
     mut stack: Stack<'gc, '_>,
+    _rt: RuntimeRef,
 ) -> Result<CallbackReturn<'gc>, Error<'gc>> {
     let table: Table;
     let index: Option<i64>;
@@ -468,6 +463,7 @@ impl<'gc> Sequence<'gc> for Pack<'gc> {
         ctx: Context<'gc>,
         mut exec: Execution<'gc, '_>,
         mut stack: Stack<'gc, '_>,
+        _rt: RuntimeRef,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         if let Pack::SetLength { table, length } = *self {
             *self = Pack::MainLoop {
@@ -478,7 +474,7 @@ impl<'gc> Sequence<'gc> for Pack<'gc> {
             };
 
             if let Some(call) =
-                meta_ops::new_index(ctx, table, "n".into_value(ctx), (length as i64).into())?
+                meta_ops::new_index(ctx, table, "n".into_value(ctx), (length as i16).into())?
             {
                 stack.extend(call.args);
                 return Ok(SequencePoll::Call {
@@ -520,7 +516,7 @@ impl<'gc> Sequence<'gc> for Pack<'gc> {
 
             while *index < *batch_end {
                 if let Some(call) =
-                    meta_ops::new_index(ctx, table, (*index as i64 + 1).into(), stack[*index])?
+                    meta_ops::new_index(ctx, table, ((*index + 1) as i16).into(), stack[*index])?
                 {
                     stack.extend(call.args);
                     return Ok(SequencePoll::Call {
@@ -583,6 +579,7 @@ impl<'gc> Sequence<'gc> for Unpack<'gc> {
         ctx: Context<'gc>,
         mut exec: Execution<'gc, '_>,
         mut stack: Stack<'gc, '_>,
+        _rt: RuntimeRef,
     ) -> Result<SequencePoll<'gc>, Error<'gc>> {
         if let Unpack::FindLength { start, table } = *self {
             *self = Unpack::LengthFound { start, table };
@@ -658,7 +655,7 @@ impl<'gc> Sequence<'gc> for Unpack<'gc> {
             }
 
             while *index < *batch_end {
-                match meta_ops::index(ctx, table, (start + *index as i64).into())? {
+                match meta_ops::index(ctx, table, ((start + *index as i64) as i16).into())? {
                     MetaResult::Value(v) => {
                         stack.push_back(v);
                     }

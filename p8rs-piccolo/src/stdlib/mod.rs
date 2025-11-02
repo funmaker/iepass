@@ -2,7 +2,7 @@ mod base;
 mod coroutine;
 // mod math;
 // mod string;
-// mod table;
+mod table;
 
 // #[cfg(feature = "std")]
 // mod io;
@@ -10,7 +10,7 @@ mod coroutine;
 pub use self::{
     base::load_base, coroutine::load_coroutine,
     // math::load_math, string::load_string,
-    // table::load_table,
+    table::load_table,
 };
 
 // #[cfg(feature = "std")]

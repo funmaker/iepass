@@ -9,7 +9,9 @@ pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
+	// TODO: Remove
 	p8rs_piccolo::stdlib::load_base(ctx);
+	p8rs_piccolo::stdlib::load_table(ctx);
 	
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
