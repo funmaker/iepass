@@ -1,16 +1,18 @@
-use std::alloc::Allocator;
-use anyhow::anyhow;
-use crate::pico8::numeric::{number_from_ascii, NumberConversionFlags};
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, IntoValue, RuntimeError, Value, String};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
 use crate::pico8::Runtime;
 
-pub fn install_pico8_base<A: Allocator + 'static>(ctx: Context) {
+use crate::pico8::numeric::{number_from_ascii, NumberConversionFlags};
+use crate::pico8::Runtime;
+
+pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
+	// TODO: Remove
 	p8rs_piccolo::stdlib::load_base(ctx);
+	p8rs_piccolo::stdlib::load_table(ctx);
 	
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
@@ -89,12 +91,9 @@ pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Result<Option<Value<'gc>>, R
 }
 
 #[api_callback]
-pub fn printh(text: String, filename: Option<String>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) -> Result<(), RuntimeError> {
-	if let Some(filename_str) = filename {
-		info!("[printh/{}] {}", filename_str, text);
-	} else {
-		info!("[printh] {}", text);
-	}
+pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) -> Result<(), RuntimeError> {
+	rt.callbacks.printh(&text, filename.as_deref(), overwrite, save_to_desktop);
+	
 	Ok(())
 }
 

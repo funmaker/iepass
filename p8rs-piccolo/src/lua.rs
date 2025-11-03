@@ -8,6 +8,7 @@ use gc_arena::{
 };
 
 use crate::{finalizers::Finalizers, stash::{Fetchable, Stashable}, stdlib::{load_base, load_coroutine}, string::InternedStringSet, thread::BadThreadMode, Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError, RuntimeRef, Singleton, StashedExecutor, String, Table, TypeError, Value};
+use crate::stdlib::load_table;
 
 /// A value representing the main "execution context" of a Lua state.
 ///
@@ -169,7 +170,7 @@ impl Lua {
             load_coroutine(ctx);
             // load_math(ctx);
             // load_string(ctx);
-            // load_table(ctx);
+            load_table(ctx);
         });
     }
     

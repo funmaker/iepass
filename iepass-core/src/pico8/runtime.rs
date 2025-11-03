@@ -3,6 +3,8 @@ use core::ops::{Div, Not};
 use core::any::Any;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
+
+use crate::pico8::callbacks::{Callbacks, DefaultCallbacks};
 use crate::pico8::memory::Memory;
 use crate::utils;
 
@@ -10,7 +12,8 @@ pub struct Runtime<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Memory<A>,
 	pub buttons: Buttons,
-	pub fps: u16,
+	pub target_fps: u16,
+	pub callbacks: Box<dyn Callbacks>,
 }
 
 impl<A> Runtime<A>
@@ -20,12 +23,13 @@ where A: Allocator + Clone {
 			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
 			memory: Memory::new(alloc),
 			buttons: Buttons::new(),
-			fps: 30,
+			target_fps: 30,
+			callbacks: Box::new(DefaultCallbacks),
 		}
 	}
 	
 	pub fn finish_update_frame(&mut self) {
-		self.buttons.finish_update_frame(self.fps);
+		self.buttons.finish_update_frame(self.target_fps);
 	}
 	
 	pub fn update_buttons(&mut self, buttons: &[u8; 8]) {
@@ -37,7 +41,7 @@ where A: Allocator + Clone {
 }
 
 impl<A> p8rs_piccolo::Runtime for Runtime<A>
-where A: Allocator + Clone + 'static {
+where A: Allocator + 'static {
 	fn as_any(&mut self) -> &mut dyn Any {
 		self
 	}

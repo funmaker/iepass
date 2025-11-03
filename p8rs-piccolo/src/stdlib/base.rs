@@ -279,51 +279,52 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    // let inext = Callback::from_fn(&ctx, |ctx, _, mut stack| {
-    //     let (table, index): (Value, Option<i64>) = stack.consume(ctx)?;
-    //     let next_index = index.unwrap_or(0).wrapping_add(1);
-    //     Ok(match meta_ops::index(ctx, table, next_index.into())? {
-    //         MetaResult::Value(v) => {
-    //             if !v.is_nil() {
-    //                 stack.extend([next_index.into(), v]);
-    //             }
-    //             CallbackReturn::Return
-    //         }
-    //         MetaResult::Call(call) => {
-    //             #[derive(Collect)]
-    //             #[collect(require_static)]
-    //             struct INext(i64);
-    // 
-    //             impl<'gc> Sequence<'gc> for INext {
-    //                 fn poll(
-    //                     self: Pin<&mut Self>,
-    //                     _ctx: Context<'gc>,
-    //                     _exec: Execution<'gc, '_>,
-    //                     mut stack: Stack<'gc, '_>,
-    //                 ) -> Result<SequencePoll<'gc>, Error<'gc>> {
-    //                     if !stack.get(0).is_nil() {
-    //                         stack.push_front(self.0.into());
-    //                     }
-    //                     Ok(SequencePoll::Return)
-    //                 }
-    //             }
-    // 
-    //             stack.extend(call.args);
-    //             CallbackReturn::Call {
-    //                 function: call.function,
-    //                 then: Some(BoxSequence::new(&ctx, INext(next_index))),
-    //             }
-    //         }
-    //     })
-    // });
+    let inext = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
+        let (table, index): (Value, Option<i64>) = stack.consume(ctx)?;
+        let next_index = index.unwrap_or(0).wrapping_add(1);
+        Ok(match meta_ops::index(ctx, table, (next_index as i16).into())? {
+            MetaResult::Value(v) => {
+                if !v.is_nil() {
+                    stack.extend([(next_index as i16).into(), v]);
+                }
+                CallbackReturn::Return
+            }
+            MetaResult::Call(call) => {
+                #[derive(Collect)]
+                #[collect(require_static)]
+                struct INext(i64);
+    
+                impl<'gc> Sequence<'gc> for INext {
+                    fn poll(
+                        self: Pin<&mut Self>,
+                        _ctx: Context<'gc>,
+                        _exec: Execution<'gc, '_>,
+                        mut stack: Stack<'gc, '_>,
+                        _rt: RuntimeRef,
+                    ) -> Result<SequencePoll<'gc>, Error<'gc>> {
+                        if !stack.get(0).is_nil() {
+                            stack.push_front((self.0 as i16).into());
+                        }
+                        Ok(SequencePoll::Return)
+                    }
+                }
+    
+                stack.extend(call.args);
+                CallbackReturn::Call {
+                    function: call.function,
+                    then: Some(BoxSequence::new(&ctx, INext(next_index))),
+                }
+            }
+        })
+    });
 
-    // ctx.set_global(
-    //     "ipairs",
-    //     Callback::from_fn_with(&ctx, inext, move |inext, ctx, _, mut stack| {
-    //         stack.into_front(ctx, *inext);
-    //         Ok(CallbackReturn::Return)
-    //     }),
-    // );
+    ctx.set_global(
+        "ipairs",
+        Callback::from_fn_with(&ctx, inext, move |inext, ctx, _, mut stack, _| {
+            stack.into_front(ctx, *inext);
+            Ok(CallbackReturn::Return)
+        }),
+    );
 
     ctx.set_global(
         "collectgarbage",

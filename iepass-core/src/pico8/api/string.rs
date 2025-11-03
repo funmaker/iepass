@@ -1,19 +1,34 @@
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{String, Context, RuntimeError};
+use p8rs_piccolo::{String, Context, RuntimeError, Stack, Value};
 
 pub fn install_pico8_string(ctx: Context) {
 	ctx.set_global("sub", sub::callback(ctx));
+	ctx.set_global("ord", ord::callback(ctx));
 }
 
 #[api_callback]
-pub fn sub<'gc>(ctx: Context<'gc>, text: String, start: i16, end: Option<i16>) -> Result<String<'gc>, RuntimeError> {
-	let len = text.len();
+pub fn sub<'gc>(ctx: Context<'gc>, str: String, start: i16, end: Option<i16>) -> Result<String<'gc>, RuntimeError> {
+	let len = str.len();
 	let start = get_string_offset(len, start);
 	let end = end.map(|e| get_string_offset(len, e)).unwrap_or(len - 1);
 	if end < start {
 		Ok(String::from_static(&ctx, &[]))
 	} else {
-		Ok(String::from_slice(&ctx, &text[start..=end]))
+		Ok(String::from_slice(&ctx, &str[start..=end]))
+	}
+}
+
+#[api_callback]
+pub fn ord(mut stack: Stack, str: String, index: Option<i16>, count: Option<i16>) {
+	let index = index.unwrap_or(1);
+	let count = count.unwrap_or(1);
+	
+	for i in index..index+count {
+		if i <= 0 || i as usize > str.len() {
+			stack.push_back(Value::Nil);
+		} else {
+			stack.push_back(str[i as usize - 1].into());
+		}
 	}
 }
 

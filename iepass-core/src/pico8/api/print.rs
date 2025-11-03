@@ -1,10 +1,11 @@
+use core::alloc::Allocator;
+use core::pin::Pin;
+use gc_arena::Collect;
+use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
+
 use crate::pico8::api::gfx::{draw_letter, set_cursor_color};
 use crate::pico8::memory::PrintAttributeFlags;
 use crate::pico8::Runtime;
-use core::alloc::Allocator;
-use gc_arena::Collect;
-use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
-use std::pin::Pin;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
@@ -66,7 +67,7 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
-	ModifyFlags(PrintAttributeFlags), // todo
+	ModifyFlags(PrintAttributeFlags), // TODO:
 }
 
 fn execute_escape_sequence<'gc, A: Allocator>(_ctx: Context<'gc>, _rt: &mut Runtime<A>, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
@@ -85,7 +86,7 @@ fn execute_escape_sequence<'gc, A: Allocator>(_ctx: Context<'gc>, _rt: &mut Runt
 					EscapeSequenceAction::SkipFrames(frames)
 				}
 				b'd' => {
-					let arg = control_arg_to_number(bytes[2]).unwrap(); // todo safety
+					let arg = control_arg_to_number(bytes[2]).unwrap(); // TODO: safety
 					EscapeSequenceAction::SetLetterFrameSkip(arg as usize)
 				}
 				_ => {

@@ -14,6 +14,7 @@ mod decoder;
 mod escape;
 mod unescape;
 mod utils;
+mod fmt;
 
 pub use char_source::IntoByteIterator;
 pub use encoder::{from_char, from_iter, from_str, from_utf8, FromCharError};
@@ -21,6 +22,7 @@ pub use decoder::{to_char, to_iter};
 pub use escape::escape;
 pub use unescape::{unescape, unescape_in_place, UnescapeError};
 pub use utils::{LossyIteratorEx, Printable};
+pub use fmt::Display;
 
 /// Character table mapping P8SCII characters to their Unicode counterparts.
 /// 
@@ -36,7 +38,7 @@ pub const CHAR_MAP: [char; 256] = [
 	// ASCII Characters
 	' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
 	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-	':', ';', '<', '-', '>', '?', '@',
+	':', ';', '<', '=', '>', '?', '@',
 	'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 	'[', '\\', ']', '^', '_', '`',

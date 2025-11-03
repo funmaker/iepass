@@ -27,6 +27,8 @@ impl<A: Allocator> Memory<A> {
 		self.inner[0x5F57] = 128; // default map size
 		self.inner[0x5f22] = 128; // default clip x_end
 		self.inner[0x5f23] = 128; // default clip y_end
+		self.inner[0x5f26] = 0; // default cursor X
+		self.inner[0x5f27] = 6; // default cursor Y
 		
 		for i in 0..16 {
 			self.inner[0x5F00 + i] = i as u8;

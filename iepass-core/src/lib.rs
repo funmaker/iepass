@@ -3,6 +3,7 @@
 #![feature(substr_range)]
 #![feature(int_from_ascii)]
 #![feature(slice_split_once)]
+#![feature(type_alias_impl_trait)]
 extern crate alloc;
 extern crate core;
 

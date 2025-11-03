@@ -1,9 +1,9 @@
-use crate::pico8::memory::{MemoryDrawState, PrintAttributeFlags};
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use anyhow::anyhow;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
+use crate::pico8::memory::{MemoryDrawState, PrintAttributeFlags};
 use crate::pico8::font::Font;
 use crate::pico8::Runtime;
 
