@@ -2,8 +2,6 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 
 __lua__
-local a = 39;
-p8rs.test("Initial", a);
 a = 5
 p8rs.test("Assign", a)
 a = 5
@@ -45,11 +43,11 @@ p8rs.test("AssignShiftRightLogical", a)
 a = 5
 a <<= 2
 p8rs.test("AssignShiftLeft", a)
-a = 5
-a >><= 2
+a = 32767
+a >><= 20
 p8rs.test("AssignRotateRight", a)
-a = 5
-a <<>= 15
+a = 32767
+a <<>= 4
 p8rs.test("AssignRotateLeft", a)
 a = "hello"
 a ..= " world"

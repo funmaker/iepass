@@ -37,12 +37,20 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 		PathBuf::from(TMP_DIR)
 			.join(orig_cart_path.as_os_str()
 			                    .to_string_lossy()
+			                    .trim_suffix(".p8")
 			                    .replace(|c: char| !c.is_ascii_alphanumeric(), "_") + ".p8");
 	
 	fs::write(&tmp_cart_path, &cart).expect("Unable to write tmp cart file");
 	
 	let pico8 = runner::pico8::run(&tmp_cart_path);
 	let p8rs = runner::p8rs::run(&cart);
+	
+	match (pico8.timeout, p8rs.timeout) {
+		(true, true) => panic!("pico8 and p8rs timeout"),
+		(true, false) => panic!("pico8 timeout"),
+		(false, true) => panic!("p8rs timeout"),
+		_ => {}
+	}
 	
 	match (pico8.runtime_error, p8rs.runtime_error) {
 		(Some(pico8_err), None) => panic!("pico8 raised a runtime error, but p8rs did not.\n\tpico8 runtime error:\n\t\t{}\n\tp8rs runtime error:\n\t\tNone", pico8_err),

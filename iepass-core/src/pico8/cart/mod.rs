@@ -15,7 +15,7 @@ pub fn load_cartridge<A: Allocator + 'static>(vm: &mut Pico8VM<A>, cartridge: &[
 	}
 
 	if !load_ctx.lua_code.is_empty() {
-		load_ctx.vm.load(&load_ctx.lua_code);
+		load_ctx.vm.load(&load_ctx.lua_code)?;
 	}
 
 	Ok(())

@@ -1,6 +1,7 @@
 #![cfg(test)]
 #![feature(pattern)]
 #![feature(array_try_from_fn)]
+#![feature(trim_prefix_suffix)]
 
 const TMP_DIR: &str = "tmp";
 

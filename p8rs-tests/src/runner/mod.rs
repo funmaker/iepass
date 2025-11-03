@@ -4,6 +4,8 @@ pub mod p8rs;
 use std::fmt::{Display, Formatter};
 use crate::utils::str_splitn_array;
 
+pub const TIMEOUT_MS: u64 = 5000;
+
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum Log {
 	TEST(String, String),
@@ -53,10 +55,11 @@ impl Display for Log {
 pub struct RunResult {
 	pub logs: Vec<Log>,
 	pub runtime_error: Option<String>,
+	pub timeout: bool,
 }
 
 impl RunResult {
-	pub fn new(logs: Vec<Log>, runtime_error: Option<String>) -> Self {
-		RunResult { logs, runtime_error }
+	pub fn new(logs: Vec<Log>, runtime_error: Option<String>, timeout: bool) -> Self {
+		RunResult { logs, runtime_error, timeout }
 	}
 }

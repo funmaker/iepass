@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use core::alloc::Allocator;
 use thiserror::Error;
+use p8rs_piccolo::ExternError;
 use p8rs_types::p8scii;
 
 use crate::pico8::Pico8VM;
@@ -150,7 +151,7 @@ pub struct CartridgeSection<'a> {
 	pub content: &'a [u8],
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Hash)]
+#[derive(Error, Debug)]
 pub enum CartLoadError {
 	#[error("Could not load cartridge, invalid input data.")]
 	InvalidInputData,
@@ -160,4 +161,6 @@ pub enum CartLoadError {
 	NoDataSection,
 	#[error("Could not load cartridge, lua code contains invalid UTF-8 characters.")]
 	InvalidLuaUnicode,
+	#[error("Compiler error: {0}")]
+	CompilerError(#[from] ExternError),
 }

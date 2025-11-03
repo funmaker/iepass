@@ -64,8 +64,6 @@ fn traverse(dir: ReadDir, output: &mut impl Write, depth: usize) {
 			writeln_ident!(output, depth, "}}");
 			first = false;
 		} else if filetype.is_file() {
-			println!("cargo:rerun-if-changed={}", entry.path().display());
-			
 			let name = entry.file_name();
 			let name = match name.to_string_lossy().strip_suffix(".p8") {
 				Some(name) => clean_file_name(name),

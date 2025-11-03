@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::thread;
+use std::time::{Duration, Instant};
 use iepass_core::pico8;
 use p8rs_types::p8scii;
 
-use crate::runner::{Log, RunResult};
+use crate::runner::{Log, RunResult, TIMEOUT_MS};
 
 struct RunnerCallback {
 	buffer: Rc<RefCell<String>>,
@@ -22,14 +24,29 @@ pub fn run(source: &[u8]) -> RunResult {
 	let output = Rc::new(RefCell::new(String::new()));
 	let mut vm = pico8::Pico8VM::new().expect("Failed to create P8rs VM");
 	vm.set_callbacks(RunnerCallback { buffer: output.clone() });
-	vm.load_cartridge(source).expect("Failed to load cartridge");
 	
+	if let Err(err) = vm.load_cartridge(source) {
+		println!("-- p8rs load error --");;
+		println!("{err}");
+		println!();
+		
+		return RunResult::new(vec![], Some(err.to_string()), false);
+	}
+	
+	let mut timeout = false;
+	let start = Instant::now();
 	let result = loop {
-		match vm.run() {
-			Ok(pico8::RunResult::Flip) => continue,
+		match vm.run_fuel(1024*1024) {
+			Ok(pico8::RunResult::Flip) |
+			Ok(pico8::RunResult::OutOfFuel) => {},
 			Ok(pico8::RunResult::Stop) => break Ok(()),
 			Err(err) => break Err(err),
-			_ => unreachable!(),
+		}
+		
+		thread::sleep(Duration::from_millis(10));
+		if start.elapsed() > Duration::from_millis(TIMEOUT_MS) {
+			timeout = true;
+			break Ok(());
 		}
 	};
 	
@@ -45,8 +62,13 @@ pub fn run(source: &[u8]) -> RunResult {
 		println!();
 	}
 	
+	if timeout {
+		println!("-- p8rs timed out --");
+		println!();
+	}
+	
 	let logs = output.lines().map(Log::from).collect();
 	let runtime_error = result.err().map(|err| err.to_string());
 	
-	RunResult::new(logs, runtime_error)
+	RunResult::new(logs, runtime_error, timeout)
 }

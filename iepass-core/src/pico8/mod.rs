@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use core::alloc::Allocator;
 use anyhow::anyhow;
 use p8rs_piccolo::table::InvalidTableKey;
-use p8rs_piccolo::{Closure, Context, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, Value};
+use p8rs_piccolo::{Closure, CompilerError, Context, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, Value};
 use p8rs_types::p8num::P8Num;
 
 pub mod memory;
@@ -57,15 +57,17 @@ impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 }
 
 impl<A: Allocator + 'static> Pico8VM<A> {
-	pub fn load(&mut self, source: &[u8]) {
+	pub fn load(&mut self, source: &[u8]) -> Result<(), ExternError> {
 		let ex = self.lua.try_enter(|ctx| {
 			let closure = Closure::load(ctx, None, source)?;
 			let ex = Executor::start(ctx, closure.into(), ());
 			
 			Ok(ctx.stash(ex))
-		}).unwrap();
+		})?;
 		
 		self.executor = Some(ex);
+		
+		Ok(())
 	}
 	
 	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartLoadError> {
