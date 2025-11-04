@@ -2,15 +2,7 @@ use alloc::borrow::ToOwned;
 use allocator_api2::vec;
 use gc_arena::allocator_api::MetricsAlloc;
 use p8rs_types::p8num::P8Num;
-use crate::{
-    meta_ops::{self, ConcatMetaResult, MetaResult},
-    opcode::{Operation, RCIndex},
-    table::RawTable,
-    thread::thread::MetaReturn,
-    types::{RegisterIndex, UpValueDescriptor, VarCount},
-    Closure, Constant, Context, Function, String, Table, Value,
-};
-
+use crate::{meta_ops::{self, ConcatMetaResult, MetaResult}, opcode::{Operation, RCIndex}, table::RawTable, thread::thread::MetaReturn, types::{RegisterIndex, UpValueDescriptor, VarCount}, Closure, Constant, Context, Function, RuntimeRef, String, Table, Value};
 use super::{thread::LuaFrame, VMError};
 
 // Runs the VM for the given number of instructions or until the current LuaFrame may have been
@@ -19,6 +11,7 @@ use super::{thread::LuaFrame, VMError};
 // Returns the number of instructions that were run.
 pub(super) fn run_vm<'gc>(
     ctx: Context<'gc>,
+    rt: RuntimeRef,
     mut lua_frame: LuaFrame<'gc, '_>,
     max_instructions: u32,
 ) -> Result<u32, VMError> {
@@ -372,6 +365,57 @@ pub(super) fn run_vm<'gc>(
                 }
             }
 
+            Operation::Peek { dest, source } => {
+                match meta_ops::peek(ctx, rt, registers.stack_frame[source.0 as usize])? {
+                    MetaResult::Value(v) => {
+                        registers.stack_frame[dest.0 as usize] = v;
+                    }
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
+
+            Operation::Peek2 { dest, source } => {
+                match meta_ops::peek2(ctx, rt, registers.stack_frame[source.0 as usize])? {
+                    MetaResult::Value(v) => {
+                        registers.stack_frame[dest.0 as usize] = v;
+                    }
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
+
+            Operation::Peek4 { dest, source } => {
+                match meta_ops::peek4(ctx, rt, registers.stack_frame[source.0 as usize])? {
+                    MetaResult::Value(v) => {
+                        registers.stack_frame[dest.0 as usize] = v;
+                    }
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
+
             Operation::Eq {
                 skip_if,
                 left,
@@ -653,6 +697,40 @@ pub(super) fn run_vm<'gc>(
                     }
                 }
             }
+            
+            Operation::ShiftRightArithmetic { dest, left, right } => {
+                let left = get_rc(&registers.stack_frame, &current_prototype.constants, left);
+                let right = get_rc(&registers.stack_frame, &current_prototype.constants, right);
+                match meta_ops::shift_right_arithmetic(ctx, left, right)? {
+                    MetaResult::Value(v) => registers.stack_frame[dest.0 as usize] = v,
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
+            
+            Operation::ShiftRightLogical { dest, left, right } => {
+                let left = get_rc(&registers.stack_frame, &current_prototype.constants, left);
+                let right = get_rc(&registers.stack_frame, &current_prototype.constants, right);
+                match meta_ops::shift_right_logical(ctx, left, right)? {
+                    MetaResult::Value(v) => registers.stack_frame[dest.0 as usize] = v,
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
 
             Operation::ShiftLeft { dest, left, right } => {
                 let left = get_rc(&registers.stack_frame, &current_prototype.constants, left);
@@ -670,11 +748,28 @@ pub(super) fn run_vm<'gc>(
                     }
                 }
             }
-
-            Operation::ShiftRight { dest, left, right } => {
+            
+            Operation::RotateRight { dest, left, right } => {
                 let left = get_rc(&registers.stack_frame, &current_prototype.constants, left);
                 let right = get_rc(&registers.stack_frame, &current_prototype.constants, right);
-                match meta_ops::shift_right(ctx, left, right)? {
+                match meta_ops::rotate_right(ctx, left, right)? {
+                    MetaResult::Value(v) => registers.stack_frame[dest.0 as usize] = v,
+                    MetaResult::Call(call) => {
+                        lua_frame.call_meta_function(
+                            ctx,
+                            call.function,
+                            &call.args,
+                            MetaReturn::Register(dest),
+                        )?;
+                        break;
+                    }
+                }
+            }
+            
+            Operation::RotateLeft { dest, left, right } => {
+                let left = get_rc(&registers.stack_frame, &current_prototype.constants, left);
+                let right = get_rc(&registers.stack_frame, &current_prototype.constants, right);
+                match meta_ops::rotate_left(ctx, left, right)? {
                     MetaResult::Value(v) => registers.stack_frame[dest.0 as usize] = v,
                     MetaResult::Call(call) => {
                         lua_frame.call_meta_function(

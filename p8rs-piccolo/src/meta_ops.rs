@@ -3,9 +3,9 @@ use core::fmt::Write;
 
 use gc_arena::Collect;
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::async_callback::{AsyncSequence, Locals};
-use crate::{async_sequence, SequenceReturn, Stack};
+use crate::{async_sequence, RuntimeRef, SequenceReturn, Stack};
 use crate::{
     table::InvalidTableKey, Callback, CallbackReturn, Context, Function, IntoValue, Table, Value,
 };
@@ -37,11 +37,17 @@ pub enum MetaMethod {
     BOr,
     BXor,
     BNot,
-    Shl,
     Shr,
+    LShr,
+    Shl,
+    Rotr,
+    Rotl,
     Concat,
     Lt,
     Le,
+    Peek,
+    Peek2,
+    Peek4,
 }
 
 impl MetaMethod {
@@ -66,11 +72,17 @@ impl MetaMethod {
             MetaMethod::BOr => "__bor",
             MetaMethod::BXor => "__bxor",
             MetaMethod::BNot => "__bnot",
-            MetaMethod::Shl => "__shl",
             MetaMethod::Shr => "__shr",
+            MetaMethod::LShr => "__lshr",
+            MetaMethod::Shl => "__shl",
+            MetaMethod::Rotr => "__rotr",
+            MetaMethod::Rotl => "__rotl",
             MetaMethod::Concat => "__concat",
             MetaMethod::Lt => "__lt",
             MetaMethod::Le => "__le",
+            MetaMethod::Peek => "__peek",
+            MetaMethod::Peek2 => "__peek2",
+            MetaMethod::Peek4 => "__peek4",
         }
     }
 
@@ -100,11 +112,17 @@ impl MetaMethod {
             MetaMethod::BOr => "binary or",
             MetaMethod::BXor => "binary xor",
             MetaMethod::BNot => "binary negate",
+            MetaMethod::Shr => "arithmetic right shift",
+            MetaMethod::LShr => "logical right shift",
             MetaMethod::Shl => "left shift",
-            MetaMethod::Shr => "right shift",
+            MetaMethod::Rotr => "right rotate",
+            MetaMethod::Rotl => "left rotate",
             MetaMethod::Concat => "concatenate",
             MetaMethod::Lt => "compare",
             MetaMethod::Le => "compare",
+            MetaMethod::Peek => "peek",
+            MetaMethod::Peek2 => "peek",
+            MetaMethod::Peek4 => "peek",
         }
     }
 }
@@ -384,19 +402,8 @@ pub fn call<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<Function<'gc>, Meta
 }
 
 pub fn len<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, MetaOperatorError> {
-    if let Some(metatable) = match v {
-        Value::Table(t) => t.metatable(),
-        Value::UserData(u) => u.metatable(),
-        _ => None,
-    } {
-        let len = metatable.get_value(ctx, MetaMethod::Len);
-        if !len.is_nil() {
-            return Ok(MetaResult::Call(MetaCall {
-                function: call(ctx, len)
-                    .map_err(|e| MetaOperatorError::Call(MetaMethod::Len, e))?,
-                args: [v],
-            }));
-        }
+    if let Some(result) = try_unary_metaop(ctx, v, MetaMethod::Len)? {
+        return Ok(result);
     }
 
     match v {
@@ -404,6 +411,58 @@ pub fn len<'gc>(ctx: Context<'gc>, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, 
         Value::Table(t) => Ok(MetaResult::Value(t.length().cast_signed().into())),
         f => Err(MetaOperatorError::Unary(MetaMethod::Len, f.type_name())),
     }
+}
+
+pub fn peek<'gc>(ctx: Context<'gc>, rt: RuntimeRef, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, MetaOperatorError> {
+    if let Some(result) = try_unary_metaop(ctx, v, MetaMethod::Peek)? {
+        return Ok(result);
+    }
+
+    match v.to_number() {
+        Some(addr) => Ok(MetaResult::Value(P8Num::from(rt.peek(addr.to_integer() as u16)).into())),
+        None => Err(MetaOperatorError::Unary(MetaMethod::Peek, v.type_name())),
+    }
+}
+
+pub fn peek2<'gc>(ctx: Context<'gc>, rt: RuntimeRef, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, MetaOperatorError> {
+    if let Some(result) = try_unary_metaop(ctx, v, MetaMethod::Peek2)? {
+        return Ok(result);
+    }
+
+    match v.to_number() {
+        Some(addr) => Ok(MetaResult::Value(P8Num::from(rt.peek2(addr.to_integer() as u16) as i16).into())),
+        None => Err(MetaOperatorError::Unary(MetaMethod::Peek2, v.type_name())),
+    }
+}
+
+pub fn peek4<'gc>(ctx: Context<'gc>, rt: RuntimeRef, v: Value<'gc>) -> Result<MetaResult<'gc, 1>, MetaOperatorError> {
+    if let Some(result) = try_unary_metaop(ctx, v, MetaMethod::Peek4)? {
+        return Ok(result);
+    }
+
+    match v.to_number() {
+        Some(addr) => Ok(MetaResult::Value(P8Num::from_raw(rt.peek4(addr.to_integer() as u16) as i32).into())),
+        None => Err(MetaOperatorError::Unary(MetaMethod::Peek4, v.type_name())),
+    }
+}
+
+fn try_unary_metaop<'gc>(ctx: Context<'gc>, v: Value<'gc>, method: MetaMethod) -> Result<Option<MetaResult<'gc, 1>>, MetaOperatorError> {
+    if let Some(metatable) = match v {
+        Value::Table(t) => t.metatable(),
+        Value::UserData(u) => u.metatable(),
+        _ => None,
+    } {
+        let peek = metatable.get_value(ctx, method);
+        if !peek.is_nil() {
+            return Ok(Some(MetaResult::Call(MetaCall {
+                function: call(ctx, peek)
+                    .map_err(|e| MetaOperatorError::Call(method, e))?,
+                args: [v],
+            })));
+        }
+    }
+    
+    Ok(None)
 }
 
 pub fn tostring<'gc>(
@@ -703,6 +762,26 @@ pub fn bitwise_xor<'gc>(
     })
 }
 
+pub fn shift_right_arithmetic<'gc>(
+    ctx: Context<'gc>,
+    lhs: Value<'gc>,
+    rhs: Value<'gc>,
+) -> Result<MetaResult<'gc, 2>, MetaOperatorError> {
+    meta_metaop(ctx, lhs, rhs, MetaMethod::Shr, |_, a, b| {
+        Some(a.to_constant()?.shift_right_arithmetic(&b.to_constant()?)?.into())
+    })
+}
+
+pub fn shift_right_logical<'gc>(
+    ctx: Context<'gc>,
+    lhs: Value<'gc>,
+    rhs: Value<'gc>,
+) -> Result<MetaResult<'gc, 2>, MetaOperatorError> {
+    meta_metaop(ctx, lhs, rhs, MetaMethod::LShr, |_, a, b| {
+        Some(a.to_constant()?.shift_right_logical(&b.to_constant()?)?.into())
+    })
+}
+
 pub fn shift_left<'gc>(
     ctx: Context<'gc>,
     lhs: Value<'gc>,
@@ -713,13 +792,23 @@ pub fn shift_left<'gc>(
     })
 }
 
-pub fn shift_right<'gc>(
+pub fn rotate_right<'gc>(
     ctx: Context<'gc>,
     lhs: Value<'gc>,
     rhs: Value<'gc>,
 ) -> Result<MetaResult<'gc, 2>, MetaOperatorError> {
-    meta_metaop(ctx, lhs, rhs, MetaMethod::Shr, |_, a, b| {
-        Some(a.to_constant()?.shift_right(&b.to_constant()?)?.into())
+    meta_metaop(ctx, lhs, rhs, MetaMethod::Rotr, |_, a, b| {
+        Some(a.to_constant()?.rotate_right(&b.to_constant()?)?.into())
+    })
+}
+
+pub fn rotate_left<'gc>(
+    ctx: Context<'gc>,
+    lhs: Value<'gc>,
+    rhs: Value<'gc>,
+) -> Result<MetaResult<'gc, 2>, MetaOperatorError> {
+    meta_metaop(ctx, lhs, rhs, MetaMethod::Rotl, |_, a, b| {
+        Some(a.to_constant()?.rotate_left(&b.to_constant()?)?.into())
     })
 }
 

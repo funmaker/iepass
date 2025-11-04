@@ -196,6 +196,18 @@ pub enum Operation {
         dest: RegisterIndex,
         source: RegisterIndex,
     },
+    Peek {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
+    Peek2 {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
+    Peek4 {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
     Eq {
         skip_if: bool,
         left: RCIndex,
@@ -269,12 +281,27 @@ pub enum Operation {
         left: RCIndex,
         right: RCIndex,
     },
+    ShiftRightArithmetic {
+        dest: RegisterIndex,
+        left: RCIndex,
+        right: RCIndex,
+    },
+    ShiftRightLogical {
+        dest: RegisterIndex,
+        left: RCIndex,
+        right: RCIndex,
+    },
     ShiftLeft {
         dest: RegisterIndex,
         left: RCIndex,
         right: RCIndex,
     },
-    ShiftRight {
+    RotateRight {
+        dest: RegisterIndex,
+        left: RCIndex,
+        right: RCIndex,
+    },
+    RotateLeft {
         dest: RegisterIndex,
         left: RCIndex,
         right: RCIndex,
@@ -404,6 +431,9 @@ impl OpCode {
             Operation::GetUpValue { dest, source } => OpCodeRepr::GetUpValue { dest, source },
             Operation::SetUpValue { dest, source } => OpCodeRepr::SetUpValue { dest, source },
             Operation::Length { dest, source } => OpCodeRepr::Length { dest, source },
+            Operation::Peek { dest, source } => OpCodeRepr::Peek { dest, source },
+            Operation::Peek2 { dest, source } => OpCodeRepr::Peek2 { dest, source },
+            Operation::Peek4 { dest, source } => OpCodeRepr::Peek4 { dest, source },
             Operation::Eq {
                 skip_if,
                 left,
@@ -624,6 +654,34 @@ impl OpCode {
                     OpCodeRepr::BitXorCC { dest, left, right }
                 }
             },
+            Operation::ShiftRightArithmetic { dest, left, right } => match (left, right) {
+                (RCIndex::Register(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::ShiftRightArithmeticRR { dest, left, right }
+                }
+                (RCIndex::Register(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::ShiftRightArithmeticRC { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::ShiftRightArithmeticCR { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::ShiftRightArithmeticCC { dest, left, right }
+                }
+            },
+            Operation::ShiftRightLogical { dest, left, right } => match (left, right) {
+                (RCIndex::Register(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::ShiftRightLogicalRR { dest, left, right }
+                }
+                (RCIndex::Register(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::ShiftRightLogicalRC { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::ShiftRightLogicalCR { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::ShiftRightLogicalCC { dest, left, right }
+                }
+            },
             Operation::ShiftLeft { dest, left, right } => match (left, right) {
                 (RCIndex::Register(left), RCIndex::Register(right)) => {
                     OpCodeRepr::ShiftLeftRR { dest, left, right }
@@ -638,18 +696,32 @@ impl OpCode {
                     OpCodeRepr::ShiftLeftCC { dest, left, right }
                 }
             },
-            Operation::ShiftRight { dest, left, right } => match (left, right) {
+            Operation::RotateRight { dest, left, right } => match (left, right) {
                 (RCIndex::Register(left), RCIndex::Register(right)) => {
-                    OpCodeRepr::ShiftRightRR { dest, left, right }
+                    OpCodeRepr::RotateRightRR { dest, left, right }
                 }
                 (RCIndex::Register(left), RCIndex::Constant(right)) => {
-                    OpCodeRepr::ShiftRightRC { dest, left, right }
+                    OpCodeRepr::RotateRightRC { dest, left, right }
                 }
                 (RCIndex::Constant(left), RCIndex::Register(right)) => {
-                    OpCodeRepr::ShiftRightCR { dest, left, right }
+                    OpCodeRepr::RotateRightCR { dest, left, right }
                 }
                 (RCIndex::Constant(left), RCIndex::Constant(right)) => {
-                    OpCodeRepr::ShiftRightCC { dest, left, right }
+                    OpCodeRepr::RotateRightCC { dest, left, right }
+                }
+            },
+            Operation::RotateLeft { dest, left, right } => match (left, right) {
+                (RCIndex::Register(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::RotateLeftRR { dest, left, right }
+                }
+                (RCIndex::Register(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::RotateLeftRC { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Register(right)) => {
+                    OpCodeRepr::RotateLeftCR { dest, left, right }
+                }
+                (RCIndex::Constant(left), RCIndex::Constant(right)) => {
+                    OpCodeRepr::RotateLeftCC { dest, left, right }
                 }
             },
             Operation::BitNot { dest, source } => OpCodeRepr::BitNot { dest, source },
@@ -800,6 +872,9 @@ impl OpCode {
             OpCodeRepr::GetUpValue { dest, source } => Operation::GetUpValue { dest, source },
             OpCodeRepr::SetUpValue { dest, source } => Operation::SetUpValue { dest, source },
             OpCodeRepr::Length { dest, source } => Operation::Length { dest, source },
+            OpCodeRepr::Peek { dest, source } => Operation::Peek { dest, source },
+            OpCodeRepr::Peek2 { dest, source } => Operation::Peek2 { dest, source },
+            OpCodeRepr::Peek4 { dest, source } => Operation::Peek4 { dest, source },
             OpCodeRepr::EqRR {
                 skip_if,
                 left,
@@ -1110,6 +1185,46 @@ impl OpCode {
                 left: left.into(),
                 right: right.into(),
             },
+            OpCodeRepr::ShiftRightArithmeticRR { dest, left, right } => Operation::ShiftRightArithmetic {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightArithmeticRC { dest, left, right } => Operation::ShiftRightArithmetic {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightArithmeticCR { dest, left, right } => Operation::ShiftRightArithmetic {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightArithmeticCC { dest, left, right } => Operation::ShiftRightArithmetic {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightLogicalRR { dest, left, right } => Operation::ShiftRightLogical {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightLogicalRC { dest, left, right } => Operation::ShiftRightLogical {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightLogicalCR { dest, left, right } => Operation::ShiftRightLogical {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::ShiftRightLogicalCC { dest, left, right } => Operation::ShiftRightLogical {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
             OpCodeRepr::ShiftLeftRR { dest, left, right } => Operation::ShiftLeft {
                 dest,
                 left: left.into(),
@@ -1130,22 +1245,42 @@ impl OpCode {
                 left: left.into(),
                 right: right.into(),
             },
-            OpCodeRepr::ShiftRightRR { dest, left, right } => Operation::ShiftRight {
+            OpCodeRepr::RotateRightRR { dest, left, right } => Operation::RotateRight {
                 dest,
                 left: left.into(),
                 right: right.into(),
             },
-            OpCodeRepr::ShiftRightRC { dest, left, right } => Operation::ShiftRight {
+            OpCodeRepr::RotateRightRC { dest, left, right } => Operation::RotateRight {
                 dest,
                 left: left.into(),
                 right: right.into(),
             },
-            OpCodeRepr::ShiftRightCR { dest, left, right } => Operation::ShiftRight {
+            OpCodeRepr::RotateRightCR { dest, left, right } => Operation::RotateRight {
                 dest,
                 left: left.into(),
                 right: right.into(),
             },
-            OpCodeRepr::ShiftRightCC { dest, left, right } => Operation::ShiftRight {
+            OpCodeRepr::RotateRightCC { dest, left, right } => Operation::RotateRight {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::RotateLeftRR { dest, left, right } => Operation::RotateLeft {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::RotateLeftRC { dest, left, right } => Operation::RotateLeft {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::RotateLeftCR { dest, left, right } => Operation::RotateLeft {
+                dest,
+                left: left.into(),
+                right: right.into(),
+            },
+            OpCodeRepr::RotateLeftCC { dest, left, right } => Operation::RotateLeft {
                 dest,
                 left: left.into(),
                 right: right.into(),
@@ -1318,6 +1453,18 @@ enum OpCodeRepr {
         source: RegisterIndex,
     },
     Length {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
+    Peek {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
+    Peek2 {
+        dest: RegisterIndex,
+        source: RegisterIndex,
+    },
+    Peek4 {
         dest: RegisterIndex,
         source: RegisterIndex,
     },
@@ -1589,6 +1736,46 @@ enum OpCodeRepr {
         left: ConstantIndex8,
         right: ConstantIndex8,
     },
+    ShiftRightArithmeticRR {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: RegisterIndex,
+    },
+    ShiftRightArithmeticRC {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: ConstantIndex8,
+    },
+    ShiftRightArithmeticCR {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: RegisterIndex,
+    },
+    ShiftRightArithmeticCC {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: ConstantIndex8,
+    },
+    ShiftRightLogicalRR {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: RegisterIndex,
+    },
+    ShiftRightLogicalRC {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: ConstantIndex8,
+    },
+    ShiftRightLogicalCR {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: RegisterIndex,
+    },
+    ShiftRightLogicalCC {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: ConstantIndex8,
+    },
     ShiftLeftRR {
         dest: RegisterIndex,
         left: RegisterIndex,
@@ -1609,22 +1796,42 @@ enum OpCodeRepr {
         left: ConstantIndex8,
         right: ConstantIndex8,
     },
-    ShiftRightRR {
+    RotateRightRR {
         dest: RegisterIndex,
         left: RegisterIndex,
         right: RegisterIndex,
     },
-    ShiftRightRC {
+    RotateRightRC {
         dest: RegisterIndex,
         left: RegisterIndex,
         right: ConstantIndex8,
     },
-    ShiftRightCR {
+    RotateRightCR {
         dest: RegisterIndex,
         left: ConstantIndex8,
         right: RegisterIndex,
     },
-    ShiftRightCC {
+    RotateRightCC {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: ConstantIndex8,
+    },
+    RotateLeftRR {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: RegisterIndex,
+    },
+    RotateLeftRC {
+        dest: RegisterIndex,
+        left: RegisterIndex,
+        right: ConstantIndex8,
+    },
+    RotateLeftCR {
+        dest: RegisterIndex,
+        left: ConstantIndex8,
+        right: RegisterIndex,
+    },
+    RotateLeftCC {
         dest: RegisterIndex,
         left: ConstantIndex8,
         right: ConstantIndex8,

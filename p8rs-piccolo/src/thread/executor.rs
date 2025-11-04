@@ -449,7 +449,7 @@ impl<'gc> Executor<'gc> {
                             thread: top_thread,
                             fuel,
                         };
-                        match run_vm(ctx, lua_frame, Self::VM_GRANULARITY) {
+                        match run_vm(ctx, rt, lua_frame, Self::VM_GRANULARITY) {
                             Err(err) => {
                                 top_state.frames.push(Frame::Error(err.into()));
                             }

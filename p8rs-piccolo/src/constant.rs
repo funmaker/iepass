@@ -46,26 +46,18 @@ impl<S> Constant<S> {
 }
 
 impl<S: AsRef<[u8]>> Constant<S> {
-    /// Converts the given constant to an integer or number, if possible.
-    pub fn to_numeric(&self) -> Option<Constant<S>> {
+    /// Interprets Numbers and Strings as a Number, if possible.
+    pub fn to_number(&self) -> Option<P8Num> {
         match self {
-            &Self::Number(a) => Some(Constant::Number(a)),
+            &Self::Number(a) => Some(a),
             Self::String(a) => {
                 let a = trim_whitespace(a.as_ref());
                 if let Ok(n) = P8Num::from_ascii(a) {
-                    Some(Constant::Number(n))
+                    Some(n)
                 } else {
                     None
                 }
             }
-            _ => None,
-        }
-    }
-
-    /// Interprets Numbers, Integers, and Strings as a Number, if possible.
-    pub fn to_number(&self) -> Option<P8Num> {
-        match self.to_numeric() {
-            Some(Self::Number(a)) => Some(a),
             _ => None,
         }
     }
@@ -149,23 +141,54 @@ impl<S: AsRef<[u8]>> Constant<S> {
     pub fn bitwise_xor(&self, rhs: &Self) -> Option<Self> {
         Some(Self::Number(self.to_number()? ^ rhs.to_number()?))
     }
+    
+    pub fn shift_right_arithmetic(&self, rhs: &Self) -> Option<Self> {
+        let rhs = rhs.to_number()?.floor();
+        if rhs < P8Num::ZERO {
+            return self.shift_left(&Self::Number(-rhs));
+        }
+        let rhs = i32::from(rhs) as u32;
+        Some(Self::Number(self.to_number()?.checked_shr(rhs).unwrap_or(P8Num::ZERO)))
+    }
+    
+    pub fn shift_right_logical(&self, rhs: &Self) -> Option<Self> {
+        let rhs = rhs.to_number()?.floor();
+        if rhs < P8Num::ZERO {
+            return self.shift_left(&Self::Number(-rhs));
+        }
+        let rhs = i32::from(rhs) as u32;
+        Some(Self::Number(self.to_number()?
+                              .to_raw()
+                              .cast_unsigned()
+                              .checked_shr(rhs)
+                              .map_or(P8Num::ZERO, |raw| P8Num::from_raw(raw as i32))))
+    }
 
     pub fn shift_left(&self, rhs: &Self) -> Option<Self> {
         let rhs = rhs.to_number()?.floor();
         if rhs < P8Num::ZERO {
-            return self.shift_right(&Self::Number(-rhs));
+            return self.shift_right_arithmetic(&Self::Number(-rhs));
         }
         let rhs = i32::from(rhs) as u32;
         Some(Self::Number(self.to_number()?.checked_shl(rhs).unwrap_or(P8Num::ZERO)))
     }
-
-    pub fn shift_right(&self, rhs: &Self) -> Option<Self> {
+    
+    pub fn rotate_right(&self, rhs: &Self) -> Option<Self> {
         let rhs = rhs.to_number()?.floor();
         if rhs < P8Num::ZERO {
-            return self.shift_right(&Self::Number(-rhs));
+            return self.rotate_left(&Self::Number(-rhs));
         }
         let rhs = i32::from(rhs) as u32;
-        Some(Self::Number(self.to_number()?.checked_shr(rhs).unwrap_or(P8Num::ZERO)))
+        Some(Self::Number(self.to_number()?.rotate_right(rhs)))
+    }
+    
+    pub fn rotate_left(&self, rhs: &Self) -> Option<Self> {
+        let rhs = rhs.to_number()?.floor();
+        if rhs < P8Num::ZERO {
+            return self.rotate_right(&Self::Number(-rhs));
+        }
+        let rhs = i32::from(rhs) as u32;
+        Some(Self::Number(self.to_number()?.rotate_left(rhs)))
     }
 
     // Comparison operators

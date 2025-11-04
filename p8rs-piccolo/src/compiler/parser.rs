@@ -197,8 +197,11 @@ pub enum BinaryOperator {
     BitAnd,
     BitOr,
     BitXor,
+    ShiftRightArithmetic,
+    ShiftRightLogical,
     ShiftLeft,
-    ShiftRight,
+    RotateRight,
+    RotateLeft,
     Concat,
     NotEqual,
     Equal,
@@ -216,6 +219,29 @@ pub enum UnaryOperator {
     Minus,
     BitNot,
     Len,
+    Peek,
+    Peek2,
+    Peek4,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum CompoundAssign {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    IDiv,
+    Mod,
+    Pow,
+    BitAnd,
+    BitOr,
+    BitXor,
+    ShiftRightArithmetic,
+    ShiftRightLogical,
+    ShiftLeft,
+    RotateRight,
+    RotateLeft,
+    Concat,
 }
 
 #[derive(Debug, Clone)]
@@ -290,6 +316,13 @@ pub struct FunctionCallStatement<S> {
 pub struct AssignmentStatement<S> {
     pub targets: Vec<AssignmentTarget<S>>,
     pub values: Vec<Expression<S>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompoundAssigmentStatement<S> {
+    pub target: AssignmentTarget<S>,
+    pub value: Expression<S>,
+    pub operator: BinaryOperator,
 }
 
 #[derive(Debug, Clone)]
@@ -686,37 +719,30 @@ impl<S: StringInterner> Parser<'_, S> {
 
     fn parse_expression_statement(&mut self) -> Result<Statement<S::String>, ParseError> {
         let mut suffixed_expression = self.parse_suffixed_expression()?;
+        
         let line_number = self
             .look_ahead(0)?
             .map(|t| t.line_number)
             .unwrap_or_else(|| self.lexer.line_number());
-        if self.check_ahead(0, Token::Assign)? || self.check_ahead(0, Token::Comma)? {
+        if let Some(assign) = self.look_ahead(0)?.and_then(|token| get_compound_assign(token)) {
+            self.take_next()?;
+            
+            let target = to_assign_target(suffixed_expression.clone(), line_number)?;
+            let value = self.parse_expression()?;
+            let operator = get_compound_assign_operator(assign);
+            let expression = Expression {
+                head: Box::new(HeadExpression::Simple(SimpleExpression::Suffixed(suffixed_expression))),
+                tail: vec![(operator, value)],
+            };
+            
+            Ok(Statement::Assignment(AssignmentStatement {
+                targets: vec![target],
+                values: vec![expression],
+            }))
+        } else if self.check_ahead(0, Token::Assign)? || self.check_ahead(0, Token::Comma)? {
             let mut targets = Vec::new();
             loop {
-                let assignment_target = if let Some(suffix) = suffixed_expression.suffixes.pop() {
-                    match suffix {
-                        SuffixPart::Field(field_suffix) => {
-                            AssignmentTarget::Field(suffixed_expression, field_suffix)
-                        }
-                        SuffixPart::Call(_) => {
-                            return Err(ParseError {
-                                kind: ParseErrorKind::AssignToExpression,
-                                line_number,
-                            });
-                        }
-                    }
-                } else {
-                    match suffixed_expression.primary {
-                        PrimaryExpression::Name(name) => AssignmentTarget::Name(name),
-                        _ => {
-                            return Err(ParseError {
-                                kind: ParseErrorKind::AssignToExpression,
-                                line_number,
-                            })
-                        }
-                    }
-                };
-                targets.push(assignment_target);
+                targets.push(to_assign_target(suffixed_expression, line_number)?);
 
                 if !self.check_ahead(0, Token::Comma)? {
                     break;
@@ -1224,8 +1250,11 @@ fn binary_priority(operator: BinaryOperator) -> (u8, u8) {
         BinaryOperator::BitAnd => (6, 6),
         BinaryOperator::BitOr => (4, 4),
         BinaryOperator::BitXor => (5, 5),
+        BinaryOperator::ShiftRightArithmetic => (7, 7),
+        BinaryOperator::ShiftRightLogical => (7, 7),
         BinaryOperator::ShiftLeft => (7, 7),
-        BinaryOperator::ShiftRight => (7, 7),
+        BinaryOperator::RotateRight => (7, 7),
+        BinaryOperator::RotateLeft => (7, 7),
         BinaryOperator::Concat => (9, 8),
         BinaryOperator::NotEqual => (3, 3),
         BinaryOperator::Equal => (3, 3),
@@ -1245,6 +1274,9 @@ fn get_unary_operator<S>(token: &Token<S>) -> Option<UnaryOperator> {
         Token::Minus => Some(UnaryOperator::Minus),
         Token::BitNotXor => Some(UnaryOperator::BitNot),
         Token::Len => Some(UnaryOperator::Len),
+        Token::Peek => Some(UnaryOperator::Peek),
+        Token::Peek2Mod => Some(UnaryOperator::Peek2),
+        Token::Peek4 => Some(UnaryOperator::Peek4),
         _ => None,
     }
 }
@@ -1255,15 +1287,18 @@ fn get_binary_operator<S>(token: &Token<S>) -> Option<BinaryOperator> {
         Token::Minus => Some(BinaryOperator::Sub),
         Token::Add => Some(BinaryOperator::Add),
         Token::Mul => Some(BinaryOperator::Mul),
-        Token::ModPeek2 => Some(BinaryOperator::Mod),
+        Token::Peek2Mod => Some(BinaryOperator::Mod),
         Token::Pow => Some(BinaryOperator::Pow),
         Token::Div => Some(BinaryOperator::Div),
         Token::IDiv => Some(BinaryOperator::IDiv),
         Token::BitAnd => Some(BinaryOperator::BitAnd),
         Token::BitOr => Some(BinaryOperator::BitOr),
         Token::BitNotXor => Some(BinaryOperator::BitXor),
+        Token::ShiftRightArithmetic => Some(BinaryOperator::ShiftRightArithmetic),
+        Token::ShiftRightLogical => Some(BinaryOperator::ShiftRightLogical),
         Token::ShiftLeft => Some(BinaryOperator::ShiftLeft),
-        Token::ShiftRightArithmetic => Some(BinaryOperator::ShiftRight),
+        Token::RotateRight => Some(BinaryOperator::RotateRight),
+        Token::RotateLeft => Some(BinaryOperator::RotateLeft),
         Token::Concat => Some(BinaryOperator::Concat),
         Token::NotEqual => Some(BinaryOperator::NotEqual),
         Token::Equal => Some(BinaryOperator::Equal),
@@ -1274,5 +1309,73 @@ fn get_binary_operator<S>(token: &Token<S>) -> Option<BinaryOperator> {
         Token::And => Some(BinaryOperator::And),
         Token::Or => Some(BinaryOperator::Or),
         _ => None,
+    }
+}
+
+// Get the compound assign associated with the given token, if it exists.
+fn get_compound_assign<S>(token: &Token<S>) -> Option<CompoundAssign> {
+    match *token {
+        Token::AssignAdd => Some(CompoundAssign::Add),
+        Token::AssignSub => Some(CompoundAssign::Sub),
+        Token::AssignMul => Some(CompoundAssign::Mul),
+        Token::AssignDiv => Some(CompoundAssign::Div),
+        Token::AssignIDiv => Some(CompoundAssign::IDiv),
+        Token::AssignMod => Some(CompoundAssign::Mod),
+        Token::AssignPow => Some(CompoundAssign::Pow),
+        Token::AssignBitAnd => Some(CompoundAssign::BitAnd),
+        Token::AssignBitOr => Some(CompoundAssign::BitOr),
+        Token::AssignBitXor => Some(CompoundAssign::BitXor),
+        Token::AssignShiftRightArithmetic => Some(CompoundAssign::ShiftRightArithmetic),
+        Token::AssignShiftRightLogical => Some(CompoundAssign::ShiftRightLogical),
+        Token::AssignShiftLeft => Some(CompoundAssign::ShiftLeft),
+        Token::AssignRotateRight => Some(CompoundAssign::RotateRight),
+        Token::AssignRotateLeft => Some(CompoundAssign::RotateLeft),
+        Token::AssignConcat => Some(CompoundAssign::Concat),
+        _ => None,
+    }
+}
+
+fn get_compound_assign_operator(compound_assign: CompoundAssign) -> BinaryOperator {
+    match compound_assign {
+        CompoundAssign::Add => BinaryOperator::Add,
+        CompoundAssign::Sub => BinaryOperator::Sub,
+        CompoundAssign::Mul => BinaryOperator::Mul,
+        CompoundAssign::Div => BinaryOperator::Div,
+        CompoundAssign::IDiv => BinaryOperator::IDiv,
+        CompoundAssign::Mod => BinaryOperator::Mod,
+        CompoundAssign::Pow => BinaryOperator::Pow,
+        CompoundAssign::BitAnd => BinaryOperator::BitAnd,
+        CompoundAssign::BitOr => BinaryOperator::BitOr,
+        CompoundAssign::BitXor => BinaryOperator::BitXor,
+        CompoundAssign::ShiftRightArithmetic => BinaryOperator::ShiftRightArithmetic,
+        CompoundAssign::ShiftRightLogical => BinaryOperator::ShiftRightLogical,
+        CompoundAssign::ShiftLeft => BinaryOperator::ShiftLeft,
+        CompoundAssign::RotateRight => BinaryOperator::RotateRight,
+        CompoundAssign::RotateLeft => BinaryOperator::RotateLeft,
+        CompoundAssign::Concat => BinaryOperator::Concat,
+    }
+}
+
+fn to_assign_target<S>(mut suffixed_expression: SuffixedExpression<S>, line_number: LineNumber) -> Result<AssignmentTarget<S>, ParseError> {
+    if let Some(suffix) = suffixed_expression.suffixes.pop() {
+        match suffix {
+            SuffixPart::Field(field_suffix) => Ok(AssignmentTarget::Field(suffixed_expression, field_suffix)),
+            SuffixPart::Call(_) => {
+                Err(ParseError {
+                    kind: ParseErrorKind::AssignToExpression,
+                    line_number,
+                })
+            }
+        }
+    } else {
+        match suffixed_expression.primary {
+            PrimaryExpression::Name(name) => Ok(AssignmentTarget::Name(name)),
+            _ => {
+                Err(ParseError {
+                    kind: ParseErrorKind::AssignToExpression,
+                    line_number,
+                })
+            }
+        }
     }
 }

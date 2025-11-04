@@ -136,19 +136,12 @@ impl<'gc> Value<'gc> {
         }
     }
 
-    /// Converts value to either a Number or an Integer, if possible.
-    pub fn to_numeric(self) -> Option<Self> {
-        self.to_constant()
-            .and_then(|c| c.to_numeric())
-            .map(|c| c.into())
-    }
-
-    /// Interprets Numbers, Integers, and Strings as a Number, if possible.
+    /// Interprets Numbers and Strings as a Number, if possible.
     pub fn to_number(self) -> Option<P8Num> {
         self.to_constant().and_then(|c| c.to_number())
     }
 
-    /// Interprets Numbers, Integers, and Strings as a String, otherwise returns None.
+    /// Interprets Numbers and Strings as a String, otherwise returns None.
     ///
     /// If the value is a [`Value::String`], the string is returned directly. Otherwise, the
     /// returned string will always be the same as what [`Value::display`] would display.
