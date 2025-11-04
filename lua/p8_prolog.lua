@@ -27,9 +27,6 @@
 ▥=▥ or 21845.5
 ;
 
-printh("Prolog script entered. __TEST1="..tostr(__TEST1)..", __TEST2="..tostr(__TEST2))
-__TEST2 = "prolog"
-
 local args = { ... }
 
 if #args ~= 1 or type(args[1]) ~= "function" then
@@ -38,8 +35,6 @@ if #args ~= 1 or type(args[1]) ~= "function" then
 end
 
 args[1]()
-
-printh("Prolog script exited. __TEST1="..tostr(__TEST1)..", [set]__TEST2="..tostr(__TEST2))
 
 _end_of_program = 1
 
