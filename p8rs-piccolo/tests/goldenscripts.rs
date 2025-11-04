@@ -156,7 +156,7 @@ fn test_goldenscripts() {
                 .strip_prefix("--- ")
                 .or_else(|| line.strip_prefix("---"))
             {
-                expected_output.push_str(str);
+                str.chars().filter(|c| *c != '\x0d').for_each(|c|expected_output.push(c));
                 line.clear();
             } else {
                 break;
@@ -195,7 +195,7 @@ fn test_goldenscripts() {
                 if let Some(error) = compile_error {
                     let formatted_error = format!("{error}\n");
                     if formatted_error != expected_output {
-                        eprintln!("{path:?}: did not match expected output\n\nexpected:\n{expected_output}\noutput:\n{formatted_error}");
+                        eprintln!("{path:?}: did not match expected output\n\nexpected: {:?}\noutput:   {:?}", expected_output, formatted_error);
                         failed_scripts.push(path);
                         continue;
                     }

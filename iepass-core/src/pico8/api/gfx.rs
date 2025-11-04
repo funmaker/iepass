@@ -1,11 +1,9 @@
+use crate::pico8::memory::MemoryDrawState;
+use crate::pico8::Runtime;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
-use anyhow::anyhow;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
-use crate::pico8::memory::{MemoryDrawState, PrintAttributeFlags};
-use crate::pico8::font::Font;
-use crate::pico8::Runtime;
 
 pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("camera", camera::callback::<A>(ctx));
@@ -14,41 +12,6 @@ pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("pal", pal::callback::<A>(ctx));
 	ctx.set_global("cls", cls::callback::<A>(ctx));
 	ctx.set_global("cursor", cursor::callback::<A>(ctx));
-}
-
-pub fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: PrintAttributeFlags, letter: u8) -> Result<(i16, i16), RuntimeError> {
-	// let is_wide = flags.contains(PrintAttributeFlags::WIDE);
-	// let is_tall = flags.contains(PrintAttributeFlags::TALL);
-	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
-	// let is_dotty = flags.contains(PrintAttributeFlags::DOTTY);
-	let use_custom_font = flags.contains(PrintAttributeFlags::CUSTOM_FONT);
-	
-	let pen_color = *rt.memory.draw_state().pen_color();
-	let [cursor_x, cursor_y] = *rt.memory.draw_state().cursor_position();
-	
-	let font = if use_custom_font { Font::new((&rt.memory[0x5600..=0x5dff]).try_into()?) } else { Font::SYSTEM };
-	let char_width = font.width_chr(letter);
-	let char_height = font.height();
-	let char_font = &font.char(letter);
-	
-	assert!(char_width <= 8, "Char width cannot be >8");
-	assert!(char_height <= 8, "Char height cannot be >8");
-	
-	for y in 0..char_height {
-		let mut font_line = char_font[y as usize];
-		for x in 0..char_width {
-			let bit =  font_line & 1 != 0;
-			font_line >>= 1;
-			
-			if bit {
-				let pixel_x = cursor_x + x;
-				let pixel_y = cursor_y + y;
-				rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color).map_err(|_| anyhow!("drawing off screen"))?;
-			}
-		}
-	}
-	
-	Ok((char_width as i16, char_height as i16))
 }
 
 pub fn set_cursor_color<A: Allocator>(draw_state: &mut MemoryDrawState<A>, x: Option<i16>, y: Option<i16>, color: Option<i16>) {

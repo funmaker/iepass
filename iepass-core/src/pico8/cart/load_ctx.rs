@@ -144,13 +144,6 @@ fn nibble_chunks(text: &[u8]) -> impl Iterator<Item=(u8, u8)> + '_ {
 	text.chunks(2).map(|chunk| (chunk[0], chunk.get(1).copied().unwrap_or(b'0')))
 }
 
-
-#[derive(Debug, Clone)]
-pub struct CartridgeSection<'a> {
-	pub name: &'a [u8],
-	pub content: &'a [u8],
-}
-
 #[derive(Error, Debug)]
 pub enum CartLoadError {
 	#[error("Could not load cartridge, invalid input data.")]

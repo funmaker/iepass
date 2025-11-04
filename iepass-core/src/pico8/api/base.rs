@@ -1,10 +1,11 @@
-use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, IntoValue, RuntimeError, Value, String};
-use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
-use crate::pico8::Runtime;
+use core::fmt::Write;
 
 use crate::pico8::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::pico8::Runtime;
+use anyhow::anyhow;
+use p8rs_macros::api_callback;
+use p8rs_piccolo::{Context, Execution, IntoValue, RuntimeError, String, Value};
+use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
 
 pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
@@ -18,20 +19,65 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
 	ctx.set_global("type", get_type::callback(ctx));
-	ctx.set_global("btn", btn::callback::<A>(ctx));
-	ctx.set_global("stat", stat::callback::<A>(ctx));
+	ctx.set_global("btn", btn::callback(ctx));
+	ctx.set_global("stat", stat::callback(ctx));
+	ctx.set_global("trace", trace::callback(ctx));
 }
 
 #[api_callback]
-pub fn stat<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Value<'gc>, mut message: Value<'gc>, mut skip: Value<'gc>) -> Result<String<'gc>, RuntimeError> {
+	
+	if skip.is_nil() { // if up to 2 args passed, skip coroutine arg
+		skip = message;
+		message = coroutine;
+		coroutine = Value::Nil;
+	}
+	
+	let mut buf: alloc::string::String = alloc::string::String::new();
+	
+	if let Value::String(first_line) = message {
+		write!(&mut buf, "{}\n", first_line)?;
+	}
+	
+	write!(&mut buf, "stack traceback:\n")?;
+	
+	if let Value::Thread(coroutine) = coroutine && coroutine != ex.current_thread().thread {
+		write!(&mut buf, "  **getting trace of different threads is not currently supported**\n")?;
+	}else {
+		let trace = ex.traceback();
+		
+		// always skip the last entry (p8_prelog.lua)
+		let trace = &trace[0..trace.len().saturating_sub(1)];
+		
+		let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
+		
+		if skip == 0 {
+			write!(&mut buf, "  [C]: in function 'trace'\n")?;
+		}
+		
+		if skip >= 0 {
+			for entry in trace.iter().skip((skip as usize).saturating_sub(1)) {
+				entry.to_extern().write(&mut buf)?;
+			}
+		}
+	}
+	
+	buf.pop(); // remove last newline
+	
+	Ok(String::from_buffer(ctx.mutation(), buf.into_bytes().into_boxed_slice()))
+}
+
+
+#[api_callback]
+pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError> {
 	Ok(match stat_cmd {
-		7 => { Some(Value::Number(P8Num::from(rt.fps.cast_signed()))) }
+		7 => { Some(Value::Number(P8Num::from(rt.target_fps.cast_signed()))) }
 		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
 	})
 }
 
 #[api_callback]
-pub fn btn<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError> {
 	match btn_idx {
 		None => Ok(Some(Value::Number(P8Num::from((rt.buttons.get_bits_for_player(0) as u16 | (rt.buttons.get_bits_for_player(1) as u16) << 8).cast_signed())))),
 		Some(button_idx) => {

@@ -11,7 +11,7 @@ use core::alloc::Allocator;
 use p8rs_piccolo::Context;
 
 pub fn install_pico8_apis<A: Allocator + 'static>(ctx: Context) {
-	base::install_pico8_base::<A>(ctx);
+	base::install_pico8_base(ctx);
 	math::install_pico8_math(ctx);
 	gfx::install_pico8_gfx::<A>(ctx);
 	print::install_pico8_print::<A>(ctx);

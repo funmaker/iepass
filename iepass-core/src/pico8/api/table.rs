@@ -1,6 +1,5 @@
-use gc_arena::Collect;
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Table, Stack, Sequence};
+use p8rs_piccolo::{Context, Table, Stack};
 
 pub fn install_pico8_table(ctx: Context) {
 	ctx.set_global("pack", pack::callback(ctx));

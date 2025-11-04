@@ -26,7 +26,7 @@ pub fn run(source: &[u8]) -> RunResult {
 	vm.set_callbacks(RunnerCallback { buffer: output.clone() });
 	
 	if let Err(err) = vm.load_cartridge(source) {
-		println!("-- p8rs load error --");;
+		println!("-- p8rs load error --");
 		println!("{err}");
 		println!();
 		

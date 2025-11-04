@@ -84,7 +84,7 @@ impl eframe::App for EmulatorApp {
 		let delta = requested_delay - elapsed.as_secs_f32() - 0.5f32*previous_error.clamp(-requested_delay*0.9f32, requested_delay*0.9f32);
 		
 		if delta < 0.001f32 && self.running {
-			w{
+			{
 				let rt = self.pico8.runtime();
 				
 				let mut buttons = [0u8; 8];

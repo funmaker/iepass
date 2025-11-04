@@ -2,8 +2,9 @@ use alloc::alloc::Global;
 use alloc::boxed::Box;
 use core::alloc::Allocator;
 use anyhow::anyhow;
+use gc_arena::Mutation;
 use p8rs_piccolo::table::InvalidTableKey;
-use p8rs_piccolo::{Closure, CompilerError, Context, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, Value};
+use p8rs_piccolo::{Closure, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, StashedTable, Table, Value};
 use p8rs_types::p8num::P8Num;
 
 pub mod memory;
@@ -139,8 +140,17 @@ impl<A: Allocator + 'static> Pico8VM<A> {
 								Ok(value) => trace!("[run_fuel] mode Result - Value: {:?}, fuel {:?}", value, fuel),
 								Err(err) => {
 									match &err {
-										Error::Lua(e) => error!("[run_fuel] Uncaught lua error: {:?}", e.0),
-										Error::Runtime(e) => error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause()),
+										Error::Lua(e) => error!("[run_fuel] Uncaught lua error ({}): {}", e.0.type_name(), e.0.display()),
+										Error::Runtime(e) => {
+											error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause());
+											if let Some(traceback) = &e.1 {
+												let mut str = alloc::string::String::new();
+												for entry in &traceback.entries[..traceback.entries.len()-1] {
+													entry.write(&mut str)?;
+												}
+												error!("{}", str);
+											}
+										},
 									}
 									return Err(err.into())
 								}
