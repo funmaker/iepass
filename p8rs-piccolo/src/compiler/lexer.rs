@@ -43,8 +43,9 @@ pub enum Token<S> {
     Pow,
     Len,
     Peek,
-    ModPeek2,
+    Peek2Mod,
     Peek4,
+    Print,
     BitNotXor,
     BitAnd,
     BitOr,
@@ -128,7 +129,7 @@ impl<S: AsRef<[u8]>> PartialEq for Token<S> {
             (Token::Pow, Token::Pow) => true,
             (Token::Len, Token::Len) => true,
             (Token::Peek, Token::Peek) => true,
-            (Token::ModPeek2, Token::ModPeek2) => true,
+            (Token::Peek2Mod, Token::Peek2Mod) => true,
             (Token::Peek4, Token::Peek4) => true,
             (Token::BitNotXor, Token::BitNotXor) => true,
             (Token::BitAnd, Token::BitAnd) => true,
@@ -216,8 +217,9 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::Pow => write!(f, "Pow"),
             Token::Len => write!(f, "Len"),
             Token::Peek => write!(f, "Peek"),
-            Token::ModPeek2 => write!(f, "ModPeek2"),
+            Token::Peek2Mod => write!(f, "Peek2Mod"),
             Token::Peek4 => write!(f, "Peek4"),
+            Token::Print => write!(f, "Print"),
             Token::BitNotXor => write!(f, "BitNotXor"),
             Token::BitAnd => write!(f, "BitAnd"),
             Token::BitOr => write!(f, "BitOr"),
@@ -255,7 +257,7 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
             Token::Dot => write!(f, "Dot"),
             Token::SemiColon => write!(f, "SemiColon"),
             Token::Colon => write!(f, "Colon"),
-            Token::DoubleColon => write!(f, "DoubleColon"),
+            Token::DoubleColon => write!(f, "T_PAAMAYIM_NEKUDOTAYIM"),
             Token::Comma => write!(f, "Comma"),
             Token::LeftParen => write!(f, "LeftParen"),
             Token::RightParen => write!(f, "RightParen"),
@@ -477,7 +479,7 @@ where
                             self.advance(1);
                             Token::AssignMod
                         } else {
-                            Token::ModPeek2
+                            Token::Peek2Mod
                         }
                     }
                     
@@ -1150,7 +1152,7 @@ end"
     #[test]
     fn ops() {
         test_tokens(
-            r#"- + * / \ ^ , ; . .. ... < <= > >= == ~= != : :: # @ % $ ( ) [ ] { }"#,
+            r#"- + * / \ ^ , ; . .. ... < <= > >= == ~= != : :: # @ % $ ? ( ) [ ] { }"#,
             &[
                 Token::Minus,
                 Token::Add,
@@ -1174,8 +1176,9 @@ end"
                 Token::DoubleColon,
                 Token::Len,
                 Token::Peek,
-                Token::ModPeek2,
+                Token::Peek2Mod,
                 Token::Peek4,
+                Token::Print,
                 Token::LeftParen,
                 Token::RightParen,
                 Token::LeftBracket,

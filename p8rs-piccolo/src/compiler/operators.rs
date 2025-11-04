@@ -19,8 +19,11 @@ pub enum SimpleBinOp {
     BitAnd,
     BitOr,
     BitXor,
+    ShiftRightLogical,
+    ShiftRightArithmetic,
     ShiftLeft,
-    ShiftRight,
+    RotateRight,
+    RotateLeft,
 }
 
 // Binary operators which map to Eq / LessThan / LessEqual operations combined with Jump and
@@ -63,8 +66,11 @@ pub fn categorize_binop(binop: BinaryOperator) -> BinOpCategory {
         BinaryOperator::BitAnd => BinOpCategory::Simple(SimpleBinOp::BitAnd),
         BinaryOperator::BitOr => BinOpCategory::Simple(SimpleBinOp::BitOr),
         BinaryOperator::BitXor => BinOpCategory::Simple(SimpleBinOp::BitXor),
+        BinaryOperator::ShiftRightArithmetic => BinOpCategory::Simple(SimpleBinOp::ShiftRightArithmetic),
+        BinaryOperator::ShiftRightLogical => BinOpCategory::Simple(SimpleBinOp::ShiftRightLogical),
         BinaryOperator::ShiftLeft => BinOpCategory::Simple(SimpleBinOp::ShiftLeft),
-        BinaryOperator::ShiftRight => BinOpCategory::Simple(SimpleBinOp::ShiftRight),
+        BinaryOperator::RotateRight => BinOpCategory::Simple(SimpleBinOp::RotateRight),
+        BinaryOperator::RotateLeft => BinOpCategory::Simple(SimpleBinOp::RotateLeft),
         BinaryOperator::Concat => BinOpCategory::Concat,
         BinaryOperator::NotEqual => BinOpCategory::Comparison(ComparisonBinOp::NotEqual),
         BinaryOperator::Equal => BinOpCategory::Comparison(ComparisonBinOp::Equal),
@@ -94,8 +100,11 @@ pub fn simple_binop_operation(
         SimpleBinOp::BitAnd => Operation::BitAnd { dest, left, right },
         SimpleBinOp::BitOr => Operation::BitOr { dest, left, right },
         SimpleBinOp::BitXor => Operation::BitXor { dest, left, right },
+        SimpleBinOp::ShiftRightArithmetic => Operation::ShiftRightArithmetic { dest, left, right },
+        SimpleBinOp::ShiftRightLogical => Operation::ShiftRightLogical { dest, left, right },
         SimpleBinOp::ShiftLeft => Operation::ShiftLeft { dest, left, right },
-        SimpleBinOp::ShiftRight => Operation::ShiftRight { dest, left, right },
+        SimpleBinOp::RotateRight => Operation::RotateRight { dest, left, right },
+        SimpleBinOp::RotateLeft => Operation::RotateLeft { dest, left, right },
     }
 }
 
@@ -181,6 +190,9 @@ pub fn unop_operation(
         UnaryOperator::Not => Operation::Not { dest, source },
         UnaryOperator::BitNot => Operation::BitNot { dest, source },
         UnaryOperator::Len => Operation::Length { dest, source },
+        UnaryOperator::Peek => Operation::Peek { dest, source },
+        UnaryOperator::Peek2 => Operation::Peek2 { dest, source },
+        UnaryOperator::Peek4 => Operation::Peek4 { dest, source },
     }
 }
 
@@ -193,5 +205,8 @@ pub fn unop_const_fold<S: AsRef<[u8]>>(
         UnaryOperator::Not => Some(cons.not()),
         UnaryOperator::BitNot => cons.bitwise_not(),
         UnaryOperator::Len => None,
+        UnaryOperator::Peek => None,
+        UnaryOperator::Peek2 => None,
+        UnaryOperator::Peek4 => None,
     }
 }
