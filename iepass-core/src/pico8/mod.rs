@@ -2,8 +2,9 @@ use alloc::alloc::Global;
 use alloc::boxed::Box;
 use core::alloc::Allocator;
 use anyhow::anyhow;
+use gc_arena::Mutation;
 use p8rs_piccolo::table::InvalidTableKey;
-use p8rs_piccolo::{Closure, CompilerError, Context, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, Value};
+use p8rs_piccolo::{Closure, Error, Executor, ExecutorMode, ExternError, Fuel, Lua, RuntimeError, StashedExecutor, StashedTable, Table, Value};
 use p8rs_types::p8num::P8Num;
 
 pub mod memory;
@@ -29,6 +30,7 @@ pub enum RunResult {
 
 pub struct Pico8VM<A: Allocator = Global> {
 	lua: Lua,
+	fresh_globals: StashedTable,
 	runtime: Runtime<A>,
 	executor: Option<StashedExecutor>,
 }
@@ -39,28 +41,39 @@ impl Pico8VM<Global> {
 	}
 }
 
+fn shallow_copy_table<'gc>(mc: &Mutation<'gc>, src: Table<'gc>) -> Result<Table<'gc>, InvalidTableKey> {
+	let ret = Table::new(mc);
+	for (k, v) in src.iter() {
+		ret.set_raw(mc, k, v)?;
+	}
+	Ok(ret)
+}
+
 impl<A: Allocator + Clone + 'static> Pico8VM<A> {
 	pub fn new_in(alloc: A) -> Result<Pico8VM<A>, InvalidTableKey> {
-		let mut vm = Self {
-			lua: Lua::empty(),
-			runtime: Runtime::new(alloc),
-			executor: None,
-		};
+		let mut lua = Lua::empty();
 		
-		vm.lua.enter(|ctx: Context| {
+		let fresh_globals = lua.enter(|ctx| {
 			install_pico8_apis::<A>(ctx);
-			Ok(())
+			Ok(ctx.stash(shallow_copy_table(ctx.mutation(), ctx.globals())?))
 		})?;
 		
-		Ok(vm)
+		Ok(Self {
+			lua,
+			runtime: Runtime::new(alloc),
+			executor: None,
+			fresh_globals
+		})
 	}
 }
 
 impl<A: Allocator + 'static> Pico8VM<A> {
 	pub fn load(&mut self, source: &[u8]) -> Result<(), ExternError> {
 		let ex = self.lua.try_enter(|ctx| {
-			let closure = Closure::load(ctx, None, source)?;
-			let ex = Executor::start(ctx, closure.into(), ());
+			let env = shallow_copy_table(ctx.mutation(), ctx.fetch(&self.fresh_globals))?;
+			let prolog = Closure::load_with_env(ctx, None, include_bytes!("../../../lua/p8_prolog.lua"), env)?;
+			let closure = Closure::load_with_env(ctx, None, source, env)?;
+			let ex = Executor::start(ctx, prolog.into(), (closure,));
 			
 			Ok(ctx.stash(ex))
 		})?;
@@ -127,8 +140,17 @@ impl<A: Allocator + 'static> Pico8VM<A> {
 								Ok(value) => trace!("[run_fuel] mode Result - Value: {:?}, fuel {:?}", value, fuel),
 								Err(err) => {
 									match &err {
-										Error::Lua(e) => error!("[run_fuel] Uncaught lua error: {:?}", e.0),
-										Error::Runtime(e) => error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause()),
+										Error::Lua(e) => error!("[run_fuel] Uncaught lua error ({}): {}", e.0.type_name(), e.0.display()),
+										Error::Runtime(e) => {
+											error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause());
+											if let Some(traceback) = &e.1 {
+												let mut str = alloc::string::String::new();
+												for entry in &traceback.entries[..traceback.entries.len()-1] {
+													entry.write(&mut str)?;
+												}
+												error!("{}", str);
+											}
+										},
 									}
 									return Err(err.into())
 								}

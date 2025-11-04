@@ -1,11 +1,12 @@
 #![feature(arc_is_unique)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::HashSet;
 use std::ops::{Sub};
 use std::time::{Duration, Instant};
 use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
-use egui::{Color32, Event, Frame, ImageSource, RawInput};
+use egui::{Color32, Event, Frame, ImageSource, Key, RawInput};
 use egui::load::SizedTexture;
 use iepass_core::pico8::{Pico8VM, RunResult};
 use iepass_core::colors::Color;
@@ -34,6 +35,7 @@ struct EmulatorApp {
 	fb_pool: FramebufferPool,
 	fb_tex: TextureHandle,
 	frame: usize,
+	pressed_keys: HashSet<Key>,
 	last_frames: [Instant; 10],
 	target_fps: u16,
 	pico8: Pico8VM,
@@ -64,6 +66,7 @@ impl EmulatorApp {
 			target_fps: 30,
 			pico8,
 			running: true,
+			pressed_keys: HashSet::new(),
 		}
 	}
 }
@@ -81,6 +84,18 @@ impl eframe::App for EmulatorApp {
 		let delta = requested_delay - elapsed.as_secs_f32() - 0.5f32*previous_error.clamp(-requested_delay*0.9f32, requested_delay*0.9f32);
 		
 		if delta < 0.001f32 && self.running {
+			{
+				let rt = self.pico8.runtime();
+				
+				let mut buttons = [0u8; 8];
+				let p1_buttons = &mut buttons[0];
+				if self.pressed_keys.contains(&Key::ArrowUp) { *p1_buttons |= 0x4 }
+				if self.pressed_keys.contains(&Key::ArrowDown) { *p1_buttons |= 0x8 }
+				
+				rt.update_buttons(&buttons);
+				rt.finish_update_frame();
+			}
+			
 			let mut run_result = self.pico8.run_fuel(25000).unwrap();
 			while run_result == RunResult::OutOfFuel && (Instant::now() - now).as_secs_f32() < requested_delay {
 				run_result = self.pico8.run_fuel(25000).unwrap();
@@ -155,6 +170,11 @@ impl eframe::App for EmulatorApp {
 					..
 				} => {
 					println!("{} {:?} {:?} {:?} {}", pressed, key, modifiers, physical_key, repeat);
+					if *pressed {
+						self.pressed_keys.insert(*key);
+					} else {
+						self.pressed_keys.remove(key);
+					}
 				},
 				_ => {},
 			}

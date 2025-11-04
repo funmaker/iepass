@@ -72,7 +72,7 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 			use ::alloc::format;
 			
 			pub fn callback<'gc, #generics>(ctx: Context<'gc>) -> Callback<'gc> #where_clause {
-				Callback::from_fn(&ctx, move |ctx, exec, mut stack, rt| {
+				Callback::from_fn(&ctx, move |ctx, mut exec, mut stack, rt| {
 					#args
 					let ret = #name::<#generics_args>(#fn_args);
 					#ret_try

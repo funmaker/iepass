@@ -4,12 +4,9 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, lock::RefLock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
+use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
 
-use super::{
-    thread::{Frame, LuaFrame, ThreadState},
-    vm::run_vm,
-};
+use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm, Traceback, TracebackEntry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutorMode {
@@ -467,7 +464,21 @@ impl<'gc> Executor<'gc> {
                             .pop()
                             .expect("normal thread must have frame above error")
                         {
-                            Frame::Lua { bottom, .. } => {
+                            ref f@ Frame::Lua { bottom, .. } => {
+                                
+                                let err = match err {
+                                    Error::Lua(_) => { err }
+                                    Error::Runtime(rt) => {
+                                        if let Some(entry) = traceback_from_frame_stack(f) {
+                                            let mut tb = rt.1.unwrap_or_else(Traceback::empty);
+                                            tb.add_entry(&entry);
+                                            Error::Runtime(RuntimeError(rt.0, Some(tb)))
+                                        }else{
+                                            Error::Runtime(rt)
+                                        }
+                                    }
+                                };
+                                
                                 top_state.close_upvalues(&ctx, bottom);
                                 top_state.stack.truncate(bottom);
                                 top_state.frames.push(Frame::Error(err));
@@ -587,6 +598,32 @@ impl<'gc> Executor<'gc> {
     }
 }
 
+pub(super) fn traceback_from_frame_stack<'a, 'gc: 'a>(frame: &'a Frame<'gc>) -> Option<TracebackEntry<'gc>> {
+    if let Frame::Lua {closure, pc, .. } = frame {
+        let proto = closure.prototype();
+        let name = match proto.reference {
+            FunctionRef::Named(name, _) => Some(name),
+            _ => None
+        };
+        
+        // The previously executed instruction for a callback should be the Call opcode.
+        let call_opcode = pc - 1;
+        
+        let line_number = match proto
+            .opcode_line_numbers.binary_search_by_key(&call_opcode, |(opi, _)| *opi)
+        {
+            Ok(i) => proto.opcode_line_numbers[i].1,
+            Err(i) => proto.opcode_line_numbers[i - 1].1,
+        };
+        
+        Some(TracebackEntry {
+            name, line_number,
+        })
+    } else {
+        None
+    }
+}
+
 /// Execution state passed to callbacks when they are run by an `Executor`.
 pub struct Execution<'gc, 'a> {
     executor: Executor<'gc>,
@@ -604,7 +641,11 @@ impl<'gc, 'a> Execution<'gc, 'a> {
             upper_frames: self.upper_frames,
         }
     }
-
+    
+    pub fn traceback(&self) -> alloc::vec::Vec<TracebackEntry<'gc>> {
+        self.upper_frames.iter().rev().filter_map(traceback_from_frame_stack).collect()
+    }
+    
     /// The fuel parameter passed to `Executor::step`.
     pub fn fuel(&mut self) -> &mut Fuel {
         self.fuel
