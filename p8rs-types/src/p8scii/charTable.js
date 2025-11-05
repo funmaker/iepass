@@ -1,7 +1,7 @@
 const CHARACTERS = [
   ["␀",  "\\0",  "U+0000", "Terminate printing", true, false, true],
   ["¹",  "\\*",  "U+00B9", "Repeat next character", false, false, false],
-  ["²",  "\\#"  ,  "U+00B2", "Draw solid background", false, false, false],
+  ["²",  "\\#",  "U+00B2", "Draw solid background", false, false, false],
   ["³",  "\\-",  "U+00B3", "Move cursor horizontally", false, false, false],
   ["⁴",  "\\|",  "U+2074", "Move cursor vertically", false, false, false],
   ["⁵",  "\\+",  "U+2075", "Move cursor", false, false, false],

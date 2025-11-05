@@ -1037,7 +1037,7 @@ mod tests {
                 [====[ [==[ this is a [[]] long string ]== ]==] ]====]
                 [[ [=] [==] another long string [==] [=] ]]
                 [[ \t\r\x escape codes are ignored \1\2\3 ]]
-                [[ ️⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
+                [[ ⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
             "#,
             &[
                 str_token(" [==[ this is a [[]] long string ]== ]==] "),

@@ -1,11 +1,12 @@
+use core::iter::Peekable;
 use thiserror::Error;
 
-use super::CHAR_MAP;
+use super::{requires_var_sel, CHAR_MAP, VAR_SEL};
 
 pub fn from_char(c: char) -> Result<Option<u8>, FromCharError> {
 	if let ' '..'~' | '\n' | '\t' | '\r' | '\0' = c {
 		Ok(Some(c as u8))
-	} else if c == '\u{FE0F}' {
+	} else if c == VAR_SEL {
 		Ok(None)
 	} else if let Some(pos) = CHAR_MAP.iter().position(|&ch| ch == c) {
 		Ok(Some(pos as u8))
@@ -15,9 +16,8 @@ pub fn from_char(c: char) -> Result<Option<u8>, FromCharError> {
 }
 
 pub fn from_iter(data: impl IntoIterator<Item = char>) -> impl Iterator<Item = Result<u8, FromCharError>> {
-	data.into_iter()
-	    .map(from_char)
-		.flat_map(Result::transpose)
+	P8sciiFromChars::new(data.into_iter().map(Ok))
+		.map(|res| res.map_err(|err| err.try_into().unwrap()))
 }
 
 pub fn from_str(data: &str) -> impl Iterator<Item = Result<u8, FromCharError>> {
@@ -25,13 +25,7 @@ pub fn from_str(data: &str) -> impl Iterator<Item = Result<u8, FromCharError>> {
 }
 
 pub fn from_utf8(data: &[u8]) -> impl Iterator<Item = Result<u8, FromUtf8Error>> + '_ {
-	DecodeUtf8::new(data)
-		.flat_map(|res| match res.map(from_char) {
-			Ok(Ok(Some(char))) => Some(Ok(char)),
-			Ok(Ok(None)) => None,
-			Ok(Err(err)) => Some(Err(err.into())),
-			Err(byte) => Some(Err(FromUtf8Error::Byte(byte))),
-		})
+	P8sciiFromChars::new(DecodeUtf8::new(data))
 }
 
 struct DecodeUtf8<'a> {
@@ -84,14 +78,53 @@ fn split_first_char(string: &str) -> Option<(char, &str)> {
 	chars.next().map(|ch| (ch, chars.as_str()))
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Hash)]
+struct P8sciiFromChars<I: Iterator> {
+	iter: Peekable<I>,
+}
+
+impl<I: Iterator> P8sciiFromChars<I> {
+	fn new(iter: I) -> Self {
+		Self {
+			iter: iter.peekable(),
+		}
+	}
+}
+
+impl<I> Iterator for P8sciiFromChars<I>
+where I: Iterator<Item = Result<char, u8>> {
+	type Item = Result<u8, FromUtf8Error>;
+	
+	fn next(&mut self) -> Option<Self::Item> {
+		let char = match self.iter.next()? {
+			Ok(char) => char,
+			Err(byte) => return Some(Err(FromUtf8Error::Byte(byte))),
+		};
+		
+		let p8ch = match from_char(char) {
+			Ok(Some(p8ch)) => p8ch,
+			Ok(None) => return Some(Err(FromUtf8Error::Char(VAR_SEL))),
+			Err(err) => return Some(Err(err.into()))
+		};
+		
+		if !requires_var_sel(p8ch) {
+			Some(Ok(p8ch))
+		} else if self.iter.peek() == Some(&Ok(VAR_SEL)) {
+			let _ = self.iter.next();
+			Some(Ok(p8ch))
+		} else {
+			Some(Err(FromUtf8Error::Char(char)))
+		}
+	}
+}
+
+#[derive(Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[error("Unexpected character {char} ({char:?})")]
 /// The error type returned when an unexpected character is encountered.
 pub struct FromCharError {
 	pub char: char,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Hash)]
+#[derive(Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// The error type returned when an unexpected character or invalid utf8 sequence is encountered.
 pub enum FromUtf8Error {
 	#[error("Unexpected character {0} ({0:?})")]
@@ -103,6 +136,17 @@ pub enum FromUtf8Error {
 impl From<FromCharError> for FromUtf8Error {
 	fn from(value: FromCharError) -> Self {
 		FromUtf8Error::Char(value.char)
+	}
+}
+
+impl TryFrom<FromUtf8Error> for FromCharError {
+	type Error = u8;
+	
+	fn try_from(value: FromUtf8Error) -> Result<Self, Self::Error> {
+		match value {
+			FromUtf8Error::Char(char) => Ok(FromCharError { char }),
+			FromUtf8Error::Byte(byte) => Err(byte),
+		}
 	}
 }
 
