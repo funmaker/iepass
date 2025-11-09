@@ -59,20 +59,6 @@ pub struct ExternTracebackEntry {
     pub line_number: LineNumber,
 }
 
-impl ExternTracebackEntry {
-    pub fn write<'gc>(&self, target: & mut impl Write) -> Result<(), RuntimeError> {
-        // offset line numbers to match pico 8
-        write!(target, "  [string \"-- pico-8 header...\"]:{}: in ", self.line_number.0 + 2)?;
-        if let Some(name) = &self.name {
-            write!(target, "function '{}'", name)?;
-        }else{
-            write!(target, "main chunk")?;
-        }
-        write!(target, "\n")?;
-        Ok(())
-    }
-}
-
 impl<'gc> From<&TracebackEntry<'gc>> for ExternTracebackEntry {
     fn from(value: &TracebackEntry<'gc>) -> Self {
         Self {

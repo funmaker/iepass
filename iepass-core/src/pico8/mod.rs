@@ -15,11 +15,13 @@ pub mod runtime;
 pub mod callbacks;
 mod numeric;
 mod api;
+mod traceback;
 
 pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
+use crate::pico8::traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum RunResult {
@@ -145,9 +147,7 @@ impl<A: Allocator + 'static> Pico8VM<A> {
 											error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause());
 											if let Some(traceback) = &e.1 {
 												let mut str = alloc::string::String::new();
-												for entry in &traceback.entries[..traceback.entries.len()-1] {
-													entry.write(&mut str)?;
-												}
+												write_traceback_entries(&mut str, (&traceback.entries[..traceback.entries.len()-1]).iter())?;
 												error!("{}", str);
 											}
 										},

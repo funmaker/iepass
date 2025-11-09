@@ -4,7 +4,7 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, lock::RefLock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
+use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, IntoValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
 
 use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm, Traceback, TracebackEntry};
 
@@ -469,7 +469,7 @@ impl<'gc> Executor<'gc> {
                                 let err = match err {
                                     Error::Lua(_) => { err }
                                     Error::Runtime(rt) => {
-                                        if let Some(entry) = traceback_from_frame_stack(f) {
+                                        if let Some(entry) = traceback_from_frame(f) {
                                             let mut tb = rt.1.unwrap_or_else(Traceback::empty);
                                             tb.add_entry(&entry);
                                             Error::Runtime(RuntimeError(rt.0, Some(tb)))
@@ -598,7 +598,7 @@ impl<'gc> Executor<'gc> {
     }
 }
 
-pub(super) fn traceback_from_frame_stack<'a, 'gc: 'a>(frame: &'a Frame<'gc>) -> Option<TracebackEntry<'gc>> {
+pub(super) fn traceback_from_frame<'a, 'gc: 'a>(frame: &'a Frame<'gc>) -> Option<TracebackEntry<'gc>> {
     if let Frame::Lua {closure, pc, .. } = frame {
         let proto = closure.prototype();
         let name = match proto.reference {
@@ -643,7 +643,7 @@ impl<'gc, 'a> Execution<'gc, 'a> {
     }
     
     pub fn traceback(&self) -> alloc::vec::Vec<TracebackEntry<'gc>> {
-        self.upper_frames.iter().rev().filter_map(traceback_from_frame_stack).collect()
+        self.upper_frames.iter().rev().filter_map(traceback_from_frame).collect()
     }
     
     /// The fuel parameter passed to `Executor::step`.
