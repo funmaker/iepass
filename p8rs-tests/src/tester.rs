@@ -22,6 +22,10 @@ fn setup() {
 pub fn test_cartridge(path: impl AsRef<Path>) {
 	setup();
 	
+	println!();
+	println!("=== {} ===", path.as_ref().display());
+	println!();
+	
 	let orig_cart_path = path.as_ref();
 	let cart = fs::read(orig_cart_path).expect("Unable to read cart file");
 	let cart = replace(

@@ -337,6 +337,10 @@ where
     pub fn line_number(&self) -> LineNumber {
         LineNumber(self.line_number)
     }
+    
+    pub fn interner_mut(&mut self) -> &mut S {
+        &mut self.interner
+    }
 
     pub fn skip_whitespace(&mut self) -> Result<(), LexError> {
         let mut do_skip_whitespace = || {

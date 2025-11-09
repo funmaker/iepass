@@ -8,6 +8,8 @@ use super::{
     StringInterner,
 };
 
+const PRINT_FUNC_NAME: &[u8] = b"print";
+
 #[derive(Debug, Clone)]
 pub struct LineAnnotated<T> {
     pub inner: T,
@@ -482,6 +484,7 @@ impl<S: StringInterner> Parser<'_, S> {
                 Statement::Break
             }
             Token::Goto => Statement::Goto(self.parse_goto_statement()?),
+            Token::Print => Statement::FunctionCall(self.parse_print_statement()?),
             _ => self.parse_expression_statement()?,
         };
 
@@ -715,6 +718,17 @@ impl<S: StringInterner> Parser<'_, S> {
         self.expect_next(Token::Goto)?;
         let name = self.expect_name()?.inner;
         Ok(GotoStatement { name })
+    }
+
+    fn parse_print_statement(&mut self) -> Result<FunctionCallStatement<S::String>, ParseError> {
+        self.expect_next(Token::Print)?;
+        let head = SuffixedExpression {
+            suffixes: Vec::new(),
+            primary: PrimaryExpression::Name(self.lexer.interner_mut().intern(PRINT_FUNC_NAME)),
+        };
+        let call = CallSuffix::Function(self.parse_expression_list()?);
+        
+        Ok(FunctionCallStatement { head, call })
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement<S::String>, ParseError> {

@@ -51,20 +51,16 @@ pub fn run(source: &[u8]) -> RunResult {
 	};
 	
 	let output = &*output.borrow();
-	let output = output.trim();
 	
 	println!("-- p8rs output --");
 	println!("{output}");
-	println!();
 	if let Some(err) = result.as_ref().err() {
 		println!("-- p8rs error --");
 		println!("{err}");
-		println!();
 	}
 	
 	if timeout {
 		println!("-- p8rs timed out --");
-		println!();
 	}
 	
 	let logs = output.lines().map(Log::from).collect();

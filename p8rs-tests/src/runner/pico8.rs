@@ -42,14 +42,11 @@ pub fn run(path: impl AsRef<Path>) -> RunResult {
 	
 	println!("-- pico8 stderr --");
 	println!("{stderr}");
-	println!();
 	println!("-- pico8 stdout --");
 	println!("{stdout}");
-	println!();
 	
 	if timeout {
 		println!("-- pico8 timed out --");
-		println!();
 	}
 	
 	let stdout = if stdout.starts_with("RUNNING: ") {
