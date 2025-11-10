@@ -5,6 +5,7 @@ __lua__
 print("Initial")
 print("Offset", 10, 20)
 print("Continue")
+print("With\n  newline")
 p8rs.test_scr("Basic")
 
 print("Red", 8)
