@@ -83,8 +83,8 @@ impl<A: Allocator + 'static> Pico8VM<A> {
 		Ok(())
 	}
 	
-	pub fn load_cartridge(&mut self, source: &[u8]) -> Result<(), CartLoadError> {
-		cart::load_cartridge(self, source)
+	pub fn load_cartridge(&mut self, source: impl AsRef<[u8]>) -> Result<(), CartLoadError> {
+		cart::load_cartridge(self, source.as_ref())
 	}
 	
 	pub fn set_callbacks(&mut self, callbacks: impl Callbacks + 'static) {

@@ -1,5 +1,6 @@
 use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
+use core::array;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
 use p8rs_types::p8num::P8Num;
@@ -21,26 +22,8 @@ impl<A: Allocator> Memory<A> {
 	}
 	
 	pub fn reset(&mut self) {
-		self.inner[0x5f25] = 6; // default pen color
-		self.inner[0x5F55] = 0x60; // default screen mapping
-		self.inner[0x5F56] = 0x20; // default map mapping
-		self.inner[0x5F57] = 128; // default map size
-		self.inner[0x5f22] = 128; // default clip x_end
-		self.inner[0x5f23] = 128; // default clip y_end
-		self.inner[0x5f26] = 0; // default cursor X
-		self.inner[0x5f27] = 6; // default cursor Y
-		
-		for i in 0..16 {
-			self.inner[0x5F00 + i] = i as u8;
-			self.inner[0x5F10 + i] = i as u8;
-		}
-		self.inner[0x5F00] = 0x10; // transparent
-	}
-	
-	// TODO: use enums
-	pub fn palette(&self, p_idx: u8) -> [u8; 16] {
-		let base = self.base_addr_palette(p_idx) as usize;
-		self.inner[base..base+16].try_into().unwrap()
+		self.draw_state().reset();
+		self.hardware_state().reset();
 	}
 	
 	pub fn screen(&mut self) -> MemoryScreen<'_> {
@@ -57,15 +40,6 @@ impl<A: Allocator> Memory<A> {
 	
 	pub fn hardware_state(&mut self) -> MemoryHardwareState<'_, A> {
 		MemoryHardwareState(self)
-	}
-	
-	pub fn base_addr_palette(&self, p_idx: u8) -> u16 {
-		match p_idx {
-			0 => 0x5f00,
-			1 => 0x5f10,
-			2 => 0x5f60,
-			_ => panic!("Invalid palette index: {}", p_idx),
-		}
 	}
 	
 	pub fn base_addr_gfx(&self) -> u16 {
@@ -103,6 +77,7 @@ impl<A: Allocator> DerefMut for Memory<A> {
 	}
 }
 
+/// 0x6000..0x7fff
 pub struct MemoryScreen<'a>(&'a mut [u8; 0x2000]);
 
 impl<'a> MemoryScreen<'a> {
@@ -174,10 +149,31 @@ macro_rules! impl_ser {
 
 impl_ser!(u8, i8, u16, i16, u32, i32, P8Num);
 
-
-pub struct MemoryDrawState<'a, A: Allocator>(&'a mut Memory<A>);
+/// 0x5f00..0x5f40
+pub struct MemoryDrawState<'a, A: Allocator> (&'a mut Memory<A>);
 
 impl<'a, A: Allocator> MemoryDrawState<'a, A> {
+	pub fn reset(&mut self) {
+		*self.pen_color() = 6;
+		*self.clip_rect() = [0, 0, 128, 128];
+		*self.cursor_position() = [0, 6];
+		*self.cursor_home_x() = 0;
+		
+		self.reset_palette();
+	}
+	
+	pub fn reset_palette(&mut self) {
+		*self.palette(Palette::Draw) = array::from_fn(|i| i as u8);
+		*self.palette(Palette::Screen) = array::from_fn(|i| i as u8);
+		
+		self.palette(Palette::Draw)[0] = 0x10; // transparent
+	}
+	
+	pub fn palette(&mut self, idx: Palette) -> &mut [u8; 16] {
+		let base = idx.base_addr() as usize;
+		(&mut self.0[base..base+16]).try_into().unwrap()
+	}
+	
 	pub fn cursor_home_x(&mut self) -> &mut u8 {
 		&mut self.0[0x5f24]
 	}
@@ -225,16 +221,48 @@ bitflags! {
     }
 }
 
-
+/// 0x5f40..0x5f80
 pub struct MemoryHardwareState<'a, A: Allocator>(&'a mut Memory<A>);
 
-// 0x5f40..0x5f80
 impl<'a, A: Allocator> MemoryHardwareState<'a, A> {
+	pub fn reset(&mut self) {
+		self.0[0x5F55] = 0x60; // default screen mapping
+		self.0[0x5F56] = 0x20; // default map mapping
+		self.0[0x5F57] = 128; // default map size
+	}
+	
 	pub fn get_print_defaults(&mut self) -> PrintAttributeFlags {
 		PrintAttributeFlags::from_bits_truncate(self.0[0x5f58])
 	}
 	
 	pub fn set_print_defaults(&mut self, flags: PrintAttributeFlags) {
 		self.0[0x5f58] = flags.bits();
+	}
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum Palette {
+	Draw = 0,
+	Screen = 1,
+	SecondaryScreen = 2,
+}
+
+impl Palette {
+	pub fn new(idx: impl TryInto<u8>) -> Option<Self> {
+		let idx = idx.try_into().ok()?;
+		match idx {
+			0 => Some(Self::Draw),
+			1 => Some(Self::Screen),
+			2 => Some(Self::SecondaryScreen),
+			_ => None,
+		}
+	}
+	
+	pub fn base_addr(self) -> u16 {
+		match self {
+			Palette::Draw => 0x5f00,
+			Palette::Screen => 0x5f10,
+			Palette::SecondaryScreen => 0x5f60,
+		}
 	}
 }
