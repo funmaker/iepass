@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::Path;
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -20,7 +21,7 @@ impl pico8::Callbacks for RunnerCallback {
 	}
 }
 
-pub fn run(source: &[u8]) -> RunResult {
+pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 	let output = Rc::new(RefCell::new(String::new()));
 	let mut vm = pico8::Pico8VM::new().expect("Failed to create P8rs VM");
 	vm.set_callbacks(RunnerCallback { buffer: output.clone() });
@@ -52,8 +53,6 @@ pub fn run(source: &[u8]) -> RunResult {
 	
 	let output = &*output.borrow();
 	
-	println!("-- p8rs output --");
-	println!("{output}");
 	if let Some(err) = result.as_ref().err() {
 		println!("-- p8rs error --");
 		println!("{err}");
@@ -62,6 +61,8 @@ pub fn run(source: &[u8]) -> RunResult {
 	if timeout {
 		println!("-- p8rs timed out --");
 	}
+	
+	std::fs::write(&log_file, &output).expect("Can't write to p8rs output log");
 	
 	let logs = output.lines().map(Log::from).collect();
 	let runtime_error = result.err().map(|err| err.to_string());

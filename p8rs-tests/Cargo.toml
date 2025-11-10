@@ -11,3 +11,5 @@ rust-version.workspace = true
 [dev-dependencies]
 iepass-core.workspace = true
 p8rs-types.workspace = true
+thiserror.workspace = true
+colored = "3.0.0"

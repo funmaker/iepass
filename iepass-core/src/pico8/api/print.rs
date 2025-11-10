@@ -69,6 +69,7 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
+	#[allow(unused)]
 	ModifyFlags(PrintAttributeFlags), // TODO:
 }
 

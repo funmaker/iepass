@@ -34,3 +34,12 @@ pub const PALETTE: [Color; 32] = [
 	Color::new(255, 110, 89),  // dark-peach
 	Color::new(255, 157, 129), // peach
 ];
+
+pub fn color_from_index(index: u8) -> Color {
+	let nib = index & 0x0F;
+	if index < 128 {
+		PALETTE[nib as usize]
+	} else {
+		PALETTE[nib as usize + 16]
+	}
+}

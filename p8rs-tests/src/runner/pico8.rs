@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::runner::{Log, RunResult, TIMEOUT_MS};
 
-pub fn run(path: impl AsRef<Path>) -> RunResult {
+pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 	let mut child =
 		Command::new("pico8")
 			.arg("-run")
@@ -40,14 +40,14 @@ pub fn run(path: impl AsRef<Path>) -> RunResult {
 	child.stdout.take().unwrap().read_to_string(&mut stdout).expect("Can't read pico8 stdout stream");
 	child.stderr.take().unwrap().read_to_string(&mut stderr).expect("Can't read pico8 stderr stream");
 	
-	println!("-- pico8 stderr --");
-	println!("{stderr}");
 	println!("-- pico8 stdout --");
 	println!("{stdout}");
 	
 	if timeout {
 		println!("-- pico8 timed out --");
 	}
+	
+	std::fs::write(&log_file, &stderr).expect("Can't write to pico8 output log");
 	
 	let stdout = if stdout.starts_with("RUNNING: ") {
 		let eol = stdout.find('\n').unwrap_or(stdout.len());
