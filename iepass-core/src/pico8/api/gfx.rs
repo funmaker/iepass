@@ -1,9 +1,9 @@
-use crate::pico8::memory::MemoryDrawState;
-use crate::pico8::Runtime;
-use alloc::vec::Vec;
 use core::alloc::Allocator;
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, RuntimeError, Value, Variadic};
+use p8rs_piccolo::{Context, Value};
+
+use crate::pico8::memory::{MemoryDrawState, Palette};
+use crate::pico8::Runtime;
 
 pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("camera", camera::callback::<A>(ctx));
@@ -30,44 +30,43 @@ pub fn set_cursor_color<A: Allocator>(draw_state: &mut MemoryDrawState<A>, x: Op
 }
 
 #[api_callback]
-pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) -> Result<(), RuntimeError> {
+pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) {
 	let col = col.unwrap_or(0) as u8 & 0xF;
 	let col = (col << 4) | col;
-	for byte in rt.memory.screen().iter_mut() {
-		*byte = col;
-	}
+	rt.memory.screen().fill(col);
 	*rt.memory.draw_state().cursor_position() = [0, 0];
 	*rt.memory.draw_state().clip_rect() = [0, 0, 128, 128];
-	Ok(())
 }
 
 #[api_callback]
-pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<i16>) -> Result<(u8, u8, u8), RuntimeError> {
+pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<i16>) -> (u8, u8, u8) {
 	let prev_cursor = *rt.memory.draw_state().cursor_position();
 	let prev_color = *rt.memory.draw_state().pen_color();
 	
 	set_cursor_color(&mut rt.memory.draw_state(), x.or(Some(0)), y.or(Some(0)), col);
 	
-	Ok((prev_cursor[0], prev_cursor[1], prev_color))
+	(prev_cursor[0], prev_cursor[1], prev_color)
 }
 
 #[api_callback]
-pub fn color<A: Allocator + 'static>(rt: &mut Runtime<A>, val: Option<u32>) -> Result<u8, RuntimeError> {
+pub fn color<A: Allocator + 'static>(rt: &mut Runtime<A>, val: Option<u8>) -> u8 {
 	let old = *rt.memory.draw_state().pen_color();
-	if let Some(val) = val { *rt.memory.draw_state().pen_color() = val as u8; }
-	Ok(old)
+	if let Some(val) = val {
+		*rt.memory.draw_state().pen_color() = val;
+	}
+	old
 }
 
 #[api_callback]
-pub fn camera<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> Result<(i16, i16), RuntimeError> {
-	let old = (rt.memory.read(0x5f28), rt.memory.read(0x5f2a));
-	rt.memory.write(0x5f28, x.unwrap_or(0));
-	rt.memory.write(0x5f2a, y.unwrap_or(0));
-	Ok(old)
+pub fn camera<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> (i16, i16) {
+	let old = rt.memory.draw_state().get_camera_position();
+	rt.memory.draw_state().set_camera_x(x.unwrap_or(0));
+	rt.memory.draw_state().set_camera_y(y.unwrap_or(0));
+	(old[0], old[1])
 }
 
 #[api_callback]
-pub fn clip<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<u8>, y: Option<u8>, w: Option<u8>, h: Option<u8>, clip_previous: Option<bool>) -> Result<(u8, u8, u8, u8), RuntimeError> {
+pub fn clip<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<u8>, y: Option<u8>, w: Option<u8>, h: Option<u8>, clip_previous: Option<bool>) -> (u8, u8, u8, u8) {
 	let [x_begin_old, y_begin_old, x_end_old, y_end_old] = *rt.memory.draw_state().clip_rect();
 	
 	if let Some(x) = x && let Some(y) = y && let Some(w) = w && let Some(h) = h {
@@ -88,29 +87,33 @@ pub fn clip<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<u8>, y: Optio
 		*rt.memory.draw_state().clip_rect() = [0, 0, 128, 128];
 	}
 	
-	Ok((x_begin_old, y_begin_old, x_end_old, y_end_old))
+	(x_begin_old, y_begin_old, x_end_old, y_end_old)
 }
 
 #[api_callback]
-pub fn pal<A: Allocator + 'static>(rt: &mut Runtime<A>, args: Variadic<Vec<Value>>) -> Result<(), RuntimeError> {
-	let argc = args.len();
-	assert!(argc >= 1 && argc <= 3, "Invalid number of arguments");
-	
-	if let Value::Table(new_pal) = args[0] {
-		let pal_idx = if argc > 1 && let Some(p) = args[1].to_number() { p.to_integer() as u8 } else { 0 };
-		let pal_base = rt.memory.base_addr_palette(pal_idx) as usize;
-		for (idx, col) in new_pal {
-			if let Some(k) = idx.to_number() && let Some(v) = col.to_number() {
-				rt.memory[pal_base + k.to_integer().rem_euclid(16) as usize] = v.to_integer() as u8;
+pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'gc>>, c1: Option<Value<'gc>>, p: Option<i16>) {
+	if c0.is_none() {
+		rt.memory.draw_state().reset_palette();
+	} else if let Some(Value::Table(new_pal)) = c0 {
+		let pal_idx = c1.and_then(|val| val.to_number())
+		                .map(|val| val.to_integer())
+		                .unwrap_or(0);
+		
+		if let Some(pal) = Palette::new(pal_idx) {
+			let mut ds = rt.memory.draw_state();
+			let pal = ds.palette(pal);
+			
+			for (idx, col) in new_pal.iter() {
+				if let (Some(k), Some(v)) = (idx.to_number(), col.to_number()) {
+					let k = k.to_integer().cast_unsigned() as usize % 16;
+					pal[k] = v.to_integer() as u8;
+				}
 			}
 		}
-	} else if let Some(idx) = args[0].to_number() && let Some(col) = args[1].to_number() {
-		let pal_idx = if argc > 2 && let Value::Number(p) = args[2] { p.to_integer() as u8 } else { 0 };
-		let pal_base = rt.memory.base_addr_palette(pal_idx) as usize;
-		rt.memory[pal_base + (idx.to_integer() % 16) as usize] = col.to_integer() as u8;
-	} else {
-		panic!("Invalid arguments");
+	} else if let (Some(k), Some(v), Some(pal)) = (c0.and_then(Value::to_number), c1.and_then(Value::to_number), Palette::new(p.unwrap_or(0))) {
+		let mut ds = rt.memory.draw_state();
+		let pal = ds.palette(pal);
+		let k = k.to_integer().cast_unsigned() as usize % 16;
+		pal[k] = v.to_integer() as u8;
 	}
-	
-	Ok(())
 }

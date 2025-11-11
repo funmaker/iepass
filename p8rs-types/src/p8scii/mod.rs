@@ -77,3 +77,13 @@ pub const CHAR_MAP: [char; 256] = [
 	// Symbols
 	'◜', '◝'
 ];
+
+/// Variation Selector-16 (U+FE0F) character
+pub const VAR_SEL: char = '\u{FE0F}';
+
+/// Returns true if a specific p8scii character requires Variation Selector-16 (U+FE0F) character in the utf-8 representation
+/// 
+/// That is: Down key (⬇️), 139 Left key (⬅️), 142 O key (🅾️), 145 Right key (➡️) and 148 Up key (⬆️)
+pub fn requires_var_sel(char: u8) -> bool {
+	matches!(char, 131 | 139 | 142 | 145 | 148) // ⬇️ ⬅️ 🅾️ ➡️ ⬆️
+}

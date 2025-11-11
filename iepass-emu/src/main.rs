@@ -1,7 +1,8 @@
-#![feature(arc_is_unique)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![feature(arc_is_unique)]
 
 use std::collections::HashSet;
+use std::fs;
 use std::ops::{Sub};
 use std::time::{Duration, Instant};
 use eframe::{egui, CreationContext};
@@ -22,11 +23,19 @@ fn main() -> eframe::Result {
 		..Default::default()
 	};
 	
+	let mut args = std::env::args().rev().collect::<Vec<_>>();
+	args.pop();
+	let cart = args.pop();
+	
+	if !args.is_empty() {
+		eprintln!("Unexpected argument: {}", args.pop().unwrap());
+	}
+	
 	eframe::run_native(
 		"IEPass Emulator",
 		options,
 		Box::new(|cc| {
-			Ok(Box::new(EmulatorApp::new(cc)))
+			Ok(Box::new(EmulatorApp::new(cc, cart)))
 		}),
 	)
 }
@@ -43,19 +52,27 @@ struct EmulatorApp {
 }
 
 impl EmulatorApp {
-	pub fn new(cc: &CreationContext) -> EmulatorApp {
+	pub fn new(cc: &CreationContext, cart_path: Option<String>) -> EmulatorApp {
 		let mut fb_pool = FramebufferPool::new(128, 128);
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
 		
 		let mut pico8 = Pico8VM::new().unwrap();
 		
-		// let load_result = pico8.load_cartridge(include_bytes!(r"C:\Users\sebi\AppData\Roaming\pico-8\carts\hello.p8"));
-		let load_result = pico8.load_cartridge(include_bytes!("../../lua/hello.p8"));
-		// pico8.load(include_bytes!("../../lua/hello.lua"));
+		let load_result = if let Some(cart_path) = cart_path {
+			match fs::read_to_string(&cart_path) {
+				Ok(cart) => pico8.load_cartridge(cart),
+				Err(err) => {
+					eprintln!("Failed to open cartridge: {}", err);
+					Ok(())
+				},
+			}
+		} else {
+			pico8.load_cartridge(include_bytes!("../../lua/hello.p8"))
+		};
 		
 		match load_result {
-			Ok(_) => { println!("Successfully loaded cartridge."); },
-			Err(err) => { println!("Failed to load cartridge: {}", err); },
+			Ok(_) => eprintln!("Successfully loaded cartridge."),
+			Err(err) => eprintln!("Failed to load cartridge: {}", err),
 		}
 		
 		Self {
@@ -164,12 +181,8 @@ impl eframe::App for EmulatorApp {
 				Event::Key {
 					pressed,
 					key,
-					modifiers,
-					physical_key,
-					repeat,
 					..
 				} => {
-					println!("{} {:?} {:?} {:?} {}", pressed, key, modifiers, physical_key, repeat);
 					if *pressed {
 						self.pressed_keys.insert(*key);
 					} else {

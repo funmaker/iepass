@@ -337,6 +337,10 @@ where
     pub fn line_number(&self) -> LineNumber {
         LineNumber(self.line_number)
     }
+    
+    pub fn interner_mut(&mut self) -> &mut S {
+        &mut self.interner
+    }
 
     pub fn skip_whitespace(&mut self) -> Result<(), LexError> {
         let mut do_skip_whitespace = || {
@@ -1037,7 +1041,7 @@ mod tests {
                 [====[ [==[ this is a [[]] long string ]== ]==] ]====]
                 [[ [=] [==] another long string [==] [=] ]]
                 [[ \t\r\x escape codes are ignored \1\2\3 ]]
-                [[ ️⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
+                [[ ⬆️⬇️⬅️➡️ PICO-8 symbols █▒░▤▥ ]]
             "#,
             &[
                 str_token(" [==[ this is a [[]] long string ]== ]==] "),

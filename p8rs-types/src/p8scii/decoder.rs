@@ -1,4 +1,4 @@
-use crate::p8scii::{IntoByteIterator, CHAR_MAP};
+use crate::p8scii::{requires_var_sel, IntoByteIterator, CHAR_MAP};
 
 pub fn to_char(c: u8) -> char {
 	CHAR_MAP[c as usize]
@@ -31,7 +31,7 @@ impl<T: Iterator<Item = u8>> Iterator for IntoChars<T> {
 			Some('\u{FE0F}')
 		} else {
 			let next = self.iter.next()?;
-			self.variant_sel = matches!(next, 131 | 139 | 145 | 148 | 142);
+			self.variant_sel = requires_var_sel(next);
 			Some(to_char(next))
 		}
 	}
