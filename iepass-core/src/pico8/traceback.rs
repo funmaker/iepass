@@ -1,5 +1,4 @@
-use core::fmt::{Display, Write};
-use alloc::string::String;
+use core::fmt::Write;
 use anyhow::anyhow;
 use p8rs_piccolo::compiler::LineNumber;
 use p8rs_piccolo::RuntimeError;

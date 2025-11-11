@@ -4,9 +4,8 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, lock::RefLock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, IntoValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
-use crate::stash::Stashable;
-use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm, StashedTraceback, StashedTracebackEntry, Traceback, TracebackEntry};
+use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
+use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm, StashedTraceback, Traceback, TracebackEntry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutorMode {

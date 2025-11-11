@@ -21,7 +21,6 @@ pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
-use p8rs_piccolo::stash::Fetchable;
 use crate::pico8::traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]

@@ -5,10 +5,9 @@ mod vm;
 use gc_arena::{Collect, DynamicRootSet, Mutation};
 use thiserror::Error;
 use alloc::vec::Vec;
-use core::fmt::Write;
 use crate::compiler::LineNumber;
 use crate::meta_ops::{MetaCallError, MetaOperatorError};
-use crate::{Context, RuntimeError, StashedString};
+use crate::StashedString;
 use crate::stash::{Fetchable, Stashable};
 pub use self::{
     executor::{
@@ -64,7 +63,7 @@ pub type ExternTraceback = TracebackBase<alloc::string::String>;
 
 impl<S> TracebackBase<S>
 {
-    fn into_traceback<D>(self) -> TracebackBase<D>
+    pub fn into_traceback<D>(self) -> TracebackBase<D>
     where TracebackEntryBase<S>: Into<TracebackEntryBase<D>>,{
         TracebackBase {
             entries: self.entries.into_iter().map(|e| Into::into(e)).collect()

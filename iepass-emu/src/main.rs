@@ -16,6 +16,7 @@ use iepass_core::pico8::palette::PALETTE;
 mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
+use iepass_core::pico8::memory::Palette;
 
 fn main() -> eframe::Result {
 	let options = eframe::NativeOptions {
@@ -127,7 +128,7 @@ impl eframe::App for EmulatorApp {
 			if run_result != RunResult::OutOfFuel {
 				let rt = self.pico8.runtime();
 				
-				let screen_palette = rt.memory.palette(1);
+				let screen_palette = *rt.memory.draw_state().palette(Palette::Screen);
 				
 				let map_color = |color: u8| -> Color {
 					assert!(color < 16);

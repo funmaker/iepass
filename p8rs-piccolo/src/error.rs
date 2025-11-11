@@ -11,7 +11,7 @@ use crate::{
     Callback, CallbackReturn, Context, FromValue, Function, IntoValue, MetaMethod, Singleton,
     Table, UserData, Value,
 };
-use crate::thread::{StashedTraceback, Traceback};
+use crate::thread::StashedTraceback;
 
 #[derive(Debug, Clone, Copy, Error)]
 #[error("type error, expected {expected}, found {found}")]
