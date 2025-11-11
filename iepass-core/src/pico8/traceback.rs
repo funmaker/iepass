@@ -3,20 +3,23 @@ use alloc::string::String;
 use anyhow::anyhow;
 use p8rs_piccolo::compiler::LineNumber;
 use p8rs_piccolo::RuntimeError;
-use p8rs_piccolo::thread::ExternTracebackEntry;
+use p8rs_piccolo::thread::{ExternTracebackEntry, TracebackEntry};
 
-pub(crate) trait TracebackEntry<S: Display> {
+pub(crate) trait PrintableTracebackEntry {
 	fn with_name<F, R>(&self, f: F) -> R
-	where F: FnOnce(&Option<S>) -> R;
+	where
+		F: FnOnce(Option<&str>) -> R;
 	
 	fn line_number(&self) -> LineNumber;
 }
 
-impl TracebackEntry<String> for ExternTracebackEntry {
+impl<'gc> PrintableTracebackEntry for TracebackEntry<'gc> {
 	fn with_name<F, R>(&self, f: F) -> R
-	where F: FnOnce(&Option<String>) -> R
+	where
+		F: FnOnce(Option<&str>) -> R
 	{
-		f(&self.name)
+		let name = self.name.as_ref().map(|s| s.to_string());
+		f(name.as_ref().map(|s| s.as_str()))
 	}
 	
 	fn line_number(&self) -> LineNumber {
@@ -24,13 +27,12 @@ impl TracebackEntry<String> for ExternTracebackEntry {
 	}
 }
 
-impl<'gc> TracebackEntry<p8rs_piccolo::String<'gc>> for p8rs_piccolo::thread::TracebackEntry<'gc> {
-
+impl<'gc> PrintableTracebackEntry for ExternTracebackEntry {
 	fn with_name<F, R>(&self, f: F) -> R
 	where
-		F: FnOnce(&Option<p8rs_piccolo::String<'gc>>) -> R
+		F: FnOnce(Option<&str>) -> R
 	{
-		f(&self.name)
+		f(self.name.as_ref().map(|s| s.as_str()))
 	}
 	
 	fn line_number(&self) -> LineNumber {
@@ -38,9 +40,10 @@ impl<'gc> TracebackEntry<p8rs_piccolo::String<'gc>> for p8rs_piccolo::thread::Tr
 	}
 }
 
-pub(crate) fn write_traceback_entries<'gc, 'a, S: Display, T>(target: & mut impl Write, entries: impl Iterator<Item=&'a T>) -> Result<usize, RuntimeError>
+
+pub(crate) fn write_traceback_entries<'gc, 'a, T>(target: & mut impl Write, entries: impl Iterator<Item=&'a T>) -> Result<usize, RuntimeError>
 	where
-		T: TracebackEntry<S> + 'a {
+		T: PrintableTracebackEntry + 'a {
 	let mut entries = entries.peekable();
 	let mut entries_written = 0;
 	

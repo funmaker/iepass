@@ -21,6 +21,7 @@ pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
+use p8rs_piccolo::stash::Fetchable;
 use crate::pico8::traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -146,6 +147,7 @@ impl<A: Allocator + 'static> Pico8VM<A> {
 										Error::Runtime(e) => {
 											error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause());
 											if let Some(traceback) = &e.1 {
+												let traceback = ctx.fetch(traceback);
 												let mut str = alloc::string::String::new();
 												write_traceback_entries(&mut str, (&traceback.entries[..traceback.entries.len()-1]).iter())?;
 												error!("{}", str);

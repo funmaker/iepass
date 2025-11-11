@@ -48,7 +48,7 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 		let trace = ex.traceback();
 		
 		// always skip the last entry (p8_prelog.lua)
-		let trace = &trace[0..trace.len().saturating_sub(1)];
+		let trace = &trace.entries[0..trace.entries.len().saturating_sub(1)];
 		
 		let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
 		

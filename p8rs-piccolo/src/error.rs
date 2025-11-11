@@ -11,7 +11,7 @@ use crate::{
     Callback, CallbackReturn, Context, FromValue, Function, IntoValue, MetaMethod, Singleton,
     Table, UserData, Value,
 };
-use crate::thread::Traceback;
+use crate::thread::{StashedTraceback, Traceback};
 
 #[derive(Debug, Clone, Copy, Error)]
 #[error("type error, expected {expected}, found {found}")]
@@ -101,7 +101,7 @@ unsafe impl Sync for ExternLuaError {}
 /// this type contains its error inside an `Arc` pointer to allow for this.
 #[derive(Debug, Clone, Collect)]
 #[collect(require_static)]
-pub struct RuntimeError(pub Arc<anyhow::Error>, pub Option<Traceback>);
+pub struct RuntimeError(pub Arc<anyhow::Error>, pub Option<StashedTraceback>);
 
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -120,7 +120,7 @@ impl RuntimeError {
         Self::new_with_traceback(err, None)
     }
     
-    pub fn new_with_traceback(err: impl Into<anyhow::Error>, traceback: Option<Traceback>) -> Self {
+    pub fn new_with_traceback(err: impl Into<anyhow::Error>, traceback: Option<StashedTraceback>) -> Self {
         Self(Arc::new(err.into()), traceback)
     }
     
