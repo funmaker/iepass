@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Execution, IntoValue, RuntimeError, String, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+use crate::pico8::traceback::write_traceback_entries;
 
 pub fn install_pico8_base(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
@@ -42,24 +43,23 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 	write!(&mut buf, "stack traceback:\n")?;
 	
 	if let Value::Thread(coroutine) = coroutine && coroutine != ex.current_thread().thread {
-		write!(&mut buf, "  **getting trace of different threads is not currently supported**\n")?;
+		write!(&mut buf, "\t**getting trace of different threads is not currently supported**\n")?;
 	}else {
 		let trace = ex.traceback();
 		
 		// always skip the last entry (p8_prelog.lua)
-		let trace = &trace[0..trace.len().saturating_sub(1)];
+		let trace = &trace.entries[0..trace.entries.len().saturating_sub(1)];
 		
 		let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
 		
 		if skip == 0 {
-			write!(&mut buf, "  [C]: in function 'trace'\n")?;
+			write!(&mut buf, "\t[C]: in function 'trace'\n")?;
 		}
 		
 		if skip >= 0 {
-			for entry in trace.iter().skip((skip as usize).saturating_sub(1)) {
-				entry.to_extern().write(&mut buf)?;
-			}
+			write_traceback_entries(&mut buf, trace.iter().skip((skip as usize).saturating_sub(1)))?;
 		}
+		
 	}
 	
 	buf.pop(); // remove last newline

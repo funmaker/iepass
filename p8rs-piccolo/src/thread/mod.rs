@@ -2,13 +2,13 @@ mod executor;
 mod thread;
 mod vm;
 
-use gc_arena::Collect;
+use gc_arena::{Collect, DynamicRootSet, Mutation};
 use thiserror::Error;
 use alloc::vec::Vec;
-use core::fmt::Write;
 use crate::compiler::LineNumber;
 use crate::meta_ops::{MetaCallError, MetaOperatorError};
-use crate::RuntimeError;
+use crate::StashedString;
+use crate::stash::{Fetchable, Stashable};
 pub use self::{
     executor::{
         BadExecutorMode, CurrentThread, Execution, Executor, ExecutorInner, ExecutorMode,
@@ -39,65 +39,99 @@ pub enum VMError {
     BadForLoopPrep(&'static str, &'static str),
 }
 
+
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
-pub struct TracebackEntry<'gc> {
-    pub name: Option<crate::String<'gc>>,
+pub struct TracebackEntryBase<S> {
+    pub name: Option<S>,
     pub line_number: LineNumber,
-}
-
-impl<'gc> TracebackEntry<'gc> {
-    pub fn to_extern(&self) -> ExternTracebackEntry {
-        ExternTracebackEntry::from(self)
-    }
 }
 
 #[derive(Debug, Clone, Collect)]
 #[collect(no_drop)]
-pub struct ExternTracebackEntry {
-    pub name: Option<alloc::string::String>,
-    pub line_number: LineNumber,
+pub struct TracebackBase<S> {
+    pub entries: Vec<TracebackEntryBase<S>>,
 }
 
-impl ExternTracebackEntry {
-    pub fn write<'gc>(&self, target: & mut impl Write) -> Result<(), RuntimeError> {
-        // offset line numbers to match pico 8
-        write!(target, "  [string \"-- pico-8 header...\"]:{}: in ", self.line_number.0 + 2)?;
-        if let Some(name) = &self.name {
-            write!(target, "function '{}'", name)?;
-        }else{
-            write!(target, "main chunk")?;
+pub type StashedTracebackEntry = TracebackEntryBase<StashedString>;
+pub type TracebackEntry<'gc> = TracebackEntryBase<crate::String<'gc>>;
+pub type ExternTracebackEntry = TracebackEntryBase<alloc::string::String>;
+
+pub type StashedTraceback = TracebackBase<StashedString>;
+pub type Traceback<'gc> = TracebackBase<crate::String<'gc>>;
+pub type ExternTraceback = TracebackBase<alloc::string::String>;
+
+impl<S> TracebackBase<S>
+{
+    pub fn into_traceback<D>(self) -> TracebackBase<D>
+    where TracebackEntryBase<S>: Into<TracebackEntryBase<D>>,{
+        TracebackBase {
+            entries: self.entries.into_iter().map(|e| Into::into(e)).collect()
         }
-        write!(target, "\n")?;
-        Ok(())
     }
 }
 
-impl<'gc> From<&TracebackEntry<'gc>> for ExternTracebackEntry {
-    fn from(value: &TracebackEntry<'gc>) -> Self {
-        Self {
-            name: value.name.map(|name| name.to_string()),
+impl<'gc> From<TracebackEntry<'gc>> for ExternTracebackEntry {
+    fn from(value: TracebackEntry<'gc>) -> Self {
+        ExternTracebackEntry {
             line_number: value.line_number,
+            name: value.name.map(|s| s.to_string())
         }
     }
 }
 
-#[derive(Debug, Clone, Collect)]
-#[collect(no_drop)]
-pub struct Traceback {
-    pub entries: Vec<ExternTracebackEntry>,
-}
 
-impl<'gc> Traceback {
-    pub fn new(entries: impl Iterator<Item=&'gc TracebackEntry<'gc>>) -> Self {
-        Self { entries: entries.map(Into::into).collect() }
-    }
-    
+
+impl<S> TracebackBase<S> {
     pub(crate) fn empty() -> Self {
         Self { entries: Vec::new() }
     }
     
-    pub(crate) fn add_entry(&mut self, entry: &TracebackEntry<'gc>) {
-        self.entries.push(entry.into());
+    pub(crate) fn add_entry(&mut self, entry: TracebackEntryBase<S>) {
+        self.entries.push(entry);
     }
 }
+
+impl Fetchable for StashedTracebackEntry {
+    type Fetched<'gc> = TracebackEntry<'gc>;
+    
+    fn fetch<'gc>(&self, roots: DynamicRootSet<'gc>) -> Self::Fetched<'gc> {
+        TracebackEntry {
+            line_number: self.line_number,
+            name: self.name.as_ref().map(|s| s.fetch(roots))
+        }
+    }
+}
+
+impl<'gc> Stashable<'gc> for TracebackEntry<'gc> {
+    type Stashed = StashedTracebackEntry;
+    
+    fn stash(self, mc: &Mutation<'gc>, roots: DynamicRootSet<'gc>) -> Self::Stashed {
+        StashedTracebackEntry {
+            line_number: self.line_number,
+            name: self.name.as_ref().map(|s| s.stash(mc, roots))
+        }
+    }
+}
+
+impl Fetchable for StashedTraceback {
+    type Fetched<'gc> = Traceback<'gc>;
+    
+    fn fetch<'gc>(&self, roots: DynamicRootSet<'gc>) -> Self::Fetched<'gc> {
+        Traceback {
+            entries: self.entries.iter().map(|entry| entry.fetch(roots)).collect()
+        }
+    }
+}
+
+impl<'gc> Stashable<'gc> for Traceback<'gc> {
+    type Stashed = StashedTraceback;
+    
+    fn stash(self, mc: &Mutation<'gc>, roots: DynamicRootSet<'gc>) -> Self::Stashed {
+        StashedTraceback {
+            entries: self.entries.into_iter().map(|entry| entry.stash(mc, roots)).collect()
+        }
+    }
+}
+
+
