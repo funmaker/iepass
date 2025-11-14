@@ -118,6 +118,8 @@ impl<A: Allocator + 'static> P8rs<A> {
 						executor.resume(ctx, ()).unwrap();
 					}
 					
+					self.runtime.update();
+					
 					if !executor.step(ctx, &mut fuel, &mut self.runtime).unwrap() {
 						if fuel.is_interrupted() {
 							trace!("[run_fuel] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode());

@@ -3,15 +3,18 @@
 
 #[macro_use] extern crate p8rs_log;
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fs;
-use std::ops::{Sub};
+use std::io::stderr;
+use std::ops::{Not, Sub};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
 use egui::{Color32, Event, Frame, ImageSource, Key, RawInput};
 use egui::load::SizedTexture;
-use p8rs::vm::{P8rs, RunResult};
+use p8rs::vm::{Callbacks, P8rs, RunResult};
 use p8rs::colors::Color;
 use p8rs::vm::palette::PALETTE;
 
@@ -19,6 +22,7 @@ mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
 use p8rs::vm::memory::Palette;
+use p8rs_types::p8scii;
 
 fn main() -> eframe::Result {
 	let options = eframe::NativeOptions {
@@ -43,11 +47,29 @@ fn main() -> eframe::Result {
 	)
 }
 
+struct EmulatorCallbacks {
+	buttons: Rc<Cell<[u8; 8]>>,
+}
+
+impl<'a> Callbacks for EmulatorCallbacks {
+	fn printh(&mut self, text: &[u8], _filename: Option<&[u8]>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) {
+		eprint!("[printh] ");
+		for char in p8scii::to_iter(text) {
+			eprint!("{}", char);
+		}
+		eprint!("\n");
+	}
+	
+	fn get_buttons(&mut self) -> [u8; 8] {
+		self.buttons.get()
+	}
+}
+
 struct EmulatorApp {
 	fb_pool: FramebufferPool,
 	fb_tex: TextureHandle,
 	frame: usize,
-	pressed_keys: HashSet<Key>,
+	pressed_buttons: Rc<Cell<[u8; 8]>>,
 	last_frames: [Instant; 10],
 	target_fps: u16,
 	pico8: P8rs,
@@ -78,6 +100,14 @@ impl EmulatorApp {
 			Err(err) => eprintln!("Failed to load cartridge: {}", err),
 		}
 		
+		let pressed_buttons = Rc::new(Cell::new([0; 8]));
+		
+		let callbacks = EmulatorCallbacks {
+			buttons: pressed_buttons.clone(),
+		};
+		
+		pico8.set_callbacks(callbacks);
+		
 		Self {
 			fb_pool,
 			fb_tex,
@@ -86,7 +116,7 @@ impl EmulatorApp {
 			target_fps: 30,
 			pico8,
 			running: true,
-			pressed_keys: HashSet::new(),
+			pressed_buttons: pressed_buttons.clone(),
 		}
 	}
 }
@@ -104,17 +134,18 @@ impl eframe::App for EmulatorApp {
 		let delta = requested_delay - elapsed.as_secs_f32() - 0.5f32*previous_error.clamp(-requested_delay*0.9f32, requested_delay*0.9f32);
 		
 		if delta < 0.001f32 && self.running {
-			{
-				let rt = self.pico8.runtime();
-				
-				let mut buttons = [0u8; 8];
-				let p1_buttons = &mut buttons[0];
-				if self.pressed_keys.contains(&Key::ArrowUp) { *p1_buttons |= 0x4 }
-				if self.pressed_keys.contains(&Key::ArrowDown) { *p1_buttons |= 0x8 }
-				
-				rt.update_buttons(&buttons);
-				rt.finish_update_frame();
-			}
+			// {
+			// 	let rt = self.pico8.runtime();
+			//
+			// 	let mut buttons = [0u8; 8];
+			// 	let p1_buttons = &mut buttons[0];
+			// 	let pressed_keys = self.pressed_buttons.();
+			// 	if pressed_keys.contains(&Key::ArrowUp) { *p1_buttons |= 0x4 }
+			// 	if pressed_keys.contains(&Key::ArrowDown) { *p1_buttons |= 0x8 }
+			//
+			// 	rt.update_buttons(&buttons);
+			// 	rt.finish_update_frame();
+			// }
 			
 			let mut run_result = self.pico8.run_fuel(25000).unwrap();
 			while run_result == RunResult::OutOfFuel && (Instant::now() - now).as_secs_f32() < requested_delay {
@@ -186,11 +217,29 @@ impl eframe::App for EmulatorApp {
 					key,
 					..
 				} => {
-					if *pressed {
-						self.pressed_keys.insert(*key);
-					} else {
-						self.pressed_keys.remove(key);
-					}
+					let player_idx = 0;
+					let btn_idx = match *key {
+						Key::ArrowLeft => Some(0u8),
+						Key::ArrowRight => Some(1),
+						Key::ArrowUp => Some(2),
+						Key::ArrowDown => Some(3),
+						Key::C => Some(4),
+						Key::N => Some(4),
+						Key::Z => Some(4),
+						Key::M => Some(5),
+						Key::V => Some(5),
+						Key::X => Some(5),
+						_ => None,
+					};
+						if let Some(btn_idx) = btn_idx {
+							let mut buttons = self.pressed_buttons.get();
+							if *pressed {
+								buttons[player_idx] = buttons[player_idx] | (1u8 << btn_idx);
+							} else {
+								buttons[player_idx] = buttons[player_idx] & (1u8 << btn_idx).not();
+							}
+							self.pressed_buttons.set(buttons);
+						}
 				},
 				_ => {},
 			}

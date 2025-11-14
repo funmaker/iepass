@@ -13,6 +13,7 @@ default = ["p8rs-log/log-04"]
 
 [dependencies]
 p8rs-log.workspace = true
+p8rs-types = { workspace = true }
 p8rs = { workspace = true, features = ["std"] }
 eframe = "0.33.2"
 egui = "0.33.2"

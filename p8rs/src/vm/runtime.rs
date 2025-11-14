@@ -17,7 +17,8 @@ pub struct Runtime<A: Allocator = Global> {
 }
 
 impl<A> Runtime<A>
-where A: Allocator + Clone {
+where A: Allocator + Clone
+{
 	pub fn new(alloc: A) -> Runtime<A> {
 		Self {
 			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
@@ -27,16 +28,18 @@ where A: Allocator + Clone {
 			callbacks: Box::new(DefaultCallbacks),
 		}
 	}
-	
-	pub fn finish_update_frame(&mut self) {
-		self.buttons.finish_update_frame(self.target_fps);
-	}
-	
-	pub fn update_buttons(&mut self, buttons: &[u8; 8]) {
-		self.buttons.update_state(buttons);
+}
+
+impl<A> Runtime<A>
+where A: Allocator
+{
+	/// Should be called before every frame
+	pub fn update(&mut self) {
+		let buttons = self.callbacks.get_buttons();
 		for i in 0..8 {
 			self.memory[0x5f4c + i] = buttons[i] & 0x3f;
 		}
+		self.buttons.update(self.target_fps, &buttons);
 	}
 }
 
@@ -75,7 +78,9 @@ impl Buttons {
 		}
 	}
 	
-	pub fn finish_update_frame(&mut self, fps: u16) {
+	pub fn update(&mut self, fps: u16, state: &[u8; 8]) {
+		self.buttons.copy_from_slice(state);
+		
 		for player in 0..8 {
 			let buttons = self.buttons[player];
 			
@@ -101,10 +106,6 @@ impl Buttons {
 				}
 			}
 		}
-	}
-	
-	fn update_state(&mut self, state: &[u8; 8]) {
-		self.buttons.copy_from_slice(state);
 	}
 	
 	pub fn get_bits_for_player(&self, player: usize) -> u8 {

@@ -76,7 +76,15 @@ enum EscapeSequenceAction {
 fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
 	let font_height = get_font(rt, flags).map(|f| f.height()).unwrap_or(6);
 	rt.memory.draw_state().cursor_position()[0] = *rt.memory.draw_state().cursor_home_x();
-	rt.memory.draw_state().cursor_position()[1] += font_height;
+	let current_y = rt.memory.draw_state().cursor_position()[1];
+	let new_y = current_y.saturating_add(font_height);
+	if new_y >= 128 {
+		rt.memory.draw_state().cursor_position()[1] = 128 - font_height;
+		let shift = new_y - rt.memory.draw_state().cursor_position()[1];
+		// TODO: finish shifting
+	}else{
+		rt.memory.draw_state().cursor_position()[1] += font_height;
+	}
 }
 
 fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintAttributeFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
@@ -132,6 +140,10 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintAttributeFlags, lett
 	
 	let pen_color = *rt.memory.draw_state().pen_color();
 	let [cursor_x, cursor_y] = *rt.memory.draw_state().cursor_position();
+	
+	if cursor_x >= 128 || cursor_y >= 128 {
+		return Ok((0, 0))
+	}
 	
 	let font = get_font(rt, flags)?;
 	let char_width = font.width_chr(letter);
