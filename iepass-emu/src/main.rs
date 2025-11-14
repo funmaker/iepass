@@ -55,11 +55,7 @@ struct EmulatorCallbacks {
 
 impl<'a> Callbacks for EmulatorCallbacks {
 	fn printh(&mut self, text: &[u8], _filename: Option<&[u8]>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) {
-		eprint!("[printh] ");
-		for char in p8scii::to_iter(text) {
-			eprint!("{}", char);
-		}
-		eprint!("\n");
+		println!("INFO: {}", p8scii::Display(text));
 	}
 	
 	fn get_buttons(&mut self) -> [u8; 8] {
@@ -104,11 +100,9 @@ impl EmulatorApp {
 		
 		let pressed_buttons = Rc::new(Cell::new([0; 8]));
 		
-		let callbacks = EmulatorCallbacks {
+		pico8.set_callbacks(EmulatorCallbacks {
 			buttons: pressed_buttons.clone(),
-		};
-		
-		pico8.set_callbacks(callbacks);
+		});
 		
 		Self {
 			fb_pool,

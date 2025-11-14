@@ -80,7 +80,7 @@ fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
 	let new_y = current_y.saturating_add(font_height);
 	if new_y >= 128 {
 		rt.memory.draw_state().cursor_position()[1] = 128 - font_height;
-		let shift = new_y - rt.memory.draw_state().cursor_position()[1];
+		let _shift = new_y - rt.memory.draw_state().cursor_position()[1];
 		// TODO: finish shifting
 	}else{
 		rt.memory.draw_state().cursor_position()[1] += font_height;
