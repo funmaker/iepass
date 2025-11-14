@@ -18,6 +18,20 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 			.spawn()
 			.expect("failed to execute pico8");
 	
+	let mut stdout = child.stdout.take().unwrap();
+	let stdout = thread::spawn(move || {
+		let mut output = String::new();
+		stdout.read_to_string(&mut output).expect("failed to read pico8 stdout stream");
+		return output;
+	});
+	
+	let mut stderr = child.stderr.take().unwrap();
+	let stderr = thread::spawn(move || {
+		let mut output = String::new();
+		stderr.read_to_string(&mut output).expect("failed to read pico8 stdout stream");
+		return output;
+	});
+	
 	let mut timeout = false;
 	let start = Instant::now();
 	loop {
@@ -35,10 +49,8 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 		}
 	}
 	
-	let mut stdout = String::new();
-	let mut stderr = String::new();
-	child.stdout.take().unwrap().read_to_string(&mut stdout).expect("Can't read pico8 stdout stream");
-	child.stderr.take().unwrap().read_to_string(&mut stderr).expect("Can't read pico8 stderr stream");
+	let stdout = stdout.join().expect("Can't read pico8 stdout stream");
+	let stderr = stderr.join().expect("Can't read pico8 stderr stream");
 	
 	println!("-- pico8 stdout --");
 	println!("{stdout}");
