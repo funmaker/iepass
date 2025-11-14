@@ -21,6 +21,8 @@ use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
 use p8rs::vm::memory::Palette;
 
 fn main() -> eframe::Result {
+	env_logger::init();
+	
 	let options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default().with_inner_size([1024.0, 512.0]),
 		..Default::default()
@@ -31,7 +33,7 @@ fn main() -> eframe::Result {
 	let cart = args.pop();
 	
 	if !args.is_empty() {
-		eprintln!("Unexpected argument: {}", args.pop().unwrap());
+		error!("Unexpected argument: {}", args.pop().unwrap());
 	}
 	
 	eframe::run_native(
@@ -65,7 +67,7 @@ impl EmulatorApp {
 			match fs::read_to_string(&cart_path) {
 				Ok(cart) => pico8.load_cartridge(cart),
 				Err(err) => {
-					eprintln!("Failed to open cartridge: {}", err);
+					error!("Failed to open cartridge: {}", err);
 					Ok(())
 				},
 			}
@@ -74,8 +76,8 @@ impl EmulatorApp {
 		};
 		
 		match load_result {
-			Ok(_) => eprintln!("Successfully loaded cartridge."),
-			Err(err) => eprintln!("Failed to load cartridge: {}", err),
+			Ok(_) => info!("Successfully loaded cartridge."),
+			Err(err) => error!("Failed to load cartridge: {}", err),
 		}
 		
 		Self {

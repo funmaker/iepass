@@ -11,7 +11,7 @@ rust-version.workspace = true
 [features]
 default = ["std"]
 std = ["p8rs-log/std", "embedded-io/std"]
-defmt = ["p8rs-log/log-04", "p8rs-types/defmt"]
+defmt = ["p8rs-log/defmt", "p8rs-types/defmt"]
 log-04 = ["p8rs-log/log-04"]
 
 [dependencies]

@@ -9,11 +9,12 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["p8rs-log/log-04"]
+default = ["log-04"]
+log-04 = ["p8rs/log-04"]
 
 [dependencies]
 p8rs-log.workspace = true
 p8rs = { workspace = true, features = ["std"] }
+env_logger.workspace = true
 eframe = "0.33.2"
 egui = "0.33.2"
-    

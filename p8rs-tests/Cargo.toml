@@ -9,7 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dev-dependencies]
-p8rs.workspace = true
+p8rs = { workspace = true, features = ["log-04"] }
 p8rs-types.workspace = true
 thiserror.workspace = true
 colored = "3.0.0"
