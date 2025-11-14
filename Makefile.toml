@@ -21,12 +21,12 @@ script = { file = "./scripts/font_gen.rs" }
 [tasks.test]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
 [tasks.test-ci]
 dependencies = ["build-assets"]
 command = "cargo"
-args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "--exclude", "p8rs-tests", "${@}"]
+args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-tests", "${@}"]
 
 # Running
 [tasks.run]
@@ -54,7 +54,7 @@ args = ["run", "${@}"]
 [tasks.build]
 dependencies = ["build-assets", "build-iepass", "build-calib"]
 command = "cargo"
-args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "--exclude", "p8rs-piccolo-util", "${@}"]
+args = ["build", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
 [tasks.build-assets]
 cwd = "./assets"

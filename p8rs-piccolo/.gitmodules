@@ -1,3 +1,0 @@
-[submodule "tests/parsing"]
-	path = tests/parsing
-	url = https://github.com/lua/tests

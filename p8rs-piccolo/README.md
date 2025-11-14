@@ -2,7 +2,8 @@
 > 
 > This is a clone of [piccolo Lua VM](https://github.com/kyren/piccolo/) by kyren,
 > modified to support [PICO-8](https://www.lexaloffle.com/pico-8.php) Lua dialect
-> in no-std environment.
+> in no-std environment. All and every documentation, including
+> this README.md file, may contain outdated or irrelevant info.
 
 ## piccolo - An experimental stackless Lua VM implemented in pure Rust
 

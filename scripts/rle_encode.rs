@@ -1,10 +1,10 @@
 //! ```cargo
 //! [dependencies]
-//! iepass-core = { path = "../iepass-core", features = ["std"] }
+//! p8rs = { path = "../p8rs", features = ["std"] }
 //! ```
 
 use std::fs::File;
-use iepass_core::rle;
+use p8rs::rle;
 
 fn main() {
 	let args: Vec<_> = std::env::args().collect();

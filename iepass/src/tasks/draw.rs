@@ -1,5 +1,5 @@
 use anyhow::Result;
-use iepass_core::colors::Color;
+use p8rs::colors::Color;
 
 use crate::tasks::display::FRAMEBUFFER_MANAGER;
 use crate::utils::PerfFutureExt;

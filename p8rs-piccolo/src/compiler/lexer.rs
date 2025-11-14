@@ -967,9 +967,9 @@ fn get_reserved_word_token<S>(word: &[u8]) -> Option<Token<S>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::compiler::interning::BasicInterner;
     use alloc::rc::Rc;
     use p8rs_macros::p8;
-    use crate::compiler::interning::BasicInterner;
 
     use super::*;
 

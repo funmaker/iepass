@@ -1,0 +1,29 @@
+[package]
+name     = "p8rs"
+resolver = "3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["std"]
+std = ["p8rs-log/std", "embedded-io/std"]
+defmt = ["p8rs-log/log-04", "p8rs-types/defmt"]
+log-04 = ["p8rs-log/log-04"]
+
+[dependencies]
+p8rs-log.workspace = true
+p8rs-piccolo.workspace = true
+p8rs-types.workspace = true
+p8rs-macros.workspace = true
+embedded-io.workspace = true
+gc-arena.workspace = true
+anyhow.workspace = true
+bitflags.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+embedded-io.workspace = true

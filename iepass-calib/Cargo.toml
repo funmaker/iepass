@@ -14,7 +14,8 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-iepass-core = { workspace = true, features = ["defmt"] }
+p8rs = { workspace = true, features = ["defmt"] }
+p8rs-log.workspace = true
 iepass.workspace = true
 anyhow.workspace = true
 defmt.workspace = true

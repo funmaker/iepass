@@ -1,3 +1,4 @@
+use core::error::Error;
 use gc_arena::{lock::Lock, Collect, Gc, Rootable};
 use p8rs_piccolo::{Callback, CallbackReturn, Closure, Executor, Lua, UserData, Value};
 
@@ -6,7 +7,7 @@ use p8rs_piccolo::{Callback, CallbackReturn, Closure, Executor, Lua, UserData, V
 struct MyUserData<'gc>(Gc<'gc, Lock<i32>>);
 
 #[test]
-fn userdata() -> Result<(), anyhow::Error> {
+fn userdata() -> Result<(), Box<dyn Error>> {
     let mut lua = Lua::core();
 
     lua.try_enter(|ctx| {

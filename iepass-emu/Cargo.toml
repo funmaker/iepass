@@ -8,8 +8,12 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["p8rs-log/log-04"]
+
 [dependencies]
-eframe = "0.32.0"
-egui = "0.32.0"
-iepass-core = { workspace = true, features = ["std"] }
+p8rs-log.workspace = true
+p8rs = { workspace = true, features = ["std"] }
+eframe = "0.33.2"
+egui = "0.33.2"
     

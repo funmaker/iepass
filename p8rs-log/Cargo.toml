@@ -1,0 +1,25 @@
+[package]
+name     = "p8rs-log"
+resolver = "3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["std-error", "std-warn", "std-info"]
+defmt = ["dep:defmt"]
+log-04 = ["dep:log-04"]
+std = []
+std-trace = []
+std-debug = []
+std-info = []
+std-warn = []
+std-error = []
+
+[dependencies]
+defmt = { workspace = true, optional = true }
+log-04 = { workspace = true, optional = true }
+cfg-if = "1.0.4"

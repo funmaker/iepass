@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Once;
 use colored::{Color, Colorize};
 use colored::control::SHOULD_COLORIZE;
-use iepass_core::pico8::palette;
+use p8rs::vm::palette;
 
 use crate::{runner, TMP_DIR};
 use crate::runner::Log;

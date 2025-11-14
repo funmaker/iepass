@@ -17,8 +17,8 @@ hashbrown.workspace = true
 thiserror.workspace = true
 p8rs-macros.workspace = true
 arrayvec.workspace = true
+p8rs-log.workspace = true
 p8rs-types = { workspace = true, features = ["gc-arena"] }
-
 rand = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -28,4 +28,4 @@ rustyline = "14.0"
 [features]
 default = ["std", "rng"]
 rng = ["dep:rand", "ahash/runtime-rng"]
-std = ["rand?/std"]
+std = ["rand?/std", "p8rs-log/std"]

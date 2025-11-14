@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![feature(arc_is_unique)]
 
+#[macro_use] extern crate p8rs_log;
+
 use std::collections::HashSet;
 use std::fs;
 use std::ops::{Sub};
@@ -9,14 +11,14 @@ use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
 use egui::{Color32, Event, Frame, ImageSource, Key, RawInput};
 use egui::load::SizedTexture;
-use iepass_core::pico8::{Pico8VM, RunResult};
-use iepass_core::colors::Color;
-use iepass_core::pico8::palette::PALETTE;
+use p8rs::vm::{P8rs, RunResult};
+use p8rs::colors::Color;
+use p8rs::vm::palette::PALETTE;
 
 mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
-use iepass_core::pico8::memory::Palette;
+use p8rs::vm::memory::Palette;
 
 fn main() -> eframe::Result {
 	let options = eframe::NativeOptions {
@@ -48,7 +50,7 @@ struct EmulatorApp {
 	pressed_keys: HashSet<Key>,
 	last_frames: [Instant; 10],
 	target_fps: u16,
-	pico8: Pico8VM,
+	pico8: P8rs,
 	running: bool,
 }
 
@@ -57,7 +59,7 @@ impl EmulatorApp {
 		let mut fb_pool = FramebufferPool::new(128, 128);
 		let fb_tex = cc.egui_ctx.load_texture("framebuffer", fb_pool.from_color(Color32::MAGENTA), FRAMEBUFFER_OPTS);
 		
-		let mut pico8 = Pico8VM::new().unwrap();
+		let mut pico8 = P8rs::new().unwrap();
 		
 		let load_result = if let Some(cart_path) = cart_path {
 			match fs::read_to_string(&cart_path) {

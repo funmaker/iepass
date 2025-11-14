@@ -6,6 +6,7 @@
 #![no_main]
 #![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]
 
+#[macro_use] extern crate p8rs_log;
 extern crate alloc;
 
 use esp_hal::clock::CpuClock;
@@ -18,9 +19,9 @@ use panic_rtt_target as _;
 use anyhow::{anyhow, Result};
 use esp_hal::{gpio, psram};
 use rtt_target::ChannelMode;
-use iepass_core::colors::Color;
-use iepass_core::pico8::palette::PALETTE;
-use iepass_core::pico8::Pico8VM;
+use p8rs::colors::Color;
+use p8rs::vm::palette::PALETTE;
+use p8rs::vm::P8rs;
 
 mod calib;
 mod peripherials;
@@ -30,6 +31,7 @@ mod utils;
 use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, display};
 use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
+use p8rs::vm::memory::Palette;
 use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
 static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
@@ -162,11 +164,11 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Creating Pico-8");
     
-    let mut pico8 = Pico8VM::new_in(&PSRAM_ALLOCATOR)?;
+    let mut pico8 = P8rs::new_in(&PSRAM_ALLOCATOR)?;
     
     info!("Loading hello.lua");
     
-    pico8.load(include_bytes!("../../lua/hello.lua"));
+    pico8.load(include_bytes!("../../lua/hello.lua")).expect("Failed to load cartridge"); // TODO: fix extern error
     
     info!("Entering main loop.");
     
@@ -189,23 +191,17 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             speaker.reset().await?;
         }
         
-        let result = pico8.run();
-        if result.out_of_fuel {
-            // don't render, run again if out of fuel
-            continue;
-        }
-        // todo: result.requested_fps
+        pico8.run().expect("Failed to run pico-8"); // TODO: result.requested_fps
         
-        
-        let mut env = pico8.env();
-        let screen_palette = env.memory.palette(1);
+        let runtime = pico8.runtime();
+        let screen_palette = *runtime.memory.draw_state().palette(Palette::Screen);
         let map_color = |color: u8| -> Color {
             assert!(color < 16);
             PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
         };
         
         let mut fb = fbs.get_empty().await;
-        let screen = env.memory.screen();
+        let screen = runtime.memory.screen();
         let pixels = screen.iter()
                            .map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
                            .flatten()

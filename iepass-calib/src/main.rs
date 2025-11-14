@@ -5,6 +5,8 @@
 	reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer."
 )]
 
+#[macro_use] extern crate p8rs_log;
+
 use panic_rtt_target as _;
 use defmt::info;
 use anyhow::Result;
@@ -15,7 +17,7 @@ use embedded_io::Read;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{self, Input, Level, Output, Pull};
 use esp_hal::timer::systimer::SystemTimer;
-use iepass_core::colors::Color;
+use p8rs::colors::Color;
 use iepass::peripherials::{Analog, Debounce, Display, Speaker, SpiBus, Touch};
 use iepass::calib::Calib;
 use iepass::static_framebuffer;
@@ -309,7 +311,7 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 }
 
 fn pixels(smol: &[u8]) -> impl Iterator<Item = Color> {
-	let mut decoder = iepass_core::rle::Decoder::new(smol);
+	let mut decoder = p8rs::rle::Decoder::new(smol);
 	
 	core::iter::from_fn(move || {
 		let mut value = [0, 0];

@@ -1,11 +1,9 @@
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 #![feature(type_alias_impl_trait)]
-#![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate alloc;
-
-#[cfg(feature = "std")]
-extern crate std;
+#[allow(unused_imports)] #[macro_use] extern crate p8rs_log;
 extern crate core;
+extern crate alloc;
 
 pub mod any;
 pub mod async_callback;

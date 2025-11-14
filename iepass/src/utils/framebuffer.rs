@@ -6,7 +6,7 @@ use embassy_sync::priority_channel::{Min, PriorityChannel};
 use embassy_sync::watch;
 use embassy_sync::watch::Watch;
 use esp_hal::dma::{DmaDescriptor, DmaTxBuffer, Preparation, TransferDirection, CHUNK_SIZE};
-use iepass_core::colors::Color;
+use p8rs::colors::Color;
 
 use crate::tasks;
 use crate::tasks::draw::DRAW_TASKS_MAX;

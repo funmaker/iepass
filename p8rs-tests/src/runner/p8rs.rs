@@ -3,7 +3,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
-use iepass_core::pico8;
+use p8rs::vm;
 use p8rs_types::p8scii;
 
 use crate::runner::{Log, RunResult, TIMEOUT_MS};
@@ -12,7 +12,7 @@ struct RunnerCallback {
 	buffer: Rc<RefCell<String>>,
 }
 
-impl pico8::Callbacks for RunnerCallback {
+impl vm::Callbacks for RunnerCallback {
 	fn printh(&mut self, text: &[u8], _filename: Option<&[u8]>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) {
 		let mut buffer = self.buffer.borrow_mut();
 		*buffer += "INFO: ";
@@ -23,7 +23,7 @@ impl pico8::Callbacks for RunnerCallback {
 
 pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 	let output = Rc::new(RefCell::new(String::new()));
-	let mut vm = pico8::Pico8VM::new().expect("Failed to create P8rs VM");
+	let mut vm = vm::P8rs::new().expect("Failed to create P8rs VM");
 	vm.set_callbacks(RunnerCallback { buffer: output.clone() });
 	
 	if let Err(err) = vm.load_cartridge(source) {
@@ -38,9 +38,9 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 	let start = Instant::now();
 	let result = loop {
 		match vm.run_fuel(1024*1024) {
-			Ok(pico8::RunResult::Flip) |
-			Ok(pico8::RunResult::OutOfFuel) => {},
-			Ok(pico8::RunResult::Stop) => break Ok(()),
+			Ok(vm::RunResult::Flip) |
+			Ok(vm::RunResult::OutOfFuel) => {},
+			Ok(vm::RunResult::Stop) => break Ok(()),
 			Err(err) => break Err(err),
 		}
 		
