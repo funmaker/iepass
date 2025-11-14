@@ -2537,6 +2537,7 @@ dependencies = [
  "env_logger",
  "p8rs",
  "p8rs-log",
+ "p8rs-types",
 ]
 
 [[package]]

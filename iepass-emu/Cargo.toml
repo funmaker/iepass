@@ -14,6 +14,7 @@ log-04 = ["p8rs/log-04"]
 
 [dependencies]
 p8rs-log.workspace = true
+p8rs-types = { workspace = true }
 p8rs = { workspace = true, features = ["std"] }
 env_logger.workspace = true
 eframe = "0.33.2"
