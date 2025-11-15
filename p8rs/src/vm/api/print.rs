@@ -2,45 +2,55 @@ use core::alloc::Allocator;
 use core::pin::Pin;
 use gc_arena::Collect;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
-
 use crate::vm::api::gfx::{set_cursor_color};
 use crate::vm::font::Font;
-use crate::vm::memory::machine_state::PrintAttributeFlags;
+use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintAttributeFlags};
 use crate::vm::Runtime;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
 		let rt = rt.downcast::<Runtime>();
-		let (text, x, y, color): (Value, Option<i16>, Option<i16>, Option<i16>) = stack.consume(ctx).unwrap();
+		let (text, mut x, y, mut color): (Value, Option<i16>, Option<i16>, Option<i16>) = stack.consume(ctx).unwrap();
+		if y.is_none() {
+			color = x;
+			x = None;
+		}
+		
 		set_cursor_color(&mut rt.memory.machine_state(), x, y, color);
 		
 		let text = if let Value::String(text) = text {
 			text
 		} else {
-			if let Value::String(str) = super::base::tostr(ctx, text, None).unwrap().unwrap() {
+			if let Some(Value::String(str)) = super::base::tostr(ctx, text, None)? {
 				str
 			}else{
 				debug!("[print] Could not convert value to string when printing!");
-				String::from_slice(ctx.mutation(), "")
+				String::from_static(ctx.mutation(), "")
 			}
 		};
 		
 		trace!("[print] {}", text);
 		
-		let last_part = TextEscapeIterator::new(text).last();
-		if last_part.is_none() {
-			// todo: return val
-			return Ok(CallbackReturn::Return);
-		}
-		
-		let last_part = last_part.unwrap();
-		if matches!(last_part, TextPart::UnterminatedEscapeSequence(_)) {
-			debug!("[print()] String contained unterminated escape sequence, discarding.");
-			// todo: return val
-			return Ok(CallbackReturn::Return);
-		}
+		match TextEscapeIterator::new(text).last() {
+			None => { // empty string
+				// todo: return val
+				return Ok(CallbackReturn::Return);
+			}
+			Some(last_part) => {
+				if matches!(last_part, TextPart::UnterminatedEscapeSequence(_)) {
+					debug!("[print()] String contained unterminated escape sequence, discarding.");
+					// todo: return val
+					return Ok(CallbackReturn::Return);
+				}
+			}
+		};
 		
 		let flags = rt.memory.machine_state().get_print_defaults();
+		
+		if y.is_none() {
+			let font_height = get_font_height(rt, flags);
+			screen_scroll(rt, font_height, false);
+		}
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
 			skip_frames: 0,
@@ -49,6 +59,8 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			next_char: None,
 			stopped: false,
 			flags: flags.bits(),
+			x_wrapped: false,
+			clipping: false,
 		})))
 	}));
 }
@@ -58,7 +70,7 @@ fn control_arg_to_number(arg: u8) -> Option<u8> {
 		b'0'..=b'9' => arg - b'0',
 		b'a'.. => arg - b'a',
 		_ => {
-			debug!("Unexpected control code argmument: {}", arg);
+			debug!("Unexpected control code argument: {}", arg);
 			return None;
 		}
 	})
@@ -73,18 +85,36 @@ enum EscapeSequenceAction {
 	ModifyFlags(PrintAttributeFlags), // TODO:
 }
 
-fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
-	let font_height = get_font(rt, flags).map(|f| f.height()).unwrap_or(6);
-	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
+
+/// Scroll the screen up if needed, so that at least `font_height` new pixels will fit, unless `MiscChipsetFeatureFlags::NO_PRINT_SCROLL` is set.
+/// The screen is scrolled up by multiples of `font_height` unless `exact` is true.
+fn screen_scroll(rt: &mut Runtime, font_height: u8, exact: bool) {
+	if rt.memory.machine_state().get_misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) { return }
+	
 	let current_y = rt.memory.machine_state().cursor_position()[1];
+	let max_y = 128 - font_height;
+	if current_y > max_y { return }
+	
 	let new_y = current_y.saturating_add(font_height);
-	if new_y >= 128 {
-		rt.memory.machine_state().cursor_position()[1] = 128 - font_height;
-		let _shift = new_y - rt.memory.machine_state().cursor_position()[1];
-		// TODO: finish shifting
-	}else{
-		rt.memory.machine_state().cursor_position()[1] += font_height;
+	if new_y <= max_y { return }
+	
+	let mut shift = new_y - max_y;
+	if !exact {
+		shift = ((shift + font_height - 1) / font_height) * font_height;
 	}
+	
+	rt.memory.machine_state().cursor_position()[1] -= shift;
+	rt.memory.screen().shift_up(shift, 0);
+}
+
+fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags, scroll_exact: bool) {
+	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
+	
+	let font_height = get_font_height(rt, flags);
+	screen_scroll(rt, font_height, scroll_exact);
+	let current_y = rt.memory.machine_state().cursor_position()[1];
+	let new_y = current_y.overflowing_add(font_height).0;
+	rt.memory.machine_state().cursor_position()[1] = new_y;
 }
 
 fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintAttributeFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
@@ -113,7 +143,7 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 			}
 		},
 		10 => {
-			cursor_new_line(rt, flags);
+			cursor_new_line(rt, flags, false);
 			EscapeSequenceAction::Nop
 		}
 		_ => {
@@ -121,6 +151,10 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 			EscapeSequenceAction::Nop
 		}
 	})
+}
+
+fn get_font_height(rt: &mut Runtime, flags: PrintAttributeFlags) -> u8 {
+	get_font(rt, flags).map(|f| f.height()).unwrap_or(6)
 }
 
 fn get_font<'a>(rt: &'a mut Runtime, flags: PrintAttributeFlags) -> Result<Font<'a>, RuntimeError> {
@@ -132,42 +166,49 @@ fn get_font<'a>(rt: &'a mut Runtime, flags: PrintAttributeFlags) -> Result<Font<
 	})
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintAttributeFlags, letter: u8) -> Result<(i16, i16), RuntimeError> {
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintAttributeFlags, letter: u8, dry_run: bool) -> Result<(i16, i16, bool), RuntimeError> {
 	// let is_wide = flags.contains(PrintAttributeFlags::WIDE);
 	// let is_tall = flags.contains(PrintAttributeFlags::TALL);
 	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
 	// let is_dotty = flags.contains(PrintAttributeFlags::DOTTY);
+	// TODO: Use flags
 	
 	let pen_color = *rt.memory.machine_state().pen_color();
-	let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
-	
-	if cursor_x >= 128 || cursor_y >= 128 {
-		return Ok((0, 0))
-	}
 	
 	let font = get_font(rt, flags)?;
 	let char_width = font.width_chr(letter);
 	let char_height = font.height();
 	let char_font = &font.char(letter);
 	
+	let overflowed_x = rt.memory.machine_state().cursor_position()[0].overflowing_add(char_width).0 > 128
+		&& rt.memory.machine_state().get_misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP);
+	
+	if overflowed_x {
+		cursor_new_line(rt, flags, true);
+	}
+	
+	let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
+	
 	assert!(char_width <= 8, "Char width cannot be >8");
 	assert!(char_height <= 8, "Char height cannot be >8");
 	
-	for y in 0..char_height {
-		let mut font_line = char_font[y as usize];
-		for x in 0..char_width {
-			let bit =  font_line & 1 != 0;
-			font_line >>= 1;
-			
-			if bit {
-				let pixel_x = cursor_x + x;
-				let pixel_y = cursor_y + y;
-				rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color).ok();
+	if !dry_run {
+		for y in 0..char_height {
+			let mut font_line = char_font[y as usize];
+			for x in 0..char_width {
+				let bit = font_line & 1 != 0;
+				font_line >>= 1;
+				
+				if bit {
+					let pixel_x = cursor_x.overflowing_add(x).0;
+					let pixel_y = cursor_y.overflowing_add(y).0;
+					rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color).ok();
+				}
 			}
 		}
 	}
 	
-	Ok((char_width as i16, char_height as i16))
+	Ok((char_width as i16, char_height as i16, overflowed_x))
 }
 
 
@@ -184,7 +225,11 @@ struct PrintSeq<'gc> {
 	/// whether a null byte has been encountered (and printing should stop)
 	stopped: bool,
 	/// current print flags
-	flags: u8
+	flags: u8,
+	/// has x wrapped (only if character wrapping is enabled)
+	x_wrapped: bool,
+	/// should print stop drawing because we ran out either x-space (without character wrapping) or y-space (without line scrolling)
+	clipping: bool,
 }
 
 impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
@@ -206,8 +251,19 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			if let Some(char) = self.next_char {
 				self.next_char = None;
 				
-				// todo: verify pico-8 behaviour / add line wrapping
-				let (w, _) = draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
+				let chipset_flags = rt.memory.machine_state().get_misc_chipset_flags();
+				let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
+
+				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL)) 
+				|| (cursor_x >= 128 && !chipset_flags.contains(MiscChipsetFeatureFlags::PRINT_WRAP)) {
+					self.clipping = true;
+				}
+				
+				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char, self.clipping)?;
+				
+				if x_overflowed {
+					self.x_wrapped = true;
+				}
 				
 				rt.memory.machine_state().cursor_position()[0] = rt.memory.machine_state().cursor_position()[0].overflowing_add(w as u8).0;
 			}
@@ -244,8 +300,9 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			}
 		}
 		
-		cursor_new_line(rt, PrintAttributeFlags::from_bits_truncate(self.flags));
-
+		if !rt.memory.machine_state().get_misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_NEWLINE) {
+			cursor_new_line(rt, PrintAttributeFlags::from_bits_truncate(self.flags), self.x_wrapped);
+		}
 		
 		// todo - return values
 		Ok(SequencePoll::Return)
