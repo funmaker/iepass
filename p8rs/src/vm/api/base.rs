@@ -89,6 +89,8 @@ pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>)
 	}
 }
 
+// TODO: btnp - observe 0x5f5c and 0x5f5d
+
 #[api_callback]
 pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError> {
 	Ok(Some(match val {

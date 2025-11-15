@@ -82,8 +82,8 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 		                         .unwrap_or("".into());
 		
 		if let (Some(Log::SCR(pico8_name, _)), Some(Log::SCR(p8rs_name, _))) = (pico8_log, p8rs_log) && pico8_name == p8rs_name {
-			try_print_src(&pico8.logs, i, "PICO-8 Screen");
-			try_print_src(&p8rs.logs, i, "P8RS Screen");
+			try_print_scr(&pico8.logs, i, "PICO-8 Screen");
+			try_print_scr(&p8rs.logs, i, "P8RS Screen");
 		}
 		
 		match (pico8_log, p8rs_log) {
@@ -95,7 +95,7 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	}
 }
 
-fn try_print_src(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8; 128]; 128]>> {
+fn try_print_scr(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8; 128]; 128]>> {
 	let test_name = match logs.get(idx) {
 		Some(Log::SCR(log_name, _)) => log_name,
 		_ => return None,

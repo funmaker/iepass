@@ -60,7 +60,15 @@ impl MachineState<'_> {
 		(&mut self[0x20..=0x23]).try_into().unwrap()
 	}
 	
-	pub fn get_print_defaults(&mut self) -> PrintAttributeFlags {
+	pub fn get_misc_chipset_flags(&self) -> MiscChipsetFeatureFlags {
+		MiscChipsetFeatureFlags::from_bits_truncate(self[0x36])
+	}
+	
+	pub fn set_misc_chipset_flags(&mut self, flags: MiscChipsetFeatureFlags) {
+		self[0x36] = flags.bits()
+	}
+	
+	pub fn get_print_defaults(&self) -> PrintAttributeFlags {
 		PrintAttributeFlags::from_bits_truncate(self[0x58])
 	}
 	
@@ -138,4 +146,24 @@ bitflags! {
         const DOTTY         = 1 << 6;
         const CUSTOM_FONT   = 1 << 7;
     }
+	
+	#[derive(Copy, Clone)]
+	pub struct MiscChipsetFeatureFlags: u8 {
+		/// the undocumented multi-screen feature is enabled
+        const MULTI_SCREEN       = 1 << 0;
+		/// the diameter of circles drawn using circ() and circfill() will be increased by 1 pixel rightward and 1 pixel downward if the fractional part of the radius is .5 or greater
+        const FRACT_CIRCLE       = 1 << 1;
+		/// automatic newlines are no longer added after each call to print()
+        const NO_PRINT_NEWLINE   = 1 << 2;
+		/// causes sprite 0 in map() and tline() to be rendered as opaque (like other sprites) instead of the usual transparent
+        const OPAQUE_ZERO_SPRITE = 1 << 3;
+		/// 0x5f59..0x5f5b will be interpreted as default values for sget, mget, and pget
+        const PIXEL_DEFAULTS     = 1 << 4;
+		/// the dampen filter used for the undocumented PCM audio channel (serial(0x808,...)) is disabled
+        const NO_PCM_DAMPEN      = 1 << 5;
+		/// automatic screen scrolling for print() without coordinate parameters is disabled
+        const NO_PRINT_SCROLL    = 1 << 6;
+		/// automatic character wrap for print() is enabled
+        const NO_PRINT_WRAP      = 1 << 7;
+	}
 }
