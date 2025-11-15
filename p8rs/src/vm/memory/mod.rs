@@ -7,6 +7,7 @@ use p8rs_macros::TransparentRef;
 
 pub mod sprites;
 pub mod map;
+pub mod sprite_flags;
 pub mod music;
 pub mod sound_effects;
 pub mod machine_state;
@@ -15,6 +16,7 @@ pub mod screen;
 use crate::utils;
 use sprites::Sprites;
 use map::Map;
+use sprite_flags::SpriteFlags;
 use music::Music;
 use sound_effects::SoundEffects;
 use machine_state::MachineState;
@@ -43,7 +45,7 @@ impl Memory {
 	
 	pub fn sprites(&mut self) -> Sprites<'_> {
 		// TODO: Handle map conflicts
-		let base_addr = match *self.machine_state().sprite_addr_map() {
+		let base_addr = match self.machine_state().sprite_addr_map().get() {
 			0x00 => 0x0000,
 			0x60 => 0x6000,
 			0x80 => 0x8000,
@@ -78,8 +80,8 @@ impl Memory {
 		}
 	}
 	
-	pub fn sprite_flags(&mut self) -> &mut [u8; 256] {
-		self.const_slice(0x3000)
+	pub fn sprite_flags(&mut self) -> SpriteFlags<'_> {
+		SpriteFlags(self.const_slice(0x3000))
 	}
 	
 	pub fn music(&mut self) -> Music<'_> {
@@ -104,7 +106,7 @@ impl Memory {
 	
 	pub fn screen(&mut self) -> Screen<'_> {
 		// TODO: Handle map conflicts
-		let base_addr = match *self.machine_state().screen_addr_map() {
+		let base_addr = match self.machine_state().screen_addr_map().get() {
 			0x00 => 0x0000,
 			0x60 => 0x6000,
 			0x80 => 0x8000,

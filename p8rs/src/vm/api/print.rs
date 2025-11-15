@@ -5,7 +5,7 @@ use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execut
 
 use crate::vm::api::gfx::{set_cursor_color};
 use crate::vm::font::Font;
-use crate::vm::memory::machine_state::PrintAttributeFlags;
+use crate::vm::memory::machine_state::PrintDefaultsFlags;
 use crate::vm::Runtime;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
@@ -40,7 +40,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			return Ok(CallbackReturn::Return);
 		}
 		
-		let flags = *rt.memory.machine_state().print_defaults();
+		let flags = *rt.memory.machine_state().print_defaults().flags();
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
 			skip_frames: 0,
@@ -70,10 +70,10 @@ enum EscapeSequenceAction {
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
 	#[allow(unused)]
-	ModifyFlags(PrintAttributeFlags), // TODO:
+	ModifyFlags(PrintDefaultsFlags), // TODO:
 }
 
-fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
+fn cursor_new_line(rt: &mut Runtime, flags: PrintDefaultsFlags) {
 	let font_height = get_font(rt, flags).map(|f| f.height()).unwrap_or(6);
 	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
 	let current_y = rt.memory.machine_state().cursor_position()[1];
@@ -87,7 +87,7 @@ fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
 	}
 }
 
-fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintAttributeFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
@@ -123,8 +123,8 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 	})
 }
 
-fn get_font<'a>(rt: &'a mut Runtime, flags: PrintAttributeFlags) -> Result<Font<'a>, RuntimeError> {
-	let use_custom_font = flags.contains(PrintAttributeFlags::CUSTOM_FONT);
+fn get_font<'a>(rt: &'a mut Runtime, flags: PrintDefaultsFlags) -> Result<Font<'a>, RuntimeError> {
+	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
 	Ok(if use_custom_font {
 		Font::new((&rt.memory[0x5600..=0x5dff]).try_into()?)
 	} else {
@@ -132,7 +132,7 @@ fn get_font<'a>(rt: &'a mut Runtime, flags: PrintAttributeFlags) -> Result<Font<
 	})
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintAttributeFlags, letter: u8) -> Result<(i16, i16), RuntimeError> {
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8) -> Result<(i16, i16), RuntimeError> {
 	// let is_wide = flags.contains(PrintAttributeFlags::WIDE);
 	// let is_tall = flags.contains(PrintAttributeFlags::TALL);
 	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
@@ -207,7 +207,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				self.next_char = None;
 				
 				// todo: verify pico-8 behaviour / add line wrapping
-				let (w, _) = draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
+				let (w, _) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char)?;
 				
 				rt.memory.machine_state().cursor_position()[0] = rt.memory.machine_state().cursor_position()[0].overflowing_add(w as u8).0;
 			}
@@ -221,7 +221,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 						self.skip_frames = self.letter_frame_skip;
 					}
 					TextPart::EscapeSequence(bytes) => {
-						match execute_escape_sequence(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), bytes)? {
+						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes)? {
 							EscapeSequenceAction::Nop => {}
 							EscapeSequenceAction::SkipFrames(n) => {
 								self.skip_frames = n;
@@ -244,7 +244,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			}
 		}
 		
-		cursor_new_line(rt, PrintAttributeFlags::from_bits_truncate(self.flags));
+		cursor_new_line(rt, PrintDefaultsFlags::from_bits_truncate(self.flags));
 
 		
 		// todo - return values
