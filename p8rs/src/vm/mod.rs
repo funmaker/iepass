@@ -21,6 +21,8 @@ pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
+use p8rs_piccolo::stash::Fetchable;
+use p8rs_piccolo::thread::{ExternTraceback, StashedTraceback, Traceback};
 use traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -186,6 +188,10 @@ impl<A: Allocator + 'static> P8rs<A> {
 	
 	pub fn runtime(&mut self) -> &mut Runtime<A> {
 		&mut self.runtime
+	}
+	
+	pub fn get_traceback(&mut self, stashed: &StashedTraceback) -> Result<ExternTraceback, ExternError> {
+		self.lua.try_enter(|ctx| Ok(ctx.fetch(stashed).into_traceback()))
 	}
 }
 

@@ -5,6 +5,7 @@ mod vm;
 use gc_arena::{Collect, DynamicRootSet, Mutation};
 use thiserror::Error;
 use alloc::vec::Vec;
+use core::fmt::{Display, Formatter};
 use crate::compiler::LineNumber;
 use crate::meta_ops::{MetaCallError, MetaOperatorError};
 use crate::StashedString;
@@ -60,6 +61,20 @@ pub type ExternTracebackEntry = TracebackEntryBase<alloc::string::String>;
 pub type StashedTraceback = TracebackBase<StashedString>;
 pub type Traceback<'gc> = TracebackBase<crate::String<'gc>>;
 pub type ExternTraceback = TracebackBase<alloc::string::String>;
+
+impl<S> Display for TracebackBase<S>
+where S: Display {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for entry in self.entries.iter() {
+            write!(f, "line {}", entry.line_number)?;
+            if let Some(name) = &entry.name {
+                write!(f, " in function '{}'", name)?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
 
 impl<S> TracebackBase<S>
 {

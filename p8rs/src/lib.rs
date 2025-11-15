@@ -9,6 +9,8 @@
 extern crate alloc;
 extern crate core;
 
+pub use p8rs_piccolo::error::ExternError;
+
 pub mod rle;
 pub mod vm;
 pub mod colors;

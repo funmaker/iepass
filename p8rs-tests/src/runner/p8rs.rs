@@ -3,7 +3,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
-use p8rs::vm;
+use p8rs::{vm, ExternError};
 use p8rs_types::p8scii;
 
 use crate::runner::{Log, RunResult, TIMEOUT_MS};
@@ -55,7 +55,15 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 	
 	if let Some(err) = result.as_ref().err() {
 		println!("-- p8rs error --");
-		println!("{err}");
+		match err {
+			ExternError::Lua(err) => println!("{err}"),
+			ExternError::Runtime(runtime_err) => {
+				println!("{err}");
+				if let Some(Ok(traceback)) = runtime_err.1.as_ref().map(|tb| vm.get_traceback(tb)) {
+					println!("traceback:\n{traceback}");
+				}
+			}
+		}
 	}
 	
 	if timeout {
