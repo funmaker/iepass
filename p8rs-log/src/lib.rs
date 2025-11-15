@@ -168,7 +168,7 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "defmt")] {
-        pub use defmt::eprintln;
+        pub use defmt::error as eprintln;
     } else if #[cfg(all(feature = "std", feature = "std-error"))] {
         pub use std::eprintln;
     } else if #[cfg(feature = "log-04")] {

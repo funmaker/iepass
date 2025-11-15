@@ -45,7 +45,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			}
 		};
 		
-		let flags = rt.memory.machine_state().get_print_defaults();
+		let flags = *rt.memory.machine_state().print_defaults();
 		
 		if y.is_none() {
 			let font_height = get_font_height(rt, flags);
