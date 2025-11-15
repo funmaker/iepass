@@ -400,7 +400,7 @@ bitflags! {
 		/// Automatic screen scrolling for print() without coordinate parameters is disabled
         const NO_PRINT_SCROLL    = 1 << 6;
 		/// Automatic character wrap for print() is enabled
-        const NO_PRINT_WRAP      = 1 << 7;
+        const PRINT_WRAP      = 1 << 7;
 		
         const _ = !0;
 	}

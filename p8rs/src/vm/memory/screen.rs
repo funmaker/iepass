@@ -31,6 +31,31 @@ impl Screen<'_> {
 		}
 		Ok(())
 	}
+	
+	pub fn shift_up(&mut self, dy: u8, fill_color: u8) {
+		let color = fill_color & 0xF;
+		let color = color | (color << 4);
+		
+		if dy >= 128 {
+			self.0.fill(color);
+			return;
+		}
+		
+		let dy = dy as usize;
+		
+		let copied_lines = 128 - dy;
+		for line in 0..copied_lines {
+			for x in 0..64 {
+				self.0[line * 64 + x] = self.0[(dy + line) * 64 + x]
+			}
+		}
+		
+		for line in copied_lines..128 {
+			for x in 0..64 {
+				self.0[line * 64 + x] = color;
+			}
+		}
+	}
 }
 
 impl Deref for Screen<'_> {
