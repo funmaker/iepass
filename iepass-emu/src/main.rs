@@ -3,10 +3,8 @@
 
 #[macro_use] extern crate p8rs_log;
 
-use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::cell::Cell;
 use std::fs;
-use std::io::stderr;
 use std::ops::{Not, Sub};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -21,7 +19,7 @@ use p8rs::vm::palette::PALETTE;
 mod framebuffer_pool;
 
 use framebuffer_pool::{FramebufferPool, FRAMEBUFFER_OPTS};
-use p8rs::vm::memory::Palette;
+use p8rs::vm::memory::machine_state::Palette;
 use p8rs_types::p8scii;
 
 fn main() -> eframe::Result {
@@ -53,7 +51,7 @@ struct EmulatorCallbacks {
 	buttons: Rc<Cell<[u8; 8]>>,
 }
 
-impl<'a> Callbacks for EmulatorCallbacks {
+impl Callbacks for EmulatorCallbacks {
 	fn printh(&mut self, text: &[u8], _filename: Option<&[u8]>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) {
 		println!("INFO: {}", p8scii::Display(text));
 	}
@@ -157,7 +155,7 @@ impl eframe::App for EmulatorApp {
 			if run_result != RunResult::OutOfFuel {
 				let rt = self.pico8.runtime();
 				
-				let screen_palette = *rt.memory.draw_state().palette(Palette::Screen);
+				let screen_palette = *rt.memory.machine_state().palette(Palette::Screen);
 				
 				let map_color = |color: u8| -> Color {
 					assert!(color < 16);

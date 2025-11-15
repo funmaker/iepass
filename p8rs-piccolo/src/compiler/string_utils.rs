@@ -17,7 +17,7 @@ pub fn trim_whitespace(mut s: &[u8]) -> &[u8] {
 pub fn display_utf8_lossy(input: &[u8]) -> impl fmt::Display + '_ {
     struct StringDisplay<'a>(&'a [u8]);
 
-    impl<'a> fmt::Display for StringDisplay<'a> {
+    impl fmt::Display for StringDisplay<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let mut input = self.0;
             loop {
@@ -51,7 +51,7 @@ pub fn display_utf8_lossy(input: &[u8]) -> impl fmt::Display + '_ {
 pub fn debug_utf8_lossy(input: &[u8]) -> impl fmt::Debug + '_ {
     struct StringDebug<'a>(&'a [u8]);
 
-    impl<'a> fmt::Debug for StringDebug<'a> {
+    impl fmt::Debug for StringDebug<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             fn write_escape_str(f: &mut fmt::Formatter, s: &str) -> fmt::Result {
                 for c in s.chars() {

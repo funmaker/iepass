@@ -194,7 +194,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         pico8.run().expect("Failed to run pico-8"); // TODO: result.requested_fps
         
         let runtime = pico8.runtime();
-        let screen_palette = *runtime.memory.draw_state().palette(Palette::Screen);
+        let screen_palette = *runtime.memory.machine_state().palette(Palette::Screen);
         let map_color = |color: u8| -> Color {
             assert!(color < 16);
             PALETTE[(screen_palette[color as usize] as usize) & 0x0F]

@@ -44,7 +44,7 @@ impl<'a> DecodeUtf8<'a> {
 	}
 }
 
-impl<'a> Iterator for DecodeUtf8<'a> {
+impl Iterator for DecodeUtf8<'_> {
 	type Item = Result<char, u8>;
 	
 	fn next(&mut self) -> Option<Self::Item> {

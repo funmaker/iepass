@@ -135,13 +135,13 @@ pub struct FramebufferTransfer<'a> {
 	len: usize,
 }
 
-impl<'a> FramebufferTransfer<'a> {
+impl FramebufferTransfer<'_> {
 	pub fn len(&self) -> usize {
 		self.len
 	}
 }
 
-unsafe impl<'a> DmaTxBuffer for FramebufferTransfer<'a> {
+unsafe impl DmaTxBuffer for FramebufferTransfer<'_> {
 	type View = Self;
 	type Final = Self;
 	

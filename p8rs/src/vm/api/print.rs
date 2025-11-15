@@ -5,14 +5,14 @@ use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execut
 
 use crate::vm::api::gfx::{set_cursor_color};
 use crate::vm::font::Font;
-use crate::vm::memory::PrintAttributeFlags;
+use crate::vm::memory::machine_state::PrintAttributeFlags;
 use crate::vm::Runtime;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
 		let rt = rt.downcast::<Runtime>();
 		let (text, x, y, color): (Value, Option<i16>, Option<i16>, Option<i16>) = stack.consume(ctx).unwrap();
-		set_cursor_color(&mut rt.memory.draw_state(), x, y, color);
+		set_cursor_color(&mut rt.memory.machine_state(), x, y, color);
 		
 		let text = if let Value::String(text) = text {
 			text
@@ -40,7 +40,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			return Ok(CallbackReturn::Return);
 		}
 		
-		let flags = rt.memory.hardware_state().get_print_defaults();
+		let flags = rt.memory.machine_state().get_print_defaults();
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
 			skip_frames: 0,
@@ -75,15 +75,15 @@ enum EscapeSequenceAction {
 
 fn cursor_new_line(rt: &mut Runtime, flags: PrintAttributeFlags) {
 	let font_height = get_font(rt, flags).map(|f| f.height()).unwrap_or(6);
-	rt.memory.draw_state().cursor_position()[0] = *rt.memory.draw_state().cursor_home_x();
-	let current_y = rt.memory.draw_state().cursor_position()[1];
+	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
+	let current_y = rt.memory.machine_state().cursor_position()[1];
 	let new_y = current_y.saturating_add(font_height);
 	if new_y >= 128 {
-		rt.memory.draw_state().cursor_position()[1] = 128 - font_height;
-		let _shift = new_y - rt.memory.draw_state().cursor_position()[1];
+		rt.memory.machine_state().cursor_position()[1] = 128 - font_height;
+		let _shift = new_y - rt.memory.machine_state().cursor_position()[1];
 		// TODO: finish shifting
 	}else{
-		rt.memory.draw_state().cursor_position()[1] += font_height;
+		rt.memory.machine_state().cursor_position()[1] += font_height;
 	}
 }
 
@@ -138,8 +138,8 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintAttributeFlags, lett
 	// let is_inverted = flags.contains(PrintAttributeFlags::INVERT);
 	// let is_dotty = flags.contains(PrintAttributeFlags::DOTTY);
 	
-	let pen_color = *rt.memory.draw_state().pen_color();
-	let [cursor_x, cursor_y] = *rt.memory.draw_state().cursor_position();
+	let pen_color = *rt.memory.machine_state().pen_color();
+	let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
 	
 	if cursor_x >= 128 || cursor_y >= 128 {
 		return Ok((0, 0))
@@ -209,7 +209,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				// todo: verify pico-8 behaviour / add line wrapping
 				let (w, _) = draw_letter(ctx, rt, PrintAttributeFlags::from_bits_truncate(self.flags), char)?;
 				
-				rt.memory.draw_state().cursor_position()[0] = rt.memory.draw_state().cursor_position()[0].overflowing_add(w as u8).0;
+				rt.memory.machine_state().cursor_position()[0] = rt.memory.machine_state().cursor_position()[0].overflowing_add(w as u8).0;
 			}
 			
 			let part = self.text.next();

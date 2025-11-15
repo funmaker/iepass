@@ -28,7 +28,7 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 	let mut stderr = child.stderr.take().unwrap();
 	let stderr = thread::spawn(move || {
 		let mut output = String::new();
-		stderr.read_to_string(&mut output).expect("failed to read pico8 stdout stream");
+		stderr.read_to_string(&mut output).expect("failed to read pico8 stderr stream");
 		return output;
 	});
 	

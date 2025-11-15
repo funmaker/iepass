@@ -4,13 +4,13 @@ use core::any::Any;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
 
-use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
-use crate::vm::memory::Memory;
 use crate::utils;
+use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
+use crate::vm::memory::{Memory, MemoryAccess};
 
 pub struct Runtime<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
-	pub memory: Memory<A>,
+	pub memory: Box<Memory, A>,
 	pub buttons: Buttons,
 	pub target_fps: u16,
 	pub callbacks: Box<dyn Callbacks>,
@@ -22,7 +22,7 @@ where A: Allocator + Clone
 	pub fn new(alloc: A) -> Runtime<A> {
 		Self {
 			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
-			memory: Memory::new(alloc),
+			memory: Memory::new_in(alloc),
 			buttons: Buttons::new(),
 			target_fps: 30,
 			callbacks: Box::new(DefaultCallbacks),

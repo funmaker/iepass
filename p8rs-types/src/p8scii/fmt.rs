@@ -27,7 +27,7 @@ impl StdDebug for Display<u8> {
 	}
 }
 
-impl<'a> StdDisplay for Display<&'a [u8]> {
+impl StdDisplay for Display<&[u8]> {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		for &byte in self.0 {
 			write!(f, "{}", to_char(byte))?;
@@ -37,7 +37,7 @@ impl<'a> StdDisplay for Display<&'a [u8]> {
 	}
 }
 
-impl<'a> StdDebug for Display<&'a [u8]> {
+impl StdDebug for Display<&[u8]> {
 	fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
 		write!(fmt, "\"")?;
 		

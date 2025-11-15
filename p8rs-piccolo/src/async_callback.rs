@@ -491,7 +491,7 @@ impl SharedSlot {
 
         struct Guard<'a>(&'a SharedSlot);
 
-        impl<'a> Drop for Guard<'a> {
+        impl Drop for Guard<'_> {
             fn drop(&mut self) {
                 self.0 .0.set(ptr::null_mut());
             }

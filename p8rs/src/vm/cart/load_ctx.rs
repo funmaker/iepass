@@ -46,7 +46,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 	}
 	
 	fn load_gfx_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
-		let gfx_base_addr = self.vm.runtime.memory.base_addr_gfx() as usize;
+		let mut sprites = self.vm.runtime.memory.sprites();
 		let mut max_offset = -1;
 		
 		if self.gfx_loaded {
@@ -59,7 +59,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 				                   .enumerate().map(move |(col_idx, byte)| ((line_idx * 64 + col_idx) as i16, byte))
 			)
 		{
-			self.vm.runtime.memory[gfx_base_addr + offset as usize] = byte;
+			sprites[offset as usize] = byte;
 			if offset > max_offset { max_offset = offset; }
 		}
 		
@@ -68,14 +68,14 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 		if max_offset == -1 {
 			debug!("load_gfx_section: GFX section loaded: empty section!");
 		} else {
-			debug!("load_gfx_section: GFX section loaded: 0x{:X} bytes written to memory starting at 0x{:04x}", max_offset + 1, gfx_base_addr);
+			debug!("load_gfx_section: GFX section loaded: 0x{:X} bytes written to memory", max_offset + 1);
 		}
 		
 		Ok(())
 	}
 	
 	fn load_map_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
-		let map_base_addr = self.vm.runtime.memory.base_addr_map() as usize;
+		let mut map = self.vm.runtime.memory.map();
 		let mut max_offset = -1;
 		
 		if self.map_loaded {
@@ -94,8 +94,8 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 			)
 		{
 			if offset >= 0x1000 { max_offset = 0x1000; break; }
-			let addr = map_base_addr + offset as usize;
-			self.vm.runtime.memory[addr] = byte;
+			let addr = offset as usize;
+			map[addr] = byte;
 			if offset > max_offset { max_offset = offset; }
 		}
 		
@@ -119,7 +119,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 		if max_offset == -1 {
 			debug!("load_map_section: MAP section loaded: empty section!");
 		}else{
-			debug!("load_map_section: MAP section loaded: 0x{:X} bytes written starting at 0x{:04x}", max_offset, map_base_addr);
+			debug!("load_map_section: MAP section loaded: 0x{:X} bytes written", max_offset);
 		}
 		
 		Ok(())
