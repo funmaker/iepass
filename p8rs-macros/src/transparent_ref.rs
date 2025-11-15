@@ -33,15 +33,29 @@ pub fn make_derive(item: &syn::DeriveInput) -> syn::Result<TokenStream> {
 	};
 	
 	let ident = &item.ident;
-	let field_type = &field.ty;
+	let bits_type = &field.ty;
 	
 	Ok(quote!{
 		impl #ident {
-			fn from_ref(inner: &#field_type) -> &Self {
+			fn from_bits_ref(inner: &#bits_type) -> &Self {
 				unsafe { ::core::mem::transmute(inner) }
 			}
-			fn from_mut(inner: &mut #field_type) -> &mut Self {
+			fn from_bits_mut(inner: &mut #bits_type) -> &mut Self {
 				unsafe { ::core::mem::transmute(inner) }
+			}
+			fn from_bits_boxed<A: ::core::alloc::Allocator>(inner: Box<#bits_type, A>) -> Box<Self, A> {
+				let (ptr, alloc) = Box::into_raw_with_allocator(inner);
+				unsafe { Box::from_raw_in(ptr as *mut Self, alloc) }
+			}
+			fn to_bits_ref(&self) -> &#bits_type {
+				unsafe { ::core::mem::transmute(self) }
+			}
+			fn to_bits_mut(&mut self) -> &mut #bits_type {
+				unsafe { ::core::mem::transmute(self) }
+			}
+			fn to_bits_boxed<A: ::core::alloc::Allocator>(self: Box<Self, A>) -> Box<#bits_type, A> {
+				let (ptr, alloc) = Box::into_raw_with_allocator(self);
+				unsafe { Box::from_raw_in(ptr as *mut #bits_type, alloc) }
 			}
 		}
 	})

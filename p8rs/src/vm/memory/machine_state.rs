@@ -61,11 +61,11 @@ impl MachineState<'_> {
 	}
 	
 	pub fn misc_chipset_flags(&mut self) -> &mut MiscChipsetFeatureFlags {
-		MiscChipsetFeatureFlags::from_mut(&mut self[0x36])
+		MiscChipsetFeatureFlags::from_bits_mut(&mut self[0x36])
 	}
 	
 	pub fn print_defaults(&mut self) -> &mut PrintAttributeFlags {
-		PrintAttributeFlags::from_mut(&mut self[0x58])
+		PrintAttributeFlags::from_bits_mut(&mut self[0x58])
 	}
 	
 	pub fn sprite_addr_map(&mut self) -> &mut u8 {
@@ -118,7 +118,6 @@ impl Palette {
 	}
 	
 	fn base_addr(self) -> usize {
-		
 		match self {
 			Palette::Draw => 0x00,
 			Palette::Screen => 0x10,

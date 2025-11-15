@@ -3,6 +3,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::boxed::Box;
 use alloc::alloc::Global;
 use p8rs_types::p8num::P8Num;
+use p8rs_macros::TransparentRef;
 
 pub mod sprites;
 pub mod map;
@@ -11,6 +12,7 @@ pub mod sound_effects;
 pub mod machine_state;
 pub mod screen;
 
+use crate::utils;
 use sprites::Sprites;
 use map::Map;
 use music::Music;
@@ -18,8 +20,8 @@ use sound_effects::SoundEffects;
 use machine_state::MachineState;
 use screen::Screen;
 
+#[derive(Debug, Clone, TransparentRef)]
 #[repr(transparent)]
-#[derive(Debug)]
 pub struct Memory([u8; 0x10000]);
 
 impl Memory {
@@ -28,8 +30,7 @@ impl Memory {
 	}
 	
 	pub fn new_in<A: Allocator>(alloc: A) -> Box<Self, A> {
-		// SAFETY: Memory is just a transparent, u8 array.
-		let mut mem = unsafe { Box::<Self, A>::new_zeroed_in(alloc).assume_init() };
+		let mut mem = Memory::from_bits_boxed(utils::new_zeroed_box_in(alloc));
 		
 		mem.reset();
 		
