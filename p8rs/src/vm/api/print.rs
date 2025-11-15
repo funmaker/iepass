@@ -40,7 +40,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			return Ok(CallbackReturn::Return);
 		}
 		
-		let flags = rt.memory.machine_state().get_print_defaults();
+		let flags = *rt.memory.machine_state().print_defaults();
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
 			skip_frames: 0,

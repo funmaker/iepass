@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
-
+use p8rs_macros::TransparentRef;
 use super::MemoryAccess;
 
 /// 0x5f00..=0x5f80
@@ -60,20 +60,12 @@ impl MachineState<'_> {
 		(&mut self[0x20..=0x23]).try_into().unwrap()
 	}
 	
-	pub fn get_misc_chipset_flags(&self) -> MiscChipsetFeatureFlags {
-		MiscChipsetFeatureFlags::from_bits_truncate(self[0x36])
+	pub fn misc_chipset_flags(&mut self) -> &mut MiscChipsetFeatureFlags {
+		MiscChipsetFeatureFlags::from_mut(&mut self[0x36])
 	}
 	
-	pub fn set_misc_chipset_flags(&mut self, flags: MiscChipsetFeatureFlags) {
-		self[0x36] = flags.bits()
-	}
-	
-	pub fn get_print_defaults(&self) -> PrintAttributeFlags {
-		PrintAttributeFlags::from_bits_truncate(self[0x58])
-	}
-	
-	pub fn set_print_defaults(&mut self, flags: PrintAttributeFlags) {
-		self[0x58] = flags.bits();
+	pub fn print_defaults(&mut self) -> &mut PrintAttributeFlags {
+		PrintAttributeFlags::from_mut(&mut self[0x58])
 	}
 	
 	pub fn sprite_addr_map(&mut self) -> &mut u8 {
@@ -126,6 +118,7 @@ impl Palette {
 	}
 	
 	fn base_addr(self) -> usize {
+		
 		match self {
 			Palette::Draw => 0x00,
 			Palette::Screen => 0x10,
@@ -134,9 +127,16 @@ impl Palette {
 	}
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct PrintAttributeFlags(u8);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct MiscChipsetFeatureFlags(u8);
+
 bitflags! {
-	#[derive(Copy, Clone)]
-    pub struct PrintAttributeFlags: u8 {
+    impl PrintAttributeFlags: u8 {
         const ENABLE        = 1 << 0;
         const PADDING       = 1 << 1;
         const WIDE          = 1 << 2;
@@ -147,9 +147,8 @@ bitflags! {
         const CUSTOM_FONT   = 1 << 7;
     }
 	
-	#[derive(Copy, Clone)]
-	pub struct MiscChipsetFeatureFlags: u8 {
-		/// the undocumented multi-screen feature is enabled
+	impl MiscChipsetFeatureFlags: u8 {
+		/// the undocumented multiscreen feature is enabled
         const MULTI_SCREEN       = 1 << 0;
 		/// the diameter of circles drawn using circ() and circfill() will be increased by 1 pixel rightward and 1 pixel downward if the fractional part of the radius is .5 or greater
         const FRACT_CIRCLE       = 1 << 1;
