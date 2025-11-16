@@ -1,13 +1,12 @@
 use std::cell::RefCell;
-use std::path::Path;
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
 use p8rs::{vm, ExternError};
 use p8rs_types::p8scii;
 
-use crate::log::Log;
-use crate::runner::{RunResult, TIMEOUT_MS};
+use crate::runner::TIMEOUT_MS;
+use crate::summary::RunResult;
 
 struct RunnerCallback {
 	buffer: Rc<RefCell<String>>,
@@ -22,7 +21,7 @@ impl vm::Callbacks for RunnerCallback {
 	}
 }
 
-pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
+pub fn run(source: &[u8]) -> RunResult {
 	let output = Rc::new(RefCell::new(String::new()));
 	let mut vm = vm::P8rs::new().expect("Failed to create P8rs VM");
 	vm.set_callbacks(RunnerCallback { buffer: output.clone() });
@@ -32,7 +31,7 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 		println!("{err}");
 		println!();
 		
-		return RunResult::new(vec![], Some(err.to_string()), false);
+		return RunResult::new("".to_string(), Some(err.to_string()), false);
 	}
 	
 	let mut timeout = false;
@@ -52,7 +51,7 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 		}
 	};
 	
-	let output = &*output.borrow();
+	let output = output.take();
 	
 	if let Some(err) = result.as_ref().err() {
 		println!("-- p8rs error --");
@@ -71,10 +70,7 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 		println!("-- p8rs timed out --");
 	}
 	
-	std::fs::write(&log_file, &output).expect("Can't write to p8rs output log");
-	
-	let logs = Log::parse(&output);
 	let runtime_error = result.err().map(|err| err.to_string());
 	
-	RunResult::new(logs, runtime_error, timeout)
+	RunResult::new(output, runtime_error, timeout)
 }

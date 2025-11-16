@@ -5,10 +5,10 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::log::Log;
-use crate::runner::{RunResult, TIMEOUT_MS};
+use crate::runner::TIMEOUT_MS;
+use crate::summary::RunResult;
 
-pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
+pub fn run(path: impl AsRef<Path>) -> RunResult {
 	let mut child =
 		Command::new("pico8")
 			.arg("-run")
@@ -60,8 +60,6 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 		println!("-- pico8 timed out --");
 	}
 	
-	std::fs::write(&log_file, &stderr).expect("Can't write to pico8 output log");
-	
 	let stdout = if stdout.starts_with("RUNNING: ") {
 		let eol = stdout.find('\n').unwrap_or(stdout.len());
 		stdout[eol ..].trim()
@@ -69,8 +67,7 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 		stdout.trim()
 	};
 	
-	let logs = Log::parse(&stderr);
 	let runtime_error = stdout.is_empty().not().then_some(stdout.to_string());
 	
-	RunResult::new(logs, runtime_error, timeout)
+	RunResult::new(stderr, runtime_error, timeout)
 }

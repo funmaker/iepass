@@ -8,8 +8,17 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dev-dependencies]
+[[bin]]
+name = "gif-gen"
+path = "gif_gen/main.rs"
+test = false
+
+[dependencies]
 p8rs = { workspace = true, features = ["log-04", "std"] }
 p8rs-types.workspace = true
-thiserror.workspace = true
+anyhow.workspace = true
 colored = "3.0.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+gif = "0.14.0"
+opener = "0.8.3"

@@ -1,4 +1,3 @@
-#![cfg(test)]
 #![feature(pattern)]
 #![feature(array_try_from_fn)]
 #![feature(trim_prefix_suffix)]
@@ -8,13 +7,16 @@
 #![feature(slice_as_array)]
 #![feature(iter_array_chunks)]
 
-const TMP_DIR: &str = "tmp";
+pub const TMP_DIR: &str = "tmp";
 
-mod tester;
-mod utils;
-mod runner;
-mod log;
+pub mod utils;
+pub mod log;
+pub mod summary;
 
+#[cfg(test)] mod tester;
+#[cfg(test)] mod runner;
+
+#[cfg(test)]
 mod carts {
 	include!(concat!(env!("OUT_DIR"), "/generated_tests.rs"));
 }

@@ -1,10 +1,12 @@
+use serde::{Deserialize, Serialize};
+
 use crate::utils::str_splitn_array;
 
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Log {
 	TEST(String, String),
-	MEM(String, u16, Box<[u8]>),
-	SCR(String, [u8; 16], Box<[[u8; 128]; 128]>),
+	MEM(String, u16, Vec<u8>),
+	SCR(String, [u8; 16], #[serde(with = "pixels_ser")] Box<[[u8; 128]; 128]>),
 	OTHER(String),
 }
 
@@ -13,6 +15,7 @@ impl Log {
 		let mut logs = vec![];
 		
 		let mut lines = text.lines();
+		let mut mem_agg = None;
 		while let Some(line) = lines.next() {
 			let log =
 				line.strip_prefix("INFO: ")
@@ -23,7 +26,7 @@ impl Log {
 						    "MEM" => {
 							    let (offset, data) = content.split_once(" | ")?;
 							    let offset = offset.strip_prefix("0x").and_then(|offset| u16::from_str_radix(offset, 16).ok())?;
-							    let data = parse_ascii_hex_string(data.as_bytes())?.into_boxed_slice();
+							    let data = parse_ascii_hex_string(data.as_bytes())?;
 							    Some(Log::MEM(name.to_string(), offset, data))
 						    },
 						    "SCR" => {
@@ -40,7 +43,27 @@ impl Log {
 					    }
 				    });
 			
+			if let (Some(Log::MEM(agg_name, agg_offset, agg_data)), Some(Log::MEM(name, offset, data))) = (mem_agg.as_mut(), log.as_ref()) {
+				if agg_name == name && agg_offset.wrapping_add(agg_data.len() as u16) == *offset {
+					agg_data.extend(data);
+					continue;
+				}
+			}
+			
+			if let Some(agg_log) = mem_agg.take() {
+				logs.push(agg_log);
+			}
+			
+			if matches!(log, Some(Log::MEM(_, _, _))) {
+				mem_agg = log;
+				continue;
+			}
+			
 			logs.push(log.unwrap_or_else(|| Log::OTHER(line.to_string())));
+		}
+		
+		if let Some(agg_log) = mem_agg.take() {
+			logs.push(agg_log);
 		}
 		
 		logs
@@ -87,7 +110,7 @@ fn parse_ascii_hex_string(data: &[u8]) -> Option<Vec<u8>> {
 fn parse_scr_line(cur_name: &str, cur_row: usize, line: &str) -> Option<[u8; 128]> {
 	let line = line.strip_prefix("INFO: ")?;
 	let [kind, name, row, data] = str_splitn_array(line, " | ")?;
-	let row = row.trim().parse().ok()?;
+	let row: usize = row.trim().parse().ok()?;
 	
 	if kind != "SCR" || name != cur_name || cur_row != row {
 		return None;
@@ -111,4 +134,31 @@ fn parse_scr_lines<'a>(iter: impl Iterator<Item = &'a str>, name: &str) -> Optio
 		.into_boxed_slice()
 		.try_into()
 		.ok()
+}
+
+mod pixels_ser {
+	use serde::{Deserialize, Deserializer, Serializer};
+	use serde::de::Error;
+	use serde::ser::SerializeSeq;
+	
+	pub fn serialize<S: Serializer>(pixels: &Box<[[u8; 128]; 128]>, s: S) -> Result<S::Ok, S::Error>  {
+		let mut seq = s.serialize_seq(Some(pixels.len()))?;
+		
+		for row in pixels.iter() {
+			seq.serialize_element(&row[..])?;
+		}
+		
+		seq.end()
+	}
+	
+	pub fn deserialize<'d, D: Deserializer<'d>>(d: D) -> Result<Box<[[u8; 128]; 128]>, D::Error>  {
+		Vec::<Vec<u8>>::deserialize(d)?
+			.iter()
+			.map(|row| row.as_slice().try_into())
+			.collect::<Result<Vec<[u8; 128]>, _>>()
+			.map_err(|_| Error::custom("Expected 128 pixels per row"))?
+			.into_boxed_slice()
+			.try_into()
+			.map_err(|_| Error::custom("Expected 128 rows"))
+	}
 }

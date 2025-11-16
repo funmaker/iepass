@@ -36,6 +36,6 @@ p8rs.test_scr("Flag PRINT_WRAP ([0x5f36] = 0x80), long text")
 
 poke(0x5f36, 0xc0)
 do_print(short_text)
-p8rs.test_scr("Flags NO_PRINT_SCROLL | PRINT_WRAP ([0x5f36] = 0xc0), short text")
+p8rs.test_scr("Flags NO_PRINT_SCROLL + PRINT_WRAP ([0x5f36] = 0xc0), short text")
 do_print(long_text)
-p8rs.test_scr("Flags NO_PRINT_SCROLL | PRINT_WRAP ([0x5f36] = 0xc0), long text")
+p8rs.test_scr("Flags NO_PRINT_SCROLL + PRINT_WRAP ([0x5f36] = 0xc0), long text")

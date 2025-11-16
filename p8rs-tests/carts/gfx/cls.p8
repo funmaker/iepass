@@ -6,7 +6,7 @@ rectfill(32, 32, 96, 96, 8)
 camera(1, 2)
 clip(3, 4, 5, 6)
 cursor(7, 8)
-colo(9)
+col(9)
 cls()
 p8rs.test_scr("Basic");
 p8rs.test_mem("Basic - Draw State", 0x5f00, 0x40)

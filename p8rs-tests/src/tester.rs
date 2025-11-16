@@ -1,4 +1,5 @@
 use std::fs;
+use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -8,6 +9,7 @@ use p8rs::vm::palette;
 
 use crate::{runner, TMP_DIR};
 use crate::log::Log;
+use crate::summary::{Summary, SummarySubject};
 use crate::utils::replace;
 
 static SETUP: Once = Once::new();
@@ -44,6 +46,7 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	                                   .trim_suffix(".p8")
 	                                   .replace(|c: char| !c.is_ascii_alphanumeric(), "_");
 	let tmp_cart_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.p8"));
+	let json_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.json"));
 	let pico8_log_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.pico8.log"));
 	let p8rs_log_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.p8rs.log"));
 	
@@ -53,8 +56,23 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	
 	fs::write(&tmp_cart_path, &cart).expect("Unable to write tmp cart file");
 	
-	let pico8 = runner::pico8::run(&tmp_cart_path, &pico8_log_path);
-	let p8rs = runner::p8rs::run(&cart, &p8rs_log_path);
+	let pico8 = runner::pico8::run(&tmp_cart_path);
+	let p8rs = runner::p8rs::run(&cart);
+	
+	fs::write(&pico8_log_path, &pico8.output).expect("Can't write to pico8 output log");
+	fs::write(&p8rs_log_path, &p8rs.output).expect("Can't write to p8rs output log");
+	
+	let pico8_logs = Log::parse(&pico8.output);
+	let p8rs_logs = Log::parse(&p8rs.output);
+	
+	let summary = Summary {
+		pico8: SummarySubject::new(&pico8_log_path, &pico8),
+		p8rs: SummarySubject::new(&p8rs_log_path, &p8rs),
+		orig_cart_path: orig_cart_path.to_string_lossy(),
+		tmp_cart_path: tmp_cart_path.to_string_lossy(),
+	};
+	let json_file = File::create(&json_path).expect("Can't create json log");
+	serde_json::to_writer(json_file, &summary).expect("Can't write to json log");
 	
 	match (pico8.timeout, p8rs.timeout) {
 		(true, true) => panic!("pico8 and p8rs timeout"),
@@ -69,9 +87,9 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 		_ => {}
 	}
 	
-	for i in 0..usize::max(pico8.logs.len(), p8rs.logs.len()) {
-		let pico8_log = pico8.logs.get(i);
-		let p8rs_log = p8rs.logs.get(i);
+	for i in 0..usize::max(pico8_logs.len(), p8rs_logs.len()) {
+		let pico8_log = pico8_logs.get(i);
+		let p8rs_log = p8rs_logs.get(i);
 		if pico8_log == p8rs_log {
 			continue
 		}
@@ -94,17 +112,20 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 				Some(Log::MEM(pico8_name, pico8_offset, pico8_data)),
 				Some(Log::MEM(p8rs_name, p8rs_offset, p8rs_data))
 			) => {
-				println!("pico8 {pico8_name} memory at 0x{pico8_offset:04x}: {}", to_hexstring(pico8_data));
-				println!("p8rs  {p8rs_name} memory at 0x{p8rs_offset:04x}: {}", to_hexstring(p8rs_data));
-				
 				if pico8_offset != p8rs_offset {
 					panic!("Test {test_name} failed, memory offset mismatch. (pico8: {pico8_offset}, p8rs: {p8rs_offset})");
 				} else if pico8_data.len() != p8rs_data.len() {
 					panic!("Test {test_name} failed, memory size mismatch. (pico8: {}, p8rs: {})", pico8_data.len(), p8rs_data.len());
 				} else {
-					let offset = pico8_data.iter().zip(p8rs_data).position(|(a, b)| a != b).unwrap();
-					let position = pico8_offset.wrapping_add(offset as u16);
-					panic!("Test {test_name} failed, memory mismatch at 0x{position:04x}. (pico8: 0x{:02x}, p8rs: 0x{:02x})", pico8_data[offset], p8rs_data[offset]);
+					let rel_pos = pico8_data.iter().zip(p8rs_data).position(|(a, b)| a != b).unwrap();
+					let abs_pos = pico8_offset.wrapping_add(rel_pos as u16);
+					let preview_rel_pos = rel_pos / 32 * 32;
+					let preview_abs_pos = pico8_offset.wrapping_add(preview_rel_pos as u16);
+					
+					println!("pico8 {pico8_name} memory at 0x{preview_abs_pos:04x}: {}", to_hexstring(&pico8_data[preview_rel_pos .. pico8_data.len().min(preview_rel_pos + 32)]));
+					println!("p8rs  {p8rs_name} memory at 0x{preview_abs_pos:04x}: {}", to_hexstring(&p8rs_data[preview_rel_pos .. p8rs_data.len().min(preview_rel_pos + 32)]));
+					
+					panic!("Test {test_name} failed, memory mismatch at 0x{abs_pos:04x}. (pico8: 0x{:02x}, p8rs: 0x{:02x})", pico8_data[rel_pos], p8rs_data[rel_pos]);
 				}
 			},
 			(
