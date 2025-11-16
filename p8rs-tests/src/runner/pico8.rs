@@ -5,7 +5,8 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::runner::{Log, RunResult, TIMEOUT_MS};
+use crate::log::Log;
+use crate::runner::{RunResult, TIMEOUT_MS};
 
 pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 	let mut child =
@@ -68,7 +69,7 @@ pub fn run(path: impl AsRef<Path>, log_file: impl AsRef<Path>) -> RunResult {
 		stdout.trim()
 	};
 	
-	let logs = stderr.lines().map(Log::from).collect();
+	let logs = Log::parse(&stderr);
 	let runtime_error = stdout.is_empty().not().then_some(stdout.to_string());
 	
 	RunResult::new(logs, runtime_error, timeout)

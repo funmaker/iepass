@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 use p8rs::{vm, ExternError};
 use p8rs_types::p8scii;
 
-use crate::runner::{Log, RunResult, TIMEOUT_MS};
+use crate::log::Log;
+use crate::runner::{RunResult, TIMEOUT_MS};
 
 struct RunnerCallback {
 	buffer: Rc<RefCell<String>>,
@@ -72,7 +73,7 @@ pub fn run(source: &[u8], log_file: impl AsRef<Path>) -> RunResult {
 	
 	std::fs::write(&log_file, &output).expect("Can't write to p8rs output log");
 	
-	let logs = output.lines().map(Log::from).collect();
+	let logs = Log::parse(&output);
 	let runtime_error = result.err().map(|err| err.to_string());
 	
 	RunResult::new(logs, runtime_error, timeout)

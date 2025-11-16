@@ -12,14 +12,16 @@ pub struct MachineState<'a>(pub(super) &'a mut [u8; 0x80]);
 
 impl MachineState<'_> {
 	pub fn reset(&mut self) {
+		self.fill(0);
+		
 		*self.pen_color() = 6;
 		*self.clip_rect() = [0, 0, 128, 128];
 		*self.cursor_position() = [0, 6];
-		*self.cursor_home_x() = 0;
 		*self.sprite_addr_map() = SpriteScreenMemoryMap::SPRITE_SHEET;
 		*self.screen_addr_map() = SpriteScreenMemoryMap::SCREEN;
 		*self.map_addr_map() = 0x20;
 		*self.map_width() = 128;
+		*self.bitplane_mask() = 0xff;
 		
 		self.reset_palette();
 	}

@@ -13,6 +13,7 @@ const TMP_DIR: &str = "tmp";
 mod tester;
 mod utils;
 mod runner;
+mod log;
 
 mod carts {
 	include!(concat!(env!("OUT_DIR"), "/generated_tests.rs"));

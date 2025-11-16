@@ -7,8 +7,8 @@ use colored::control::SHOULD_COLORIZE;
 use p8rs::vm::palette;
 
 use crate::{runner, TMP_DIR};
-use crate::runner::Log;
-use crate::utils::{replace, CollectArray};
+use crate::log::Log;
+use crate::utils::replace;
 
 static SETUP: Once = Once::new();
 fn setup() {
@@ -76,67 +76,92 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 			continue
 		}
 		
-		let test_name = pico8_log.and_then(Log::name)
-		                         .or(p8rs_log.and_then(Log::name))
-		                         .map(|name| format!(" {}", name))
-		                         .unwrap_or("".into());
+		let test_name = pico8_log.and_then(|log| log.name()).unwrap_or("<unknown>");
+		let p8rs_name = p8rs_log.and_then(|log| log.name()).unwrap_or("<unknown>");
 		
-		if let (Some(Log::SCR(pico8_name, _)), Some(Log::SCR(p8rs_name, _))) = (pico8_log, p8rs_log) && pico8_name == p8rs_name {
-			try_print_scr(&pico8.logs, i, "PICO-8 Screen");
-			try_print_scr(&p8rs.logs, i, "P8RS Screen");
+		if test_name != p8rs_name {
+			panic!("Test failed, log name mismatch. (pico8: {test_name}, p8rs: {p8rs_name})");
 		}
 		
 		match (pico8_log, p8rs_log) {
-			(Some(pico8_log), Some(p8rs_log)) => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\t{}\n\tp8rs log:\n\t\t{}", test_name, pico8_log, p8rs_log),
-			(Some(pico8_log), None)           => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\t{}\n\tp8rs log:\n\t\tNone", test_name, pico8_log),
-			(None, Some(p8rs_log))            => panic!("Test{} failed, log mismatch.\n\tpico8 log:\n\t\tNone\n\tp8rs log:\n\t\t{}", test_name, p8rs_log),
-			_ => unreachable!()
+			(
+				Some(Log::TEST(_, pico8_val)),
+				Some(Log::TEST(_, p8rs_val))
+			) => {
+				panic!("Test {test_name} failed, value mismatch. (pico8: {pico8_val}, p8rs: {p8rs_val})");
+			},
+			(
+				Some(Log::MEM(pico8_name, pico8_offset, pico8_data)),
+				Some(Log::MEM(p8rs_name, p8rs_offset, p8rs_data))
+			) => {
+				println!("pico8 {pico8_name} memory at 0x{pico8_offset:04x}: {}", to_hexstring(pico8_data));
+				println!("p8rs  {p8rs_name} memory at 0x{p8rs_offset:04x}: {}", to_hexstring(p8rs_data));
+				
+				if pico8_offset != p8rs_offset {
+					panic!("Test {test_name} failed, memory offset mismatch. (pico8: {pico8_offset}, p8rs: {p8rs_offset})");
+				} else if pico8_data.len() != p8rs_data.len() {
+					panic!("Test {test_name} failed, memory size mismatch. (pico8: {}, p8rs: {})", pico8_data.len(), p8rs_data.len());
+				} else {
+					let offset = pico8_data.iter().zip(p8rs_data).position(|(a, b)| a != b).unwrap();
+					let position = pico8_offset.wrapping_add(offset as u16);
+					panic!("Test {test_name} failed, memory mismatch at 0x{position:04x}. (pico8: 0x{:02x}, p8rs: 0x{:02x})", pico8_data[offset], p8rs_data[offset]);
+				}
+			},
+			(
+				Some(Log::SCR(pico8_name, pico8_pal, pico8_pixels)),
+				Some(Log::SCR(p8rs_name, p8rs_pal, p8rs_pixels))
+			) => {
+				let pixel_pos =
+					pico8_pixels.iter()
+					            .zip(p8rs_pixels.iter())
+					            .enumerate()
+					            .flat_map(|(y, (a, b))|
+						            a.iter()
+						             .zip(b.iter())
+						             .position(|(a, b)| a != b)
+						             .map(|x| (x, y)))
+					            .next();
+				
+				print_scr("pico8 Screen", pico8_name, pico8_pal, pico8_pixels, pixel_pos);
+				print_scr("p8rs  Screen", p8rs_name, p8rs_pal, p8rs_pixels, pixel_pos);
+				
+				if pico8_pal != p8rs_pal {
+					panic!("Test {test_name} failed, palette mismatch. (pico8: {pico8_pal:?}, p8rs: {p8rs_pal:?})");
+				} else {
+					let (col, row) = pixel_pos.unwrap();
+					panic!("Test {test_name} failed, pixel mismatch at {col}x{row}. (pico8: {:x}, p8rs: {:x})", pico8_pixels[row][col], p8rs_pixels[row][col]);
+				}
+			},
+			(
+				Some(Log::OTHER(pico8_text)),
+				Some(Log::OTHER(p8rs_text))
+			) => {
+				panic!("Test {test_name} failed, log mismatch. (pico8: {pico8_text}, p8rs: {p8rs_text})")
+			},
+			(pico8_log, p8rs_log) => panic!("Test {test_name} failed, log mismatch. (pico8: {}, p8rs: {})", pico8_log.map_or("None" ,Log::kind), p8rs_log.map_or("None" ,Log::kind)),
 		}
 	}
 }
 
-fn try_print_scr(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8; 128]; 128]>> {
-	let test_name = match logs.get(idx) {
-		Some(Log::SCR(log_name, _)) => log_name,
-		_ => return None,
-	};
+fn to_hexstring(data: &[u8]) -> String {
+	use std::fmt::Write;
 	
-	let start = logs[0..idx].iter()
-	                        .rposition(|log| !matches!(log, Log::SCR(n, _) if n == test_name))
-	                        .map_or(0, |idx| idx + 1);
+	let mut ret = String::with_capacity(data.len() * 2 + data.len() / 4);
 	
-	let pal = match &logs[start] {
-		Log::SCR(n, pal) if n == test_name => pal.strip_prefix("pal | "),
-		_ => return None,
-	}?;
-	
-	let pal: [_; 16] =
-		pal.as_bytes()
-		   .chunks(2)
-		   .map(|col| u8::from_ascii_radix(col, 16))
-		   .collect_array()
-		   .ok()?
-		   .try_map(Result::ok)?;
-	
-	let mut output = vec![];
-	for row in 0..128 {
-		let line = match &logs[start + 1 + row] {
-			Log::SCR(n, pal) if n == test_name => pal.split_once(" | ").map(|(_, data)| data),
-			_ => return None,
-		}?;
-		
-		output.push(
-			line.as_bytes()
-			    .iter()
-			    .map(|col| u8::from_ascii_radix(&[*col], 16))
-				.array_chunks()
-				.flat_map(|[a, b]| [b, a])
-			    .collect_array()
-			    .ok()?
-				.try_map(Result::ok)?
-				.map(|col| pal[col as usize])
-		);
+	for chunk in data.chunks(4) {
+		for byte in chunk {
+			write!(ret, "{:02x}", byte).unwrap();
+		}
+		write!(ret, " ").unwrap();
 	}
+	
+	ret.truncate(ret.len().saturating_sub(1));
+	
+	ret
+}
+
+fn print_scr(screen_name: &str, test_name: &str, pal: &[u8; 16], pixels: &[[u8; 128]; 128], error_pos: Option<(usize, usize)>) {
+	let (error_col, error_row) = error_pos.unzip();
 	
 	println!("{:^134}", format!("{screen_name} - {test_name}"));
 	print!("   {:<16}", "");
@@ -146,26 +171,35 @@ fn try_print_scr(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8
 	}
 	println!();
 	print!("   ");
-	for _ in 0..8 {
-		print!("{digits}");
+	for (col, char) in (0..128).zip(digits.chars().cycle()) {
+		if Some(col) == error_col {
+			print!("{}", char.to_string().color(Color::Black).on_color(Color::Red));
+		} else {
+			print!("{char}")
+		}
 	}
 	println!();
 	
 	print!("  ╭");
-	for _ in 0..128 {
-		print!("─")
+	for col in 0..128 {
+		if Some(col) == error_col {
+			print!("╳");
+		} else {
+			print!("─")
+		}
 	}
 	println!("╮");
 	
-	for (row, [upper, lower]) in output.iter().array_chunks().enumerate() {
+	for (row, [upper, lower]) in pixels.iter().array_chunks().enumerate() {
 		let row = row * 2;
+		let is_row_error = error_row == Some(row) || error_row == Some(row + 1);
 		let label = if row % 16 == 0 && row > 0 {
 			format!("{:02X}", row)
 		} else {
 			format!("{:X}", row % 16)
 		};
 		
-		if (idx - start) == row + 1 || (idx - start) == row + 2 {
+		if is_row_error {
 			print!("{:>2}╳", label.color(Color::Black).on_color(Color::Red));
 		} else {
 			print!("{:>2}│", label);
@@ -180,8 +214,8 @@ fn try_print_scr(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8
 			};
 			
 			if SHOULD_COLORIZE.should_colorize() {
-				let uc = palette::color_from_index(upper[x]).rgb();
-				let lc = palette::color_from_index(lower[x]).rgb();
+				let uc = palette::color_from_index(pal[upper[x] as usize & 0x0F]).rgb();
+				let lc = palette::color_from_index(pal[lower[x] as usize & 0x0F]).rgb();
 				if let Some(grid) = grid && uc == lc {
 					let gc = if uc.0 / 3 + uc.1 / 3 + uc.2 / 3 > 128 {
 						(uc.0.saturating_sub(64), uc.1.saturating_sub(64), uc.2.saturating_sub(64))
@@ -203,16 +237,23 @@ fn try_print_scr(logs: &[Log], idx: usize, screen_name: &str) -> Option<Box<[[u8
 				}
 			}
 		}
-		println!("│")
+		
+		if is_row_error {
+			println!("╳");
+		} else {
+			println!("│");
+		}
 	}
 	
 	print!("  ╰");
-	for _ in 0..128 {
-		print!("─")
+	for col in 0..128 {
+		if Some(col) == error_col {
+			print!("╳");
+		} else {
+			print!("─")
+		}
 	}
 	println!("╯");
 	println!();
-	
-	Some(output.into_boxed_slice().into_array().unwrap())
 }
 

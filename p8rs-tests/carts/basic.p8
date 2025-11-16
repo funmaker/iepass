@@ -16,5 +16,6 @@ p8rs.test("table", {
 	[{ nested = "key" }] = { nested = "table" }
 })
 p8rs.test_mem("draw state", 0x5f00, 0x40)
+poke(0x5f44, 0, 0, 0, 0, 0, 0, 0, 0) -- reset rnd seed
 p8rs.test_mem("hardware state", 0x5f40, 0x40)
 p8rs.test_scr("screen")
