@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
-use p8rs::{vm, ExternError};
+use p8rs::vm;
+use p8rs::piccolo::ExternError;
 use p8rs_types::p8scii;
 
 use crate::runner::TIMEOUT_MS;

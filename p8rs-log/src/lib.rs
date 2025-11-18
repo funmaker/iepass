@@ -114,6 +114,8 @@ cfg_if::cfg_if! {
         pub use log_04::trace;
     } else if #[cfg(all(feature = "std", feature = "std-trace"))] {
         pub use std::println as trace;
+    } else if #[cfg(feature = "std")] {
+        #[macro_export] macro_rules! trace { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); }} }
     } else {
         #[macro_export] macro_rules! trace { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); compile_error!("No loging available. Specify logger crate or enable 'std' feature.") }} }
     }
@@ -128,6 +130,8 @@ cfg_if::cfg_if! {
         pub use log_04::debug;
     } else if #[cfg(all(feature = "std", feature = "std-debug"))] {
         pub use std::println as debug;
+    } else if #[cfg(feature = "std")] {
+        #[macro_export] macro_rules! debug { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); }} }
     } else {
         #[macro_export] macro_rules! debug { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); compile_error!("No loging available. Specify logger crate or enable 'std' feature.") }} }
     }
@@ -142,6 +146,8 @@ cfg_if::cfg_if! {
         pub use log_04::info;
     } else if #[cfg(all(feature = "std", feature = "std-info"))] {
         pub use std::println as info;
+    } else if #[cfg(feature = "std")] {
+        #[macro_export] macro_rules! info { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); }} }
     } else {
         #[macro_export] macro_rules! info { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); compile_error!("No loging available. Specify logger crate or enable 'std' feature.") }} }
     }
@@ -156,6 +162,8 @@ cfg_if::cfg_if! {
         pub use log_04::warn;
     } else if #[cfg(all(feature = "std", feature = "std-warn"))] {
         pub use std::println as warn;
+    } else if #[cfg(feature = "std")] {
+        #[macro_export] macro_rules! warn { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); }} }
     } else {
         #[macro_export] macro_rules! warn { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); compile_error!("No loging available. Specify logger crate or enable 'std' feature.") }} }
     }
@@ -168,6 +176,8 @@ cfg_if::cfg_if! {
         pub use log_04::error;
     } else if #[cfg(all(feature = "std", feature = "std-error"))] {
         pub use std::eprintln as error;
+    } else if #[cfg(feature = "std")] {
+        #[macro_export] macro_rules! error { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); }} }
     } else {
         #[macro_export] macro_rules! error { ( $($x:expr),* ) => {{let _ = ($( &$x ),*); compile_error!("No loging available. Specify logger crate or enable 'std' feature.") }} }
     }
@@ -176,7 +186,7 @@ cfg_if::cfg_if! {
 cfg_if::cfg_if! {
     if #[cfg(feature = "defmt")] {
         pub use defmt::error as eprintln;
-    } else if #[cfg(all(feature = "std", feature = "std-error"))] {
+    } else if #[cfg(all(feature = "std"))] {
         pub use std::eprintln;
     } else if #[cfg(feature = "log-04")] {
         pub use log_04::error as eprintln;
@@ -188,7 +198,7 @@ cfg_if::cfg_if! {
 cfg_if::cfg_if! {
     if #[cfg(feature = "defmt")] {
         pub use defmt::println;
-    } else if #[cfg(all(feature = "std", feature = "std-error"))] {
+    } else if #[cfg(all(feature = "std"))] {
         pub use std::println;
     } else if #[cfg(feature = "log-04")] {
         pub use log_04::error as println;
