@@ -4,10 +4,12 @@ use allocator_api2::vec;
 use gc_arena::{allocator_api::MetricsAlloc, lock::RefLock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeError, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
-use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm, StashedTraceback, Traceback, TracebackEntry};
+use crate::{compiler::{FunctionRef, LineNumber}, thread::BadThreadMode, CallbackReturn, Context, Error, FromMultiValue, Fuel, Function, IntoMultiValue, RuntimeRef, SequencePoll, Stack, String, Thread, ThreadMode, Variadic};
+use crate::traceback::{Traceback, TracebackEntry};
+use super::{thread::{Frame, LuaFrame, ThreadState}, vm::run_vm};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExecutorMode {
     /// There are no threads being run and the `Executor` must be restarted to do any work.
     Stopped,
@@ -24,6 +26,7 @@ pub enum ExecutorMode {
 }
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("bad executor mode: {found:?}, expected {expected:?}")]
 pub struct BadExecutorMode {
     pub found: ExecutorMode,
@@ -31,6 +34,7 @@ pub struct BadExecutorMode {
 }
 
 #[derive(Debug, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct ExecutorState<'gc> {
     thread_stack: vec::Vec<Thread<'gc>, MetricsAlloc<'gc>>,
@@ -56,6 +60,7 @@ pub type ExecutorInner<'gc> = RefLock<ExecutorState<'gc>>;
 /// nested. Instead, use the normal mechanisms for callbacks to call Lua code so that everything is
 /// run by the same `Executor` which called the callback.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct Executor<'gc>(Gc<'gc, ExecutorInner<'gc>>);
 
@@ -468,13 +473,14 @@ impl<'gc> Executor<'gc> {
                                 
                                 let err = match err {
                                     Error::Lua(_) => { err }
-                                    Error::Runtime(rt) => {
+                                    Error::Runtime(mut err) => {
                                         if let Some(entry) = traceback_from_frame(&top_frame) {
-                                            let mut tb = rt.1.unwrap_or_else(StashedTraceback::empty);
-                                            tb.add_entry(ctx.stash(entry));
-                                            Error::Runtime(RuntimeError(rt.0, Some(tb)))
-                                        }else{
-                                            Error::Runtime(rt)
+                                            err.traceback
+                                               .get_or_insert_with(|| Traceback::empty(&ctx))
+                                               .add_entry(&ctx, entry);
+                                            Error::Runtime(err)
+                                        } else {
+                                            Error::Runtime(err)
                                         }
                                     }
                                 };
@@ -495,7 +501,7 @@ impl<'gc> Executor<'gc> {
                                     pending_error: Some(err),
                                 });
                             }
-                            frame => panic!("tried to wind through improper frame {frame:?}"),
+                            frame => panic!("tried to wind through improper frame {:?}", frame),
                         }
                     }
                     _ => panic!("tried to step invalid frame type"),
@@ -643,10 +649,14 @@ impl<'gc, 'a> Execution<'gc, 'a> {
         }
     }
     
-    pub fn traceback(&self) -> Traceback<'gc> {
-        Traceback {
-            entries: self.upper_frames.iter().rev().filter_map(|f| traceback_from_frame(f)).collect()
-        }
+    pub fn traceback(&self, ctx: &Context<'gc>) -> Traceback<'gc> {
+        Traceback::new(
+            ctx,
+            self.upper_frames
+                .iter()
+                .rev()
+                .filter_map(|f| traceback_from_frame(f)),
+        )
     }
     
     /// The fuel parameter passed to `Executor::step`.

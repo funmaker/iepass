@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use core::ops::{Deref, DerefMut, Index, IndexMut};
 
 /// 0x3000..=0x30ff
 pub struct SpriteFlags<'a>(#[allow(dead_code)] pub(super) &'a mut [u8; 256]);

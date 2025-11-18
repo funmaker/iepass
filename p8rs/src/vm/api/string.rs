@@ -7,7 +7,7 @@ pub fn install_pico8_string(ctx: Context) {
 }
 
 #[api_callback]
-pub fn sub<'gc>(ctx: Context<'gc>, str: String, start: i16, end: Option<i16>) -> Result<String<'gc>, RuntimeError> {
+pub fn sub<'gc>(ctx: Context<'gc>, str: String, start: i16, end: Option<i16>) -> Result<String<'gc>, RuntimeError<'gc>> {
 	let len = str.len();
 	let start = get_string_offset(len, start);
 	let end = end.map(|e| get_string_offset(len, e)).unwrap_or(len - 1);

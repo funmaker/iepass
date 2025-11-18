@@ -120,7 +120,7 @@ impl Memory {
 	}
 	
 	#[inline(always)]
-	pub fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
+	pub(crate) fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
 		(&mut self.0[base as usize..base as usize + S]).try_into().unwrap()
 	}
 }

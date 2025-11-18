@@ -11,6 +11,7 @@ use super::{
 const PRINT_FUNC_NAME: &[u8] = b"print";
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LineAnnotated<T> {
     pub inner: T,
     pub line_number: LineNumber,
@@ -51,6 +52,7 @@ impl<T> LineAnnotated<T> {
 }
 
 #[derive(Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LocalAttributes(u8);
 
 impl LocalAttributes {
@@ -89,11 +91,13 @@ impl fmt::Debug for LocalAttributes {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Chunk<S> {
     pub block: Block<S>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Block<S> {
     pub statements: Vec<LineAnnotated<Statement<S>>>,
     pub return_statement: Option<LineAnnotated<ReturnStatement<S>>>,
@@ -101,6 +105,7 @@ pub struct Block<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Statement<S> {
     If(IfStatement<S>),
     While(WhileStatement<S>),
@@ -118,11 +123,13 @@ pub enum Statement<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ReturnStatement<S> {
     pub returns: Vec<Expression<S>>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct IfStatement<S> {
     pub if_part: (Expression<S>, Block<S>),
     pub else_if_parts: Vec<(Expression<S>, Block<S>)>,
@@ -130,12 +137,14 @@ pub struct IfStatement<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WhileStatement<S> {
     pub condition: Expression<S>,
     pub block: Block<S>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ForStatement<S> {
     Numeric {
         name: S,
@@ -152,22 +161,26 @@ pub enum ForStatement<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RepeatStatement<S> {
     pub body: Block<S>,
     pub until: Expression<S>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LabelStatement<S> {
     pub name: S,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GotoStatement<S> {
     pub name: S,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FunctionStatement<S> {
     pub name: S,
     pub fields: Vec<S>,
@@ -176,18 +189,21 @@ pub struct FunctionStatement<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LocalFunctionStatement<S> {
     pub name: S,
     pub definition: FunctionDefinition<S>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LocalStatement<S> {
     pub names: Vec<(S, LocalAttributes)>,
     pub values: Vec<Expression<S>>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -216,6 +232,7 @@ pub enum BinaryOperator {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum UnaryOperator {
     Not,
     Minus,
@@ -227,6 +244,7 @@ pub enum UnaryOperator {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CompoundAssign {
     Add,
     Sub,
@@ -247,18 +265,21 @@ pub enum CompoundAssign {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Expression<S> {
     pub head: Box<HeadExpression<S>>,
     pub tail: Vec<(BinaryOperator, Expression<S>)>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum HeadExpression<S> {
     Simple(SimpleExpression<S>),
     UnaryOperator(UnaryOperator, Expression<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SimpleExpression<S> {
     Number(P8Num),
     String(S),
@@ -272,36 +293,42 @@ pub enum SimpleExpression<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PrimaryExpression<S> {
     Name(S),
     GroupedExpression(Expression<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FieldSuffix<S> {
     Named(S),
     Indexed(Expression<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CallSuffix<S> {
     Method(S, Vec<Expression<S>>),
     Function(Vec<Expression<S>>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SuffixPart<S> {
     Field(FieldSuffix<S>),
     Call(CallSuffix<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SuffixedExpression<S> {
     pub primary: PrimaryExpression<S>,
     pub suffixes: Vec<SuffixPart<S>>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FunctionDefinition<S> {
     pub parameters: Vec<S>,
     pub has_varargs: bool,
@@ -309,18 +336,21 @@ pub struct FunctionDefinition<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FunctionCallStatement<S> {
     pub head: SuffixedExpression<S>,
     pub call: CallSuffix<S>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AssignmentStatement<S> {
     pub targets: Vec<AssignmentTarget<S>>,
     pub values: Vec<Expression<S>>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CompoundAssigmentStatement<S> {
     pub target: AssignmentTarget<S>,
     pub value: Expression<S>,
@@ -328,29 +358,34 @@ pub struct CompoundAssigmentStatement<S> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AssignmentTarget<S> {
     Name(S),
     Field(SuffixedExpression<S>, FieldSuffix<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TableConstructor<S> {
     pub fields: Vec<ConstructorField<S>>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConstructorField<S> {
     Array(Expression<S>),
     Record(RecordKey<S>, Expression<S>),
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RecordKey<S> {
     Named(S),
     Indexed(Expression<S>),
 }
 
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ParseErrorKind {
     #[error("found {unexpected:?}, expected {expected:?}")]
     Unexpected {
@@ -375,6 +410,7 @@ pub enum ParseErrorKind {
 }
 
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("parse error at line {line_number}: {kind}")]
 pub struct ParseError {
     pub kind: ParseErrorKind,

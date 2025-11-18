@@ -16,6 +16,7 @@ use crate::{
 /// for the metamethod in a metatable. For example, `MetaMethod::Add.name()` is `"__add"`,
 /// `MetaMethod::Sub.name()` is `"__sub"`, etc.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub enum MetaMethod {
     Len,
@@ -136,6 +137,7 @@ impl<'gc> IntoValue<'gc> for MetaMethod {
 /// If invoking a metamethod must call Lua code, this will contain a function and arguments to call
 /// to trigger it.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct MetaCall<'gc, const N: usize> {
     pub function: Function<'gc>,
@@ -144,6 +146,7 @@ pub struct MetaCall<'gc, const N: usize> {
 
 /// Return value for metamethods that return a value *or* require calling into Lua.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum MetaResult<'gc, const N: usize> {
     Value(Value<'gc>),
@@ -163,6 +166,7 @@ impl<'gc, const N: usize> From<MetaCall<'gc, N>> for MetaResult<'gc, N> {
 }
 
 #[derive(Debug, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum MetaOperatorError {
     #[error("could not call metamethod {}: {}", .0.name(), .1)]
     Call(MetaMethod, #[source] MetaCallError),
@@ -177,6 +181,7 @@ pub enum MetaOperatorError {
 }
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("could not call a {} value", .0)]
 pub struct MetaCallError(&'static str);
 
@@ -836,6 +841,7 @@ pub fn less_equal<'gc>(
 /// or a [`Function`] that must be called with the values to
 /// concatenate.
 #[derive(Debug, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum ConcatMetaResult<'gc> {
     Value(Value<'gc>),

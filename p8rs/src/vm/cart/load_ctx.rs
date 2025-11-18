@@ -87,7 +87,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 				nibble_chunks(line).take(128).map(|(h, l)| {
 					if let (Some(h), Some(l)) = (hex_char_to_nibble(h), hex_char_to_nibble(l)) {
 						(h << 4) | l
-					}else{
+					} else {
 						0
 					}
 				}).enumerate().map(move |(col_idx, byte)| ((line_idx * 128 + col_idx) as i16, byte))
@@ -118,7 +118,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 		
 		if max_offset == -1 {
 			debug!("load_map_section: MAP section loaded: empty section!");
-		}else{
+		} else {
 			debug!("load_map_section: MAP section loaded: 0x{:X} bytes written", max_offset);
 		}
 		

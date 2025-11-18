@@ -4,35 +4,42 @@ use gc_arena::Collect;
 
 /// An index that points to a register in the stack relative to the current frame.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct RegisterIndex(pub u8);
 
 /// An 8 bit index into the constant table
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct ConstantIndex8(pub u8);
 
 /// A 16 bit index into the constant table
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct ConstantIndex16(pub u16);
 
 /// An index into the upvalue table
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct UpValueIndex(pub u8);
 
 /// An index into the prototype table
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct PrototypeIndex(pub u8);
 
 /// A one byte Option value that can either be Some(0-254) or None
 #[derive(Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct Opt254(u8);
 
 #[derive(Debug, Collect, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub enum UpValueDescriptor {
     Environment,
@@ -99,6 +106,7 @@ impl Debug for Opt254 {
 /// Count of arguments or return values which can either be a constant between 0-254 or a special
 /// "variable" value.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct VarCount(Opt254);
 

@@ -274,6 +274,7 @@ impl<S: AsRef<[u8]>> fmt::Debug for Token<S> {
 }
 
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LexError {
     #[error("short string not finished, expected matching {}", p8scii::to_char(*.0))]
     UnfinishedShortString(u8),
@@ -301,6 +302,7 @@ pub enum LexError {
 
 /// A 0-indexed line number of the current source input.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct LineNumber(pub u64);
 

@@ -31,6 +31,7 @@ use arrayvec::ArrayVec;
 
 /// An iterator with a peek_nth() method that returns an optional reference to the nth element.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeekableNth<I, const SIZE: usize>
 where
 	I: Iterator,

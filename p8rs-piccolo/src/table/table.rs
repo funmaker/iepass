@@ -33,8 +33,12 @@ pub type TableInner<'gc> = RefLock<TableState<'gc>>;
 /// [`meta_ops`](crate::meta_ops) module and manually run any triggered code on an
 /// [`Executor`](crate::Executor).
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
-pub struct Table<'gc>(Gc<'gc, TableInner<'gc>>);
+pub struct Table<'gc>(
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))] // TODO: Implement Format for gc_area
+    Gc<'gc, TableInner<'gc>>,
+);
 
 impl<'gc> PartialEq for Table<'gc> {
     fn eq(&self, other: &Table<'gc>) -> bool {

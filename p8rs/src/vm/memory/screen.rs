@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut};
 
 /// Usually 0x6000..=0x7fff
 pub struct Screen<'a>(pub(super) &'a mut [u8; 0x2000]);
@@ -16,7 +16,7 @@ impl Screen<'_> {
 		let (addr, high) = Self::get_addr(x, y)?;
 		Ok(if high {
 			self.0[addr] & 0xF
-		}else{
+		} else {
 			self.0[addr] >> 4
 		})
 	}
@@ -26,7 +26,7 @@ impl Screen<'_> {
 		let old = self.0[addr];
 		if high {
 			self.0[addr] = (old & 0xF0) | (value & 0xF);
-		}else{
+		} else {
 			self.0[addr] = (value << 4) | (old & 0xF);
 		}
 		Ok(())

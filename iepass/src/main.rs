@@ -6,12 +6,11 @@
 #![no_main]
 #![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]
 
-#[macro_use] extern crate p8rs_log;
 extern crate alloc;
+#[macro_use] extern crate p8rs;
 
 use esp_hal::clock::CpuClock;
 use esp_hal::timer::systimer::SystemTimer;
-use defmt::info;
 use embassy_executor::Spawner;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
 use esp_hal::system::CpuControl;
@@ -21,6 +20,7 @@ use esp_hal::{gpio, psram};
 use rtt_target::ChannelMode;
 use p8rs::colors::Color;
 use p8rs::vm::palette::PALETTE;
+use p8rs::vm::memory::machine_state::Palette;
 use p8rs::vm::P8rs;
 
 mod calib;
@@ -31,7 +31,6 @@ mod utils;
 use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, display};
 use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
-use p8rs::vm::memory::Palette;
 use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
 static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
@@ -168,7 +167,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Loading hello.lua");
     
-    pico8.load(include_bytes!("../../lua/hello.lua")).expect("Failed to load cartridge"); // TODO: fix extern error
+    pico8.load(include_bytes!("../../lua/hello.lua"))?;
     
     info!("Entering main loop.");
     
@@ -191,7 +190,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             speaker.reset().await?;
         }
         
-        pico8.run().expect("Failed to run pico-8"); // TODO: result.requested_fps
+        pico8.run()?; // TODO: result.requested_fps
         
         let runtime = pico8.runtime();
         let screen_palette = *runtime.memory.machine_state().palette(Palette::Screen);

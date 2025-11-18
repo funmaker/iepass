@@ -5,6 +5,7 @@ use crate::types::{
 };
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub enum RCIndex {
     Register(RegisterIndex),
@@ -24,6 +25,7 @@ impl From<ConstantIndex8> for RCIndex {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub enum Operation {
     Move {
@@ -313,6 +315,7 @@ pub enum Operation {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub struct OpCode(OpCodeRepr);
 
@@ -1291,6 +1294,7 @@ impl OpCode {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 enum OpCodeRepr {
     Move {

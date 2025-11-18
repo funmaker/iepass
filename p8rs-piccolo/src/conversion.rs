@@ -400,6 +400,7 @@ impl<'gc, T: IntoMultiValue<'gc>, E: IntoValue<'gc>> IntoMultiValue<'gc> for Res
 /// Use this to provide a variable number of arguments to a function, or to collect multiple return
 /// values into a single container.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Variadic<T>(pub T);
 
 impl<T> ops::Deref for Variadic<T> {

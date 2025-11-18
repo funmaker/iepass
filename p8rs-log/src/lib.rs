@@ -1,8 +1,15 @@
 //! Formatting macros for p8rs.
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 #![allow(unused_macros)]
+#![allow(unused_imports)]
 
-pub use cfg_if::cfg_if;
+use cfg_if::cfg_if;
+
+#[cfg(feature = "defmt")]
+extern crate defmt;
+
+#[cfg(feature = "log-04")]
+extern crate log_04;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "defmt")] {

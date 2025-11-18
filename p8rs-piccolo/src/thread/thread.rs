@@ -23,6 +23,7 @@ use super::VMError;
 
 /// The current state of a [`Thread`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ThreadMode {
     /// No frames are on the thread and there are no available results, the thread can be started.
     Stopped,
@@ -40,6 +41,7 @@ pub enum ThreadMode {
 }
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("bad thread mode: {found:?}{}", if let Some(expected) = *.expected {
         format!(", expected {:?}", expected)
     } else {
@@ -57,8 +59,12 @@ pub type ThreadInner<'gc> = RefLock<ThreadState<'gc>>;
 /// All running Lua or callback code is run as part of a larger `Thread`. `Thread`s may create other
 /// `Thread`s, suspend them, resume them, and may yield to calling `Thread`s.
 #[derive(Debug, Clone, Copy, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
-pub struct Thread<'gc>(Gc<'gc, RefLock<ThreadState<'gc>>>);
+pub struct Thread<'gc>(
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))] // TODO: Implement Format for gc_area
+    Gc<'gc, RefLock<ThreadState<'gc>>>,
+);
 
 impl<'gc> PartialEq for Thread<'gc> {
     fn eq(&self, other: &Thread<'gc>) -> bool {
@@ -237,6 +243,7 @@ impl<'gc> Thread<'gc> {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct OpenUpValue<'gc> {
     thread: GcWeak<'gc, RefLock<ThreadState<'gc>>>,
@@ -264,6 +271,7 @@ impl<'gc> OpenUpValue<'gc> {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub(super) enum MetaReturn {
     /// No return value is expected.
@@ -275,6 +283,7 @@ pub(super) enum MetaReturn {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(require_static)]
 pub(super) enum LuaReturn {
     /// Normal function call, place return values at the bottom of the returning function's stack,
@@ -285,6 +294,7 @@ pub(super) enum LuaReturn {
 }
 
 #[derive(Debug, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub(super) enum Frame<'gc> {
     /// A running Lua frame.
@@ -326,6 +336,7 @@ pub(super) enum Frame<'gc> {
 }
 
 #[derive(Debug, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct ThreadState<'gc> {
     pub(super) frames: vec::Vec<Frame<'gc>, MetricsAlloc<'gc>>,

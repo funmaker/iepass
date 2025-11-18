@@ -6,6 +6,7 @@
 /// All operations that take a variable amount of time should consume some amount of fuel, so that
 /// it is always possible to bound the amount of time spent in `Executor::step`.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Fuel {
     fuel: i32,
     interrupted: bool,

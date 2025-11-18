@@ -10,12 +10,13 @@ use crate::{Callback, Closure, Constant, Function, String, Table, Thread, UserDa
 ///
 /// Every value that Lua code can manipulate directly is ultimately a some kind of `Value`.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum Value<'gc> {
     Nil,
     Boolean(bool),
     Number(P8Num),
-    String(String<'gc>),
+    String(#[cfg_attr(feature = "defmt", defmt(Debug2Format))] String<'gc>), // TODO: Format for piccolo Strings?
     Table(Table<'gc>),
     Function(Function<'gc>),
     Thread(Thread<'gc>),
@@ -53,36 +54,7 @@ impl<'gc> Value<'gc> {
     /// [`Value::Table`]s, [`Value::Function`]s, [`Value::Thread`]s, and [`Value::UserData`]
     /// are all printed as `"<typename {:p}>"`, where 'typename' is the value returned by
     /// [`Value::type_name`].
-    pub fn display(self) -> impl fmt::Display + 'gc {
-        struct ValueDisplay<'gc>(Value<'gc>);
-
-        impl<'gc> fmt::Display for ValueDisplay<'gc> {
-            fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self.0 {
-                    Value::Nil => write!(fmt, "nil"),
-                    Value::Boolean(b) => write!(fmt, "{}", b),
-                    Value::Number(f) => write!(fmt, "{}", f),
-                    Value::String(s) => {
-                        for char in p8scii::to_iter(s.as_bytes()) {
-                            write!(fmt, "{}", char)?;
-                        }
-                        Ok(())
-                    },
-                    Value::Table(t) => write!(fmt, "<table {:p}>", Gc::as_ptr(t.into_inner())),
-                    Value::Function(Function::Closure(c)) => {
-                        write!(fmt, "<function {:p}>", Gc::as_ptr(c.into_inner()))
-                    }
-                    Value::Function(Function::Callback(c)) => {
-                        write!(fmt, "<function {:p}>", Gc::as_ptr(c.into_inner()))
-                    }
-                    Value::Thread(t) => write!(fmt, "<thread {:p}>", Gc::as_ptr(t.into_inner())),
-                    Value::UserData(u) => {
-                        write!(fmt, "<userdata {:p}>", Gc::as_ptr(u.into_inner()))
-                    }
-                }
-            }
-        }
-
+    pub fn display(self) -> ValueDisplay<'gc> {
         ValueDisplay(self)
     }
 
@@ -263,6 +235,64 @@ impl<'gc> From<Thread<'gc>> for Value<'gc> {
 impl<'gc> From<UserData<'gc>> for Value<'gc> {
     fn from(v: UserData<'gc>) -> Value<'gc> {
         Value::UserData(v)
+    }
+}
+
+pub struct ValueDisplay<'gc>(Value<'gc>);
+
+impl<'gc> fmt::Display for ValueDisplay<'gc> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Value::Nil => write!(fmt, "nil"),
+            Value::Boolean(b) => write!(fmt, "{}", b),
+            Value::Number(f) => write!(fmt, "{}", f),
+            Value::String(s) => {
+                for char in p8scii::to_iter(s.as_bytes()) {
+                    write!(fmt, "{}", char)?;
+                }
+                Ok(())
+            },
+            Value::Table(t) => write!(fmt, "<table {:p}>", Gc::as_ptr(t.into_inner())),
+            Value::Function(Function::Closure(c)) => {
+                write!(fmt, "<function {:p}>", Gc::as_ptr(c.into_inner()))
+            }
+            Value::Function(Function::Callback(c)) => {
+                write!(fmt, "<function {:p}>", Gc::as_ptr(c.into_inner()))
+            }
+            Value::Thread(t) => write!(fmt, "<thread {:p}>", Gc::as_ptr(t.into_inner())),
+            Value::UserData(u) => {
+                write!(fmt, "<userdata {:p}>", Gc::as_ptr(u.into_inner()))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for ValueDisplay<'_> {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self.0 {
+            Value::Nil => defmt::write!(fmt, "nil"),
+            Value::Boolean(b) => defmt::write!(fmt, "{}", b),
+            Value::Number(f) => defmt::write!(fmt, "{}", f),
+            Value::String(s) => {
+                for char in p8scii::to_iter(s.as_bytes()) {
+                    defmt::write!(fmt, "{}", char);
+                }
+            },
+            Value::Table(t) => defmt::write!(fmt, "<table 0x{:x}>", Gc::as_ptr(t.into_inner()) as usize),
+            Value::Function(Function::Closure(c)) => {
+                defmt::write!(fmt, "<function 0x{:x}>", Gc::as_ptr(c.into_inner()) as usize)
+            },
+            Value::Function(Function::Callback(c)) => {
+                defmt::write!(fmt, "<function 0x{:x}>", Gc::as_ptr(c.into_inner()) as usize)
+            },
+            Value::Thread(t) => {
+                defmt::write!(fmt, "<thread 0x{:x}>", Gc::as_ptr(t.into_inner()) as usize)
+            },
+            Value::UserData(u) => {
+                defmt::write!(fmt, "<userdata 0x{:x}>", Gc::as_ptr(u.into_inner()) as usize)
+            },
+        }
     }
 }
 

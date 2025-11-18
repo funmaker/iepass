@@ -258,15 +258,15 @@ impl P8Num {
 		if is_i32 {
 			if is_hex {
 				write!(&mut string, "0x{:08x}", value.to_raw()).unwrap();
-			}else{
+			} else {
 				write!(&mut string, "{}", value.to_raw()).unwrap();
 			}
-		}else{
+		} else {
 			if is_hex {
 				// write!(&mut string, "0x{:04x}.{:04x}", value.to_integer(), value.to_raw() & 0xFFFF).unwrap();
 				write!(&mut string, "0x{:04x}", value.to_integer()).unwrap();
 				write!(&mut string, ".{:04x}", value.to_raw() & 0xFFFF).unwrap();
-			}else{
+			} else {
 				write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap();
 			}
 		}

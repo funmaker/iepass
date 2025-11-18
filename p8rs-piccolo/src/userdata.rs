@@ -12,10 +12,12 @@ use crate::{
 };
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("UserData type mismatch")]
 pub struct BadUserDataType;
 
 #[derive(Debug, Copy, Clone, Default, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct UserDataMeta<'gc> {
     pub metatable: Option<Table<'gc>>,
@@ -46,8 +48,12 @@ pub type UserDataInner<'gc> = AnyInner<UserDataMetaState<'gc>>;
 /// advanced cases where you simply need to store a user defined GC type with safe downcasting,
 /// use [`Any`] directly.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
-pub struct UserData<'gc>(Any<'gc, UserDataMetaState<'gc>>);
+pub struct UserData<'gc>(
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))] // TODO: Implement Format for gc_area
+    Any<'gc, UserDataMetaState<'gc>>,
+);
 
 impl<'gc> PartialEq for UserData<'gc> {
     fn eq(&self, other: &Self) -> bool {

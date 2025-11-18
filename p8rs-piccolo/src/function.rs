@@ -6,6 +6,7 @@ use crate::{BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Exec
 
 /// Any callable Lua value (either a [`Closure`] or a [`Callback`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum Function<'gc> {
     Closure(Closure<'gc>),

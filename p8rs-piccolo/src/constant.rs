@@ -5,6 +5,7 @@ use p8rs_types::p8num::P8Num;
 use crate::compiler::string_utils::trim_whitespace;
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum Constant<S> {
     Nil,
@@ -235,6 +236,7 @@ impl<S: AsRef<[u8]>> PartialEq for Constant<S> {
 /// Wrapper for a `Constant` that implements Hash and Eq, and only compares equal when the types are
 /// bit for bit identical.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct IdenticalConstant<S>(pub Constant<S>);
 

@@ -50,3 +50,10 @@ impl StdDebug for Display<&[u8]> {
 		Ok(())
 	}
 }
+
+#[cfg(feature = "defmt")]
+impl<T> defmt::Format for Display<T> where Display<T>: StdDebug {
+	fn format(&self, f: defmt::Formatter) {
+		defmt::Debug2Format(&self).format(f)
+	}
+}

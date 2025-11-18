@@ -23,7 +23,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 		} else {
 			if let Some(Value::String(str)) = super::base::tostr(ctx, text, None)? {
 				str
-			}else{
+			} else {
 				debug!("[print] Could not convert value to string when printing!");
 				String::from_static(ctx.mutation(), "")
 			}
@@ -117,7 +117,7 @@ fn cursor_new_line(rt: &mut Runtime, flags: PrintDefaultsFlags, scroll_exact: bo
 	rt.memory.machine_state().cursor_position()[1] = new_y;
 }
 
-fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError> {
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
@@ -154,19 +154,19 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 }
 
 fn get_font_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> u8 {
-	get_font(rt, flags).map(|f| f.height()).unwrap_or(6)
+	get_font(rt, flags).height()
 }
 
-fn get_font<'a>(rt: &'a mut Runtime, flags: PrintDefaultsFlags) -> Result<Font<'a>, RuntimeError> {
+fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
 	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
-	Ok(if use_custom_font {
-		Font::new((&rt.memory[0x5600..=0x5dff]).try_into()?)
+	if use_custom_font {
+		Font::new(rt.memory.const_slice(0x5600))
 	} else {
 		Font::SYSTEM
-	})
+	}
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, dry_run: bool) -> Result<(i16, i16, bool), RuntimeError> {
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, dry_run: bool) -> (i16, i16, bool) {
 	// let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
 	// let is_tall = flags.contains(PrintDefaultsFlags::TALL);
 	// let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
@@ -175,7 +175,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	
 	let pen_color = *rt.memory.machine_state().pen_color();
 	
-	let font = get_font(rt, flags)?;
+	let font = get_font(rt, flags);
 	let char_width = font.width_chr(letter);
 	let char_height = font.height();
 	let char_font = &font.char(letter);
@@ -208,7 +208,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 		}
 	}
 	
-	Ok((char_width as i16, char_height as i16, overflowed_x))
+	(char_width as i16, char_height as i16, overflowed_x)
 }
 
 
@@ -259,7 +259,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 					self.clipping = true;
 				}
 				
-				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.clipping)?;
+				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.clipping);
 				
 				if x_overflowed {
 					self.x_wrapped = true;

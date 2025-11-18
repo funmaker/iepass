@@ -11,9 +11,10 @@ use crate::{
     Callback, CallbackReturn, Context, FromValue, Function, IntoValue, MetaMethod, Singleton,
     Table, UserData, Value,
 };
-use crate::thread::StashedTraceback;
+use crate::traceback::{ExternTraceback, Traceback};
 
 #[derive(Debug, Clone, Copy, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("type error, expected {expected}, found {found}")]
 pub struct TypeError {
     pub expected: &'static str,
@@ -24,6 +25,7 @@ pub struct TypeError {
 ///
 /// Any [`Value`] can be raised as an error and it will be contained here.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct LuaError<'gc>(pub Value<'gc>);
 
@@ -51,6 +53,7 @@ impl<'gc> LuaError<'gc> {
 /// are converted *lossily* into normal Rust strings. Tables, functions, threads, and userdata are
 /// stored in their *raw pointer* form.
 #[derive(Debug, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExternLuaError {
     #[error("nil")]
     Nil,
@@ -100,52 +103,65 @@ unsafe impl Sync for ExternLuaError {}
 /// Rust errors can be caught and re-raised through Lua which allows for unrestricted sharing, so
 /// this type contains its error inside an `Arc` pointer to allow for this.
 #[derive(Debug, Clone, Collect)]
-#[collect(require_static)]
-pub struct RuntimeError(pub Arc<anyhow::Error>, pub Option<StashedTraceback>);
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[collect(no_drop)]
+pub struct RuntimeError<'gc> {
+    #[collect(require_static)]
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+    pub source: Arc<anyhow::Error>,
+    pub traceback: Option<Traceback<'gc>>
+}
 
-impl fmt::Display for RuntimeError {
+impl fmt::Display for RuntimeError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.source.fmt(f)
     }
 }
 
-impl<E: Into<anyhow::Error>> From<E> for RuntimeError {
+impl<E: Into<anyhow::Error>> From<E> for RuntimeError<'_> {
     fn from(err: E) -> Self {
         Self::new(err)
     }
 }
 
-impl RuntimeError {
+impl<'gc> RuntimeError<'gc> {
     pub fn new(err: impl Into<anyhow::Error>) -> Self {
         Self::new_with_traceback(err, None)
     }
     
-    pub fn new_with_traceback(err: impl Into<anyhow::Error>, traceback: Option<StashedTraceback>) -> Self {
-        Self(Arc::new(err.into()), traceback)
+    pub fn new_with_traceback(err: impl Into<anyhow::Error>, traceback: Option<Traceback<'gc>>) -> Self {
+        Self {
+            source: Arc::new(err.into()),
+            traceback,
+        }
     }
     
     pub fn root_cause(&self) -> &(dyn StdError + 'static) {
-        self.0.root_cause()
+        self.source.root_cause()
     }
 
     pub fn is<E>(&self) -> bool
     where
         E: fmt::Display + fmt::Debug + Send + Sync + 'static,
     {
-        self.0.is::<E>()
+        self.source.is::<E>()
     }
 
     pub fn downcast<E>(&self) -> Option<&E>
     where
         E: fmt::Display + fmt::Debug + Send + Sync + 'static,
     {
-        self.0.downcast_ref::<E>()
+        self.source.downcast_ref::<E>()
+    }
+    
+    pub fn to_extern(self) -> ExternRuntimeError {
+        self.into()
     }
 }
 
-impl AsRef<dyn StdError + 'static> for RuntimeError {
+impl AsRef<dyn StdError + 'static> for RuntimeError<'_> {
     fn as_ref(&self) -> &(dyn StdError + 'static) {
-        (*self.0).as_ref()
+        (*self.source).as_ref()
     }
 }
 
@@ -154,10 +170,11 @@ impl AsRef<dyn StdError + 'static> for RuntimeError {
 /// This can be either a [`LuaError`] containing a Lua [`Value`], or a [`RuntimeError`] containing a
 /// Rust error.
 #[derive(Debug, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum Error<'gc> {
     Lua(LuaError<'gc>),
-    Runtime(RuntimeError),
+    Runtime(RuntimeError<'gc>),
 }
 
 impl<'gc> fmt::Display for Error<'gc> {
@@ -181,8 +198,8 @@ impl<'gc> From<LuaError<'gc>> for Error<'gc> {
     }
 }
 
-impl<'gc> From<RuntimeError> for Error<'gc> {
-    fn from(error: RuntimeError) -> Self {
+impl<'gc> From<RuntimeError<'gc>> for Error<'gc> {
+    fn from(error: RuntimeError<'gc>) -> Self {
         Self::Runtime(error)
     }
 }
@@ -206,7 +223,7 @@ impl<'gc> Error<'gc> {
     /// instead.
     pub fn from_value(value: Value<'gc>) -> Self {
         if let Value::UserData(ud) = value {
-            if let Ok(err) = ud.downcast_static::<RuntimeError>() {
+            if let Ok(err) = ud.downcast::<Rootable![RuntimeError<'_>]>() {
                 return Error::Runtime(err.clone());
             }
         }
@@ -238,7 +255,7 @@ impl<'gc> Error<'gc> {
                                 MetaMethod::ToString,
                                 Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
                                     let ud = stack.consume::<UserData>(ctx)?;
-                                    let error = ud.downcast_static::<RuntimeError>()?;
+                                    let error = ud.downcast::<Rootable![RuntimeError<'_>]>()?;
                                     stack.replace(ctx, error.to_string());
                                     Ok(CallbackReturn::Return)
                                 }),
@@ -248,7 +265,7 @@ impl<'gc> Error<'gc> {
                     }
                 }
 
-                let ud = UserData::new_static(&ctx, err.clone());
+                let ud = UserData::new::<Rootable![RuntimeError<'_>]>(&ctx, err.clone());
                 ud.set_metatable(&ctx, Some(ctx.singleton::<Rootable![UDMeta<'_>]>().0));
                 ud.into()
             }
@@ -276,11 +293,76 @@ impl<'gc> FromValue<'gc> for Error<'gc> {
     }
 }
 
+/// A shareable, dynamically typed wrapper around a normal Rust error.
+///
+/// Rust errors can be caught and re-raised through Lua which allows for unrestricted sharing, so
+/// this type contains its error inside an `Arc` pointer to allow for this.
+#[derive(Debug, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ExternRuntimeError {
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
+    pub source: Arc<anyhow::Error>,
+    pub traceback: Option<ExternTraceback>
+}
+
+impl ExternRuntimeError {
+    pub fn new(err: impl Into<anyhow::Error>) -> Self {
+        Self::new_with_traceback(err, None)
+    }
+    
+    pub fn new_with_traceback(err: impl Into<anyhow::Error>, traceback: Option<ExternTraceback>) -> Self {
+        Self {
+            source: Arc::new(err.into()),
+            traceback,
+        }
+    }
+    
+    pub fn root_cause(&self) -> &(dyn StdError + 'static) {
+        self.source.root_cause()
+    }
+    
+    pub fn is<E>(&self) -> bool
+    where
+        E: fmt::Display + fmt::Debug + Send + Sync + 'static,
+    {
+        self.source.is::<E>()
+    }
+    
+    pub fn downcast<E>(&self) -> Option<&E>
+    where
+        E: fmt::Display + fmt::Debug + Send + Sync + 'static,
+    {
+        self.source.downcast_ref::<E>()
+    }
+}
+
+impl AsRef<dyn StdError + 'static> for ExternRuntimeError {
+    fn as_ref(&self) -> &(dyn StdError + 'static) {
+        (*self.source).as_ref()
+    }
+}
+
+impl fmt::Display for ExternRuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.source.fmt(f)
+    }
+}
+
+impl<'gc> From<RuntimeError<'gc>> for ExternRuntimeError {
+    fn from(error: RuntimeError<'gc>) -> Self {
+        ExternRuntimeError {
+            source: error.source,
+            traceback: error.traceback.map(|tb| tb.to_extern()),
+        }
+    }
+}
+
 /// An [`enum@Error`] that is not bound to the GC context.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExternError {
     Lua(ExternLuaError),
-    Runtime(RuntimeError),
+    Runtime(ExternRuntimeError),
 }
 
 impl fmt::Display for ExternError {
@@ -316,9 +398,21 @@ impl From<ExternLuaError> for ExternError {
     }
 }
 
-impl From<RuntimeError> for ExternError {
-    fn from(error: RuntimeError) -> Self {
+impl From<ExternRuntimeError> for ExternError {
+    fn from(error: ExternRuntimeError) -> Self {
         Self::Runtime(error)
+    }
+}
+
+impl<'gc> From<RuntimeError<'gc>> for ExternError {
+    fn from(error: RuntimeError) -> Self {
+        ExternError::Runtime(error.into())
+    }
+}
+
+impl From<anyhow::Error> for ExternError {
+    fn from(err: anyhow::Error) -> Self {
+        ExternError::Runtime(ExternRuntimeError::new(err))
     }
 }
 
@@ -326,7 +420,7 @@ impl<'gc> From<Error<'gc>> for ExternError {
     fn from(err: Error<'gc>) -> Self {
         match err {
             Error::Lua(err) => err.to_extern().into(),
-            Error::Runtime(e) => e.into(),
+            Error::Runtime(err) => err.to_extern().into(),
         }
     }
 }

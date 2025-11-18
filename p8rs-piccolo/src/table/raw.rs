@@ -8,6 +8,7 @@ use p8rs_types::p8num::P8Num;
 use crate::{Callback, Closure, Function, String, Table, Thread, UserData, Value};
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum InvalidTableKey {
     #[error("table key is NaN")]
     IsNaN,
@@ -16,6 +17,7 @@ pub enum InvalidTableKey {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum NextValue<'gc> {
     /// The key provided to [`Table::next`] was found and there is an element present after it.
@@ -480,6 +482,7 @@ impl<'gc> RawTable<'gc> {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 enum CanonicalKey<'gc> {
     Boolean(bool),
@@ -531,6 +534,7 @@ impl<'gc> CanonicalKey<'gc> {
 // This is done to make iteration predictable in the presence of any table mutation that does not
 // cause the table to grow.
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 enum Key<'gc> {
     Live(CanonicalKey<'gc>),

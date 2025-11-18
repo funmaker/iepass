@@ -8,7 +8,6 @@
 #[macro_use] extern crate p8rs_log;
 
 use panic_rtt_target as _;
-use defmt::info;
 use anyhow::Result;
 use embassy_executor::Spawner;
 use embassy_futures::block_on;

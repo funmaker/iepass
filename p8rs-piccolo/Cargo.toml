@@ -8,7 +8,16 @@ authors = ["kyren <catherine@kyju.org>"]
 license = "MIT"
 repository.workspace = true
 
+[features]
+default = ["std", "rng"]
+rng = ["dep:rand", "ahash/runtime-rng"]
+std = ["p8rs-log/std", "rand?/std"]
+defmt = ["p8rs-log/defmt", "p8rs-types/defmt", "dep:defmt"]
+log-04 = ["p8rs-log/log-04"]
+
 [dependencies]
+p8rs-types = { workspace = true, features = ["gc-arena"] }
+p8rs-log.workspace = true
 ahash.workspace = true
 allocator-api2.workspace = true
 anyhow.workspace = true
@@ -17,15 +26,5 @@ hashbrown.workspace = true
 thiserror.workspace = true
 p8rs-macros.workspace = true
 arrayvec.workspace = true
-p8rs-log.workspace = true
-p8rs-types = { workspace = true, features = ["gc-arena"] }
+defmt = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
-
-[dev-dependencies]
-clap = { version = "4.5", features = ["cargo"] }
-rustyline = "14.0"
-
-[features]
-default = ["std", "rng"]
-rng = ["dep:rand", "ahash/runtime-rng"]
-std = ["rand?/std", "p8rs-log/std"]

@@ -21,7 +21,6 @@ pub use runtime::Runtime;
 pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
-use p8rs_piccolo::thread::{ExternTraceback, StashedTraceback};
 use traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -147,11 +146,11 @@ impl<A: Allocator + 'static> P8rs<A> {
 									match &err {
 										Error::Lua(e) => error!("[run_fuel] Uncaught lua error ({}): {}", e.0.type_name(), e.0.display()),
 										Error::Runtime(e) => {
-											error!("[run_fuel] Uncaught runtime error: {}", e.0.root_cause());
-											if let Some(traceback) = &e.1 {
-												let traceback = ctx.fetch(traceback);
+											error!("[run_fuel] Uncaught runtime error: {}", e);
+											if let Some(traceback) = &e.traceback {
+												let entries = traceback.entries();
 												let mut str = alloc::string::String::new();
-												write_traceback_entries(&mut str, (&traceback.entries[..traceback.entries.len()-1]).iter())?;
+												write_traceback_entries(&mut str, (&entries[..entries.len()-1]).iter())?;
 												error!("{}", str);
 											}
 										},
@@ -187,10 +186,6 @@ impl<A: Allocator + 'static> P8rs<A> {
 	
 	pub fn runtime(&mut self) -> &mut Runtime<A> {
 		&mut self.runtime
-	}
-	
-	pub fn get_traceback(&mut self, stashed: &StashedTraceback) -> Result<ExternTraceback, ExternError> {
-		self.lua.try_enter(|ctx| Ok(ctx.fetch(stashed).into_traceback()))
 	}
 }
 

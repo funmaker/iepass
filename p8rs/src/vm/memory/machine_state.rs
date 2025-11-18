@@ -1,9 +1,9 @@
-use std::ops::{Deref, DerefMut};
-use std::time::Duration;
+use core::ops::{Deref, DerefMut};
+use core::time::Duration;
 use bitflags::bitflags;
-use p8rs_macros::TransparentRef;
+use p8rs_macros::{p8, TransparentRef};
 use thiserror::Error;
-
+use p8rs_types::p8num::P8Num;
 use crate::utils::NonZeroNibble;
 use super::MemoryAccess;
 
@@ -580,8 +580,8 @@ impl TryFrom<Duration> for BtnpRepDelay {
 	type Error = TryFromDurationError;
 	
 	fn try_from(value: Duration) -> Result<Self, Self::Error> {
-		let steps = (value.as_secs_f32() * 30.0).round();
-		if steps >= 1.0 && steps <= 254.0 {
+		let steps = (P8Num::new(value.as_secs_f32()) * p8!(30)).round().to_integer();
+		if steps >= 1 && steps <= 254 {
 			Ok(BtnpRepDelay(steps as u8))
 		} else {
 			Err(TryFromDurationError)
@@ -618,8 +618,8 @@ impl TryFrom<Duration> for BtnpRepInterval {
 	type Error = TryFromDurationError;
 	
 	fn try_from(value: Duration) -> Result<Self, Self::Error> {
-		let steps = (value.as_secs_f32() * 30.0).round();
-		if steps >= 1.0 && steps <= 255.0 {
+		let steps = (P8Num::new(value.as_secs_f32()) * p8!(30)).round().to_integer();
+		if steps >= 1 && steps <= 255 {
 			Ok(BtnpRepInterval(steps as u8))
 		} else {
 			Err(TryFromDurationError)

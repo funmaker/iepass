@@ -1,5 +1,5 @@
 use core::fmt;
-
+use alloc::sync::Arc;
 use gc_arena::{DynamicRoot, DynamicRootSet, Mutation, Rootable};
 use p8rs_types::p8num::P8Num;
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     Callback, Closure, Error, Executor, Function, RuntimeError, String, Table, Thread, UserData,
     Value,
 };
+use crate::traceback::{Traceback, TracebackInner};
 
 /// A trait for types that can be stashed into a [`DynamicRootSet`].
 ///
@@ -44,6 +45,18 @@ impl fmt::Debug for StashedString {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedString {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedString(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
+    }
+}
+
 impl<'gc> Stashable<'gc> for String<'gc> {
     type Stashed = StashedString;
 
@@ -68,6 +81,18 @@ impl fmt::Debug for StashedTable {
         f.debug_tuple("StashedTable")
             .field(&self.0.as_ptr())
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedTable {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedTable(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
     }
 }
 
@@ -98,6 +123,18 @@ impl fmt::Debug for StashedClosure {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedClosure {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedClosure(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
+    }
+}
+
 impl<'gc> Stashable<'gc> for Closure<'gc> {
     type Stashed = StashedClosure;
 
@@ -122,6 +159,18 @@ impl fmt::Debug for StashedCallback {
         f.debug_tuple("StashedCallback")
             .field(&self.0.as_ptr())
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedCallback {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedCallback(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
     }
 }
 
@@ -152,6 +201,18 @@ impl fmt::Debug for StashedThread {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedThread {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedThread(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
+    }
+}
+
 impl<'gc> Stashable<'gc> for Thread<'gc> {
     type Stashed = StashedThread;
 
@@ -176,6 +237,18 @@ impl fmt::Debug for StashedUserData {
         f.debug_tuple("StashedUserData")
             .field(&self.0.as_ptr())
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedUserData {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedUserData(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
     }
 }
 
@@ -206,6 +279,18 @@ impl fmt::Debug for StashedExecutor {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for StashedExecutor {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "StashedExecutor(0x{:x})",
+            self.0.as_ptr() as *const () as usize,
+        )
+    }
+}
+
 impl<'gc> Stashable<'gc> for Executor<'gc> {
     type Stashed = StashedExecutor;
 
@@ -223,6 +308,7 @@ impl Fetchable for StashedExecutor {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StashedFunction {
     Closure(StashedClosure),
     Callback(StashedCallback),
@@ -263,6 +349,7 @@ impl Fetchable for StashedFunction {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StashedValue {
     Nil,
     Boolean(bool),
@@ -375,9 +462,55 @@ impl Fetchable for StashedValue {
     }
 }
 
+#[derive(Clone)]
+pub struct StashedTraceback(DynamicRoot<Rootable![TracebackInner<'_>]>);
+
+impl<'gc> Stashable<'gc> for Traceback<'gc> {
+    type Stashed = StashedTraceback;
+    
+    fn stash(self, mc: &Mutation<'gc>, roots: DynamicRootSet<'gc>) -> Self::Stashed {
+        StashedTraceback(roots.stash::<Rootable![TracebackInner<'_>]>(mc, self.into_inner()))
+    }
+}
+
+impl Fetchable for StashedTraceback {
+    type Fetched<'gc> = Traceback<'gc>;
+    
+    fn fetch<'gc>(&self, roots: DynamicRootSet<'gc>) -> Self::Fetched<'gc> {
+        Traceback::from_inner(roots.fetch(&self.0))
+    }
+}
+
+pub struct StashedRuntimeError {
+    pub source: Arc<anyhow::Error>,
+    pub traceback: Option<StashedTraceback>
+}
+
 pub enum StashedError {
     Lua(StashedValue),
-    Runtime(RuntimeError),
+    Runtime(StashedRuntimeError),
+}
+
+impl<'gc> Stashable<'gc> for RuntimeError<'gc> {
+    type Stashed = StashedRuntimeError;
+    
+    fn stash(self, mc: &Mutation<'gc>, roots: DynamicRootSet<'gc>) -> Self::Stashed {
+        StashedRuntimeError {
+            source: self.source,
+            traceback: self.traceback.map(|tb| tb.stash(mc, roots))
+        }
+    }
+}
+
+impl Fetchable for StashedRuntimeError {
+    type Fetched<'gc> = RuntimeError<'gc>;
+    
+    fn fetch<'gc>(&self, roots: DynamicRootSet<'gc>) -> Self::Fetched<'gc> {
+        RuntimeError {
+            source: self.source.clone(),
+            traceback: self.traceback.as_ref().map(|tb| tb.fetch(roots))
+        }
+    }
 }
 
 impl From<StashedValue> for StashedError {
@@ -386,15 +519,9 @@ impl From<StashedValue> for StashedError {
     }
 }
 
-impl From<RuntimeError> for StashedError {
-    fn from(error: RuntimeError) -> Self {
+impl From<StashedRuntimeError> for StashedError {
+    fn from(error: StashedRuntimeError) -> Self {
         Self::Runtime(error)
-    }
-}
-
-impl<E: Into<anyhow::Error>> From<E> for StashedError {
-    fn from(error: E) -> Self {
-        RuntimeError::from(error).into()
     }
 }
 
@@ -404,7 +531,7 @@ impl<'gc> Stashable<'gc> for Error<'gc> {
     fn stash(self, mc: &Mutation<'gc>, roots: DynamicRootSet<'gc>) -> Self::Stashed {
         match self {
             Error::Lua(err) => StashedError::Lua(err.0.stash(mc, roots)),
-            Error::Runtime(err) => StashedError::Runtime(err),
+            Error::Runtime(err) => StashedError::Runtime(err.stash(mc, roots)),
         }
     }
 }
@@ -415,7 +542,7 @@ impl Fetchable for StashedError {
     fn fetch<'gc>(&self, roots: DynamicRootSet<'gc>) -> Self::Fetched<'gc> {
         match self {
             StashedError::Lua(err) => Error::from_value(err.fetch(roots)),
-            StashedError::Runtime(err) => err.clone().into(),
+            StashedError::Runtime(err) => Error::Runtime(err.fetch(roots)),
         }
     }
 }

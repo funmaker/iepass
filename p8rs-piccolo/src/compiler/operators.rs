@@ -8,6 +8,7 @@ use super::parser::{BinaryOperator, UnaryOperator};
 
 // Binary operators which map directly to a single opcode
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SimpleBinOp {
     Add,
     Sub,
@@ -29,6 +30,7 @@ pub enum SimpleBinOp {
 // Binary operators which map to Eq / LessThan / LessEqual operations combined with Jump and
 // LoadBool
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ComparisonBinOp {
     NotEqual,
     Equal,
@@ -40,6 +42,7 @@ pub enum ComparisonBinOp {
 
 // 'and' and 'or', which short circuit their right hand side
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ShortCircuitBinOp {
     And,
     Or,
@@ -47,6 +50,7 @@ pub enum ShortCircuitBinOp {
 
 // Categorized BinaryOperator
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BinOpCategory {
     Simple(SimpleBinOp),
     Comparison(ComparisonBinOp),

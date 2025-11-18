@@ -1,9 +1,9 @@
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 #![feature(type_alias_impl_trait)]
 
-#[allow(unused_imports)] #[macro_use] extern crate p8rs_log;
-extern crate core;
+#[macro_use] extern crate p8rs_log;
 extern crate alloc;
+extern crate core;
 
 pub mod any;
 pub mod async_callback;
@@ -31,6 +31,7 @@ pub mod userdata;
 pub mod value;
 pub mod peek_nth;
 pub mod runtime;
+pub mod traceback;
 
 #[cfg(feature = "std")]
 pub mod io;
@@ -51,6 +52,7 @@ pub use self::{
     stash::{
         StashedCallback, StashedClosure, StashedError, StashedExecutor, StashedFunction,
         StashedString, StashedTable, StashedThread, StashedUserData, StashedValue,
+        StashedTraceback,
     },
     string::String,
     table::Table,
@@ -58,4 +60,5 @@ pub use self::{
     userdata::UserData,
     value::Value,
     runtime::{Runtime, RuntimeRef},
+    traceback::{Traceback, ExternTraceback}
 };

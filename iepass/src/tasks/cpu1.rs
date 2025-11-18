@@ -1,6 +1,5 @@
 use static_cell::{ConstStaticCell, StaticCell};
 use esp_hal::system::Stack;
-use defmt::info;
 use embassy_executor::Spawner;
 use esp_hal_embassy::Executor;
 use anyhow::Result;

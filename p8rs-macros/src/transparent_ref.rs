@@ -43,7 +43,8 @@ pub fn make_derive(item: &syn::DeriveInput) -> syn::Result<TokenStream> {
 			fn from_bits_mut(inner: &mut #bits_type) -> &mut Self {
 				unsafe { ::core::mem::transmute(inner) }
 			}
-			fn from_bits_boxed<A: ::core::alloc::Allocator>(inner: Box<#bits_type, A>) -> Box<Self, A> {
+			fn from_bits_boxed<A: ::core::alloc::Allocator>(inner: ::alloc::boxed::Box<#bits_type, A>) -> ::alloc::boxed::Box<Self, A> {
+				use ::alloc::boxed::Box;
 				let (ptr, alloc) = Box::into_raw_with_allocator(inner);
 				unsafe { Box::from_raw_in(ptr as *mut Self, alloc) }
 			}
@@ -53,7 +54,8 @@ pub fn make_derive(item: &syn::DeriveInput) -> syn::Result<TokenStream> {
 			fn to_bits_mut(&mut self) -> &mut #bits_type {
 				unsafe { ::core::mem::transmute(self) }
 			}
-			fn to_bits_boxed<A: ::core::alloc::Allocator>(self: Box<Self, A>) -> Box<#bits_type, A> {
+			fn to_bits_boxed<A: ::core::alloc::Allocator>(self: ::alloc::boxed::Box<Self, A>) -> ::alloc::boxed::Box<#bits_type, A> {
+				use ::alloc::boxed::Box;
 				let (ptr, alloc) = Box::into_raw_with_allocator(self);
 				unsafe { Box::from_raw_in(ptr as *mut #bits_type, alloc) }
 			}

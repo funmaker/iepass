@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut};
 
 /// Usually 0x0000..=0x1fff
 pub struct Sprites<'a>(#[allow(dead_code)] pub(super) &'a mut [u8; 0x2000]);

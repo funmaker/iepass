@@ -684,6 +684,7 @@ impl<'gc> Sequence<'gc> for Unpack<'gc> {
 }
 
 #[derive(PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum RawArrayOpResult<T> {
     Success(T),
     Possible,

@@ -36,6 +36,7 @@ use super::{
 };
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CompileErrorKind {
     #[error("insufficient available registers")]
     Registers,
@@ -64,6 +65,7 @@ pub enum CompileErrorKind {
 }
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[error("compiler error at line {line_number}: {kind}")]
 pub struct CompileError {
     pub kind: CompileErrorKind,
@@ -71,6 +73,7 @@ pub struct CompileError {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum FunctionRef<S> {
     Named(S, LineNumber),
@@ -107,6 +110,7 @@ impl<S> FunctionRef<S> {
 }
 
 #[derive(Debug, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct CompiledPrototype<S> {
     pub reference: FunctionRef<S>,
@@ -207,6 +211,7 @@ struct CompilerFunction<S> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum ExprDescriptor<S> {
     Variable(VariableDescriptor<S>),
     Constant(Constant<S>),
@@ -263,6 +268,7 @@ enum ExprDescriptor<S> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum VariableDescriptor<S> {
     Local(RegisterIndex, LocalAttributes),
     UpValue(UpValueIndex, LocalAttributes),
@@ -280,6 +286,7 @@ enum ExprDestination {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum JumpLabel<S> {
     Unique(u64),
     Named(S),
@@ -303,6 +310,7 @@ where
 impl<S> Eq for JumpLabel<S> where S: AsRef<[u8]> {}
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct BlockDescriptor {
     // The index of the first local variable in this block. All locals above this will be freed when
     // this block is exited.
@@ -315,6 +323,7 @@ struct BlockDescriptor {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct JumpTarget<S> {
     label: JumpLabel<S>,
     // The target instruction that will be jumped to
@@ -326,6 +335,7 @@ struct JumpTarget<S> {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 struct PendingJump<S> {
     target: JumpLabel<S>,
     // The index of the placeholder jump instruction

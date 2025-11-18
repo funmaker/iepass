@@ -4,18 +4,13 @@ use allocator_api2::{boxed, vec, SliceExt};
 use gc_arena::{allocator_api::MetricsAlloc, lock::Lock, Collect, Gc, Mutation};
 use thiserror::Error;
 
-use crate::{
-    compiler::{self, CompiledPrototype, FunctionRef, LineNumber},
-    opcode::OpCode,
-    thread::OpenUpValue,
-    types::UpValueDescriptor,
-    Constant, Context, String, Table, Value,
-};
+use crate::{compiler::{self, CompiledPrototype, FunctionRef, LineNumber}, opcode::OpCode, thread::OpenUpValue, types::UpValueDescriptor, Constant, Context, String, Table, Value};
 
 // Note: These errors must not have #[error(transparent)] so that
 // anyhow::Error::root_cause and downcasting work as expected by the
 // interpreter. (Even though that gives slightly cleaner error messages).
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CompilerError {
     #[error("parse error")]
     Parsing(#[from] compiler::ParseError),
@@ -31,6 +26,7 @@ pub enum CompilerError {
 /// If a prototype has only an single (optional) `_ENV` upvalue, then it can be turned into an
 /// executable `Closure` by binding it with its environment with [`Closure::new`].
 #[derive(Debug, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct FunctionPrototype<'gc> {
     pub chunk_name: String<'gc>,
@@ -142,6 +138,7 @@ impl<'gc> FunctionPrototype<'gc> {
 }
 
 #[derive(Debug, Copy, Clone, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub enum UpValueState<'gc> {
     Open(OpenUpValue<'gc>),
@@ -151,6 +148,7 @@ pub enum UpValueState<'gc> {
 pub type UpValueInner<'gc> = Lock<UpValueState<'gc>>;
 
 #[derive(Debug, Collect, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct UpValue<'gc>(Gc<'gc, UpValueInner<'gc>>);
 
@@ -177,6 +175,7 @@ impl<'gc> UpValue<'gc> {
 }
 
 #[derive(Debug, Copy, Clone, Error)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClosureError {
     #[error("cannot use prototype with upvalues other than _ENV to create top-level closure")]
     HasUpValues,
@@ -185,9 +184,12 @@ pub enum ClosureError {
 }
 
 #[derive(Debug, Collect)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[collect(no_drop)]
 pub struct ClosureInner<'gc> {
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))] // TODO: Implement Format for gc_area
     proto: Gc<'gc, FunctionPrototype<'gc>>,
+    #[cfg_attr(feature = "defmt", defmt(Debug2Format))] // TODO: Implement Format for gc_area
     upvalues: vec::Vec<UpValue<'gc>, MetricsAlloc<'gc>>,
 }
 
@@ -200,6 +202,13 @@ pub struct ClosureInner<'gc> {
 #[derive(Debug, Copy, Clone, Collect)]
 #[collect(no_drop)]
 pub struct Closure<'gc>(Gc<'gc, ClosureInner<'gc>>);
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Closure<'_> {
+    fn format(&self, f: defmt::Formatter) {
+        self.0.format(f);
+    }
+}
 
 impl<'gc> PartialEq for Closure<'gc> {
     fn eq(&self, other: &Closure<'gc>) -> bool {

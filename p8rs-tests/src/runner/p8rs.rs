@@ -59,7 +59,7 @@ pub fn run(source: &[u8]) -> RunResult {
 			ExternError::Lua(err) => println!("{err}"),
 			ExternError::Runtime(runtime_err) => {
 				println!("{err}");
-				if let Some(Ok(traceback)) = runtime_err.1.as_ref().map(|tb| vm.get_traceback(tb)) {
+				if let Some(traceback) = runtime_err.traceback.as_ref() {
 					println!("traceback:\n{traceback}");
 				}
 			}

@@ -1,5 +1,4 @@
 use anyhow::Result;
-use defmt::info;
 
 use crate::peripherials::display::{Display};
 use crate::utils::framebuffer::{static_framebuffer, FramebufferManager};

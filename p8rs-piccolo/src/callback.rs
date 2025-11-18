@@ -226,6 +226,18 @@ impl<'gc> fmt::Debug for Callback<'gc> {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Callback<'_> {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "Callback(0x{:x})",
+            Gc::as_ptr(self.0) as *const () as usize,
+        )
+    }
+}
+
 impl<'gc> PartialEq for Callback<'gc> {
     fn eq(&self, other: &Callback<'gc>) -> bool {
         Gc::ptr_eq(self.0, other.0)
@@ -341,6 +353,18 @@ impl<'gc> fmt::Debug for BoxSequence<'gc> {
         fmt.debug_tuple("Sequence")
             .field(&(self.0.as_ref().get_ref() as *const _))
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for BoxSequence<'_> {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+            f,
+            "BoxSequence(0x{:x})",
+            self.0.as_ref().get_ref() as *const _ as *const () as usize,
+        )
     }
 }
 

@@ -27,7 +27,6 @@ perf = ["esp-alloc/internal-heap-stats"]
 
 [dependencies]
 p8rs = { workspace = true, features = ["defmt"] }
-p8rs-log.workspace = true
 anyhow.workspace = true
 defmt.workspace = true
 esp-bootloader-esp-idf.workspace = true

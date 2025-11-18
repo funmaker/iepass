@@ -1,48 +1,8 @@
-use core::fmt::Write;
-use anyhow::anyhow;
-use p8rs_piccolo::compiler::LineNumber;
-use p8rs_piccolo::RuntimeError;
-use p8rs_piccolo::thread::{ExternTracebackEntry, TracebackEntry};
+use core::fmt::{Display, Write};
+use anyhow::Result;
+use p8rs_piccolo::traceback::{TracebackEntryBase};
 
-pub(crate) trait PrintableTracebackEntry {
-	fn with_name<F, R>(&self, f: F) -> R
-	where
-		F: FnOnce(Option<&str>) -> R;
-	
-	fn line_number(&self) -> LineNumber;
-}
-
-impl<'gc> PrintableTracebackEntry for TracebackEntry<'gc> {
-	fn with_name<F, R>(&self, f: F) -> R
-	where
-		F: FnOnce(Option<&str>) -> R
-	{
-		let name = self.name.as_ref().map(|s| s.to_string());
-		f(name.as_ref().map(|s| s.as_str()))
-	}
-	
-	fn line_number(&self) -> LineNumber {
-		self.line_number
-	}
-}
-
-impl<'gc> PrintableTracebackEntry for ExternTracebackEntry {
-	fn with_name<F, R>(&self, f: F) -> R
-	where
-		F: FnOnce(Option<&str>) -> R
-	{
-		f(self.name.as_ref().map(|s| s.as_str()))
-	}
-	
-	fn line_number(&self) -> LineNumber {
-		self.line_number
-	}
-}
-
-
-pub(crate) fn write_traceback_entries<'gc, 'a, T>(target: & mut impl Write, entries: impl Iterator<Item=&'a T>) -> Result<usize, RuntimeError>
-	where
-		T: PrintableTracebackEntry + 'a {
+pub(crate) fn write_traceback_entries<'a, S: Display + 'a>(target: &mut impl Write, entries: impl Iterator<Item=&'a TracebackEntryBase<S>>) -> Result<usize> {
 	let mut entries = entries.peekable();
 	let mut entries_written = 0;
 	
@@ -50,19 +10,17 @@ pub(crate) fn write_traceback_entries<'gc, 'a, T>(target: & mut impl Write, entr
 		let has_next_entry = entries.peek().is_some();
 		
 		// offset line numbers to match pico 8
-		write!(target, "\t[string \"-- pico-8 header...\"]:{}: in ", entry.line_number().0 + 2)?;
+		write!(target, "\t[string \"-- pico-8 header...\"]:{}: in ", entry.line_number.0 + 2)?;
 		
-		entry.with_name(|name| {
-			if let Some(name) = name {
-				write!(target, "function '{}'", name).ok()
+		if let Some(name) = entry.name.as_ref() {
+			write!(target, "function '{}'", name)?;
+		} else {
+			if has_next_entry {
+				write!(target, "anonymous function")?;
 			} else {
-				if has_next_entry {
-					write!(target, "anonymous function").ok()
-				}else{
-					write!(target, "main chunk").ok()
-				}
+				write!(target, "main chunk")?;
 			}
-		}).ok_or_else(|| anyhow!("Cannot write!"))?;
+		}
 		
 		write!(target, "\n")?;
 		

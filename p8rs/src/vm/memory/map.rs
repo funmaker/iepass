@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut};
 
 /// Usually 0x0000..=0x1fff
 #[allow(dead_code)] 

@@ -26,8 +26,7 @@ pub fn install_pico8_base(ctx: Context) {
 }
 
 #[api_callback]
-pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Value<'gc>, mut message: Value<'gc>, mut skip: Value<'gc>) -> Result<String<'gc>, RuntimeError> {
-	
+pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Value<'gc>, mut message: Value<'gc>, mut skip: Value<'gc>) -> Result<String<'gc>, RuntimeError<'gc>> {
 	if skip.is_nil() { // if up to 2 args passed, skip coroutine arg
 		skip = message;
 		message = coroutine;
@@ -44,11 +43,12 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 	
 	if let Value::Thread(coroutine) = coroutine && coroutine != ex.current_thread().thread {
 		write!(&mut buf, "\t**getting trace of different threads is not currently supported**\n")?;
-	}else {
-		let trace = ex.traceback();
+	} else {
+		let trace = ex.traceback(&ctx);
+		let entries = trace.entries();
 		
 		// always skip the last entry (p8_prelog.lua)
-		let trace = &trace.entries[0..trace.entries.len().saturating_sub(1)];
+		let entries = &entries[0..entries.len().saturating_sub(1)];
 		
 		let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
 		
@@ -57,7 +57,7 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 		}
 		
 		if skip >= 0 {
-			write_traceback_entries(&mut buf, trace.iter().skip((skip as usize).saturating_sub(1)))?;
+			write_traceback_entries(&mut buf, entries.iter().skip((skip as usize).saturating_sub(1)))?;
 		}
 		
 	}
@@ -69,7 +69,7 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 
 
 #[api_callback]
-pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	Ok(match stat_cmd {
 		7 => { Some(Value::Number(P8Num::from(rt.target_fps.cast_signed()))) }
 		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
@@ -77,7 +77,7 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, 
 }
 
 #[api_callback]
-pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	match btn_idx {
 		None => Ok(Some(Value::Number(P8Num::from((rt.buttons.get_bits_for_player(0) as u16 | (rt.buttons.get_bits_for_player(1) as u16) << 8).cast_signed())))),
 		Some(button_idx) => {
@@ -92,7 +92,7 @@ pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>)
 // TODO: btnp - observe 0x5f5c and 0x5f5d
 
 #[api_callback]
-pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	Ok(Some(match val {
 		Value::Nil => "nil".into_value(ctx),
 		Value::Boolean(_) => "boolean".into_value(ctx),
@@ -106,7 +106,7 @@ pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<
 }
 
 #[api_callback]
-pub fn tostr<'gc>(ctx: Context<'gc>, val: Value<'gc>, opts: Option<Value<'gc>>) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn tostr<'gc>(ctx: Context<'gc>, val: Value<'gc>, opts: Option<Value<'gc>>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	let flags = P8NumStringConversionFlags::from_bits_truncate(match opts {
 		Some(Value::Boolean(true)) => 1,
 		Some(Value::Number(num)) => num.to_integer() as u8,
@@ -128,21 +128,19 @@ pub fn tostr<'gc>(ctx: Context<'gc>, val: Value<'gc>, opts: Option<Value<'gc>>) 
 }
 
 #[api_callback]
-pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Result<Option<Value<'gc>>, RuntimeError> {
+pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Option<Value<'gc>> {
 	let flags: NumberConversionFlags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
 	let conversion = number_from_ascii(&val, flags);
 	if conversion.is_ok() {
-		Ok(Some(conversion.unwrap()))
-	}else{
-		Ok(None)
+		Some(conversion.unwrap())
+	} else {
+		None
 	}
 }
 
 #[api_callback]
-pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) -> Result<(), RuntimeError> {
+pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
 	rt.callbacks.printh(&text, filename.as_deref(), overwrite, save_to_desktop);
-	
-	Ok(())
 }
 
 
