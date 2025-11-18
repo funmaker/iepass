@@ -237,7 +237,7 @@ impl<R: Read> Read for Decoder<R> {
 #[cfg(feature = "std")]
 mod std_impls {
 	use super::*;
-	use core::io::{self, Read, Write};
+	use std::io::{self, Read, Write};
 	
 	impl<W: embedded_io::Write> Write for Encoder<W>
 	where Self: embedded_io::Write + ErrorType<Error = io::Error> {
