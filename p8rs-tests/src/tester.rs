@@ -21,6 +21,8 @@ fn setup() {
 			err => err.expect("Unable to remove tmp dir"),
 		}
 		fs::create_dir_all(TMP_DIR).expect("Unable to create tmp dir");
+		
+		env_logger::init();
 	});
 }
 

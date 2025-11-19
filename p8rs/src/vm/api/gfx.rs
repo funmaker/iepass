@@ -3,7 +3,7 @@ use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::{Context, Value};
 use p8rs_types::p8num::P8Num;
 
-use crate::vm::memory::machine_state::Palette;
+use crate::vm::memory::machine_state::{FillPatternFlags, FillPatternState, Palette};
 use crate::vm::Runtime;
 
 pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
@@ -13,6 +13,7 @@ pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("pal", pal::callback::<A>(ctx));
 	ctx.set_global("cls", cls::callback::<A>(ctx));
 	ctx.set_global("cursor", cursor::callback::<A>(ctx));
+	ctx.set_global("fillp", fillp::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -114,4 +115,15 @@ pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'g
 		let k = k.to_integer().cast_unsigned() as usize % 16;
 		pal[k] = v.to_integer() as u8;
 	}
+}
+
+#[api_callback]
+pub fn fillp<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
+	let pat = pat.unwrap().saturating_add(P8Num::ZERO);
+	let flags = (pat.to_raw() >> 8) as u8;
+	let flags = flags.reverse_bits() & 0b0000_0111;
+	let flags = FillPatternFlags::from_bits_retain(flags);
+	let pattern = pat.to_integer().cast_unsigned();
+	
+	*rt.memory.machine_state().fill_pattern() = FillPatternState::new(pattern, flags);
 }

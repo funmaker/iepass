@@ -369,16 +369,20 @@ impl FillPatternState {
 		u16::from_le_bytes([self.0[0], self.0[1]])
 	}
 	
-	pub fn expand(&self) -> [[bool; 4]; 4] {
+	pub fn expand(&self) -> Option<[[bool; 4]; 4]> {
 		let lo = self.0[0];
 		let hi = self.0[1];
 		
-		[
-			[hi & 1 << 7 != 0, hi & 1 << 6 != 0, hi & 1 << 5 != 0, hi & 1 << 4 != 0],
-			[hi & 1 << 3 != 0, hi & 1 << 2 != 0, hi & 1 << 1 != 0, hi & 1 << 0 != 0],
-			[lo & 1 << 7 != 0, lo & 1 << 6 != 0, lo & 1 << 5 != 0, lo & 1 << 4 != 0],
-			[lo & 1 << 3 != 0, lo & 1 << 2 != 0, lo & 1 << 1 != 0, lo & 1 << 0 != 0],
-		]
+		if lo == 0 && hi == 0 {
+			None
+		} else {
+			Some([
+				[hi & 1 << 7 != 0, hi & 1 << 6 != 0, hi & 1 << 5 != 0, hi & 1 << 4 != 0],
+				[hi & 1 << 3 != 0, hi & 1 << 2 != 0, hi & 1 << 1 != 0, hi & 1 << 0 != 0],
+				[lo & 1 << 7 != 0, lo & 1 << 6 != 0, lo & 1 << 5 != 0, lo & 1 << 4 != 0],
+				[lo & 1 << 3 != 0, lo & 1 << 2 != 0, lo & 1 << 1 != 0, lo & 1 << 0 != 0],
+			])
+		}
 	}
 }
 
@@ -392,9 +396,9 @@ bitflags! {
 		/// Enables transparency
         const TRANSPARENT = 1 << 0;
 		/// When drawing sprites, fill pattern will determine nibble of secondary palette to use
-        const SPRITES_REMAP = 1 << 1;
+        const REMAP_SPRITES = 1 << 1;
 		/// All drawing functions that accept fill pattern will use it to determine nibble of secondary palette to use
-        const ALL_REMAP = 1 << 2;
+        const REMAP_ALL = 1 << 2;
 		
         const _ = !0;
     }

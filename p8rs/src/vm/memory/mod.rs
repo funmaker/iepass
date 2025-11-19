@@ -2,6 +2,7 @@ use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
 use alloc::boxed::Box;
 use alloc::alloc::Global;
+use core::fmt::{Debug, Formatter};
 use p8rs_types::p8num::P8Num;
 use p8rs_macros::TransparentRef;
 
@@ -22,9 +23,9 @@ use music::Music;
 use sound_effects::SoundEffects;
 use machine_state::MachineState;
 use screen::Screen;
-use crate::vm::memory::painter::Painter;
+use painter::Painter;
 
-#[derive(Debug, Clone, TransparentRef)]
+#[derive(Clone, TransparentRef)]
 #[repr(transparent)]
 pub struct Memory([u8; 0x10000]);
 
@@ -142,6 +143,19 @@ impl Deref for Memory {
 impl DerefMut for Memory {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.0
+	}
+}
+
+impl Debug for Memory {
+	fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+		f.write_str("Memory[64KB]")
+	}
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Memory {
+	fn format(&self, fmt: defmt::Formatter) {
+		defmt::write!(fmt, "Memory[64KB]");
 	}
 }
 
