@@ -12,6 +12,7 @@ pub mod music;
 pub mod sound_effects;
 pub mod machine_state;
 pub mod screen;
+mod painter;
 
 use crate::utils;
 use sprites::Sprites;
@@ -21,6 +22,7 @@ use music::Music;
 use sound_effects::SoundEffects;
 use machine_state::MachineState;
 use screen::Screen;
+use crate::vm::memory::painter::Painter;
 
 #[derive(Debug, Clone, TransparentRef)]
 #[repr(transparent)]
@@ -117,6 +119,10 @@ impl Memory {
 		};
 		
 		Screen(self.const_slice(base_addr))
+	}
+	
+	pub fn painter(&mut self) -> Painter<'_> {
+		Painter::new(self)
 	}
 	
 	#[inline(always)]

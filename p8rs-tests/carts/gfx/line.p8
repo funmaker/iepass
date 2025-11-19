@@ -61,23 +61,23 @@ line(64, 32)
 p8rs.test_scr("Continuation");
 
 cls()
-p8rs.test_mem("Memory - cls", 0x5f00, 0x40);
+p8rs.test_mem("Memory - cls", 0x5f00, 0x80);
 line(64, 32, 83, 90, 8)
-p8rs.test_mem("Memory - full", 0x5f00, 0x40);
+p8rs.test_mem("Memory - full", 0x5f00, 0x80);
 line(34, 54, 11)
-p8rs.test_mem("Memory - cont 1", 0x5f00, 0x40);
+p8rs.test_mem("Memory - cont 1", 0x5f00, 0x80);
 line(12)
-p8rs.test_mem("Memory - col", 0x5f00, 0x40);
+p8rs.test_mem("Memory - col", 0x5f00, 0x80);
 line(94, 54)
-p8rs.test_mem("Memory - set pos", 0x5f00, 0x40);
+p8rs.test_mem("Memory - set pos", 0x5f00, 0x80);
 line(45, 90)
-p8rs.test_mem("Memory - cont 2", 0x5f00, 0x40);
+p8rs.test_mem("Memory - cont 2", 0x5f00, 0x80);
 line()
-p8rs.test_mem("Memory - reset", 0x5f00, 0x40);
+p8rs.test_mem("Memory - reset", 0x5f00, 0x80);
 line(64, 32)
-p8rs.test_mem("Memory - set pos 2", 0x5f00, 0x40);
+p8rs.test_mem("Memory - set pos 2", 0x5f00, 0x80);
 line(64, 64)
-p8rs.test_mem("Memory - cont 3", 0x5f00, 0x40);
+p8rs.test_mem("Memory - cont 3", 0x5f00, 0x80);
 p8rs.test_scr("Less args");
 
 cls()

@@ -1,7 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
 /// Usually 0x0000..=0x1fff
-pub struct Sprites<'a>(#[allow(dead_code)] pub(super) &'a mut [u8; 0x2000]);
+pub struct Sprites<'m>(#[allow(dead_code)] pub(super) &'m mut [u8; 0x2000]);
 
 impl Sprites<'_> {
 	// fn set_pixel(&mut self, x: u8, y: u8, value: u8) {

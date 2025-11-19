@@ -164,7 +164,7 @@ impl<'gc> UserData<'gc> {
     /// reference to the held type, otherwise it will return `Err(BadUserDataType)`.
     ///
     /// This is equivalent to calling `this.downcast::<Static<T>>()` (except this returns a
-    /// reference to the inner [`Static::0`] field instead).
+    /// reference to the inner [`Static`] field instead).
     pub fn downcast_static<T: 'static>(self) -> Result<&'gc T, BadUserDataType> {
         self.downcast::<Static<T>>().map(|r| &r.0)
     }

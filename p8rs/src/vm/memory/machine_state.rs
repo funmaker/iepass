@@ -8,7 +8,7 @@ use crate::utils::NonZeroNibble;
 use super::MemoryAccess;
 
 /// 0x5f00..=0x5f80
-pub struct MachineState<'a>(pub(super) &'a mut [u8; 0x80]);
+pub struct MachineState<'m>(pub(super) &'m mut [u8; 0x80]);
 
 impl MachineState<'_> {
 	pub fn reset(&mut self) {
@@ -86,9 +86,8 @@ impl MachineState<'_> {
 		PauseState::from_bits_mut(&mut self[0x30])
 	}
 	
-	/// [lo_pat, hi_pat, flags]
-	pub fn fill_pattern(&mut self) -> &mut [u8; 3] {
-		self.const_slice(0x31)
+	pub fn fill_pattern(&mut self) -> &mut FillPatternState {
+		FillPatternState::from_bits_mut(self.const_slice(0x31))
 	}
 	
 	pub fn color_flags(&mut self) -> &mut ColorFlags {
@@ -180,8 +179,12 @@ impl MachineState<'_> {
 	}
 	
 	#[inline(always)]
-	pub fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
+	pub(crate) fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
 		(&mut self.0[base as usize..base as usize + S]).try_into().unwrap()
+	}
+	
+	pub fn set_pen_color(&mut self, color: P8Num) {
+		*self.pen_color() = color.to_integer() as u8;
 	}
 }
 
@@ -346,6 +349,57 @@ impl PauseState {
 		self.0
 	}
 }
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct FillPatternState([u8; 3]);
+
+impl FillPatternState {
+	pub fn new(pattern: u16, flags: FillPatternFlags) -> Self {
+		let [lo, hi] = u16::to_le_bytes(pattern);
+		FillPatternState([lo, hi, flags.bits()])
+	}
+	
+	pub fn flags(&mut self) -> &mut FillPatternFlags {
+		FillPatternFlags::from_bits_mut(&mut self.0[2])
+	}
+	
+	pub fn pattern(&self) -> u16 {
+		u16::from_le_bytes([self.0[0], self.0[1]])
+	}
+	
+	pub fn expand(&self) -> [[bool; 4]; 4] {
+		let lo = self.0[0];
+		let hi = self.0[1];
+		
+		[
+			[hi & 1 << 7 != 0, hi & 1 << 6 != 0, hi & 1 << 5 != 0, hi & 1 << 4 != 0],
+			[hi & 1 << 3 != 0, hi & 1 << 2 != 0, hi & 1 << 1 != 0, hi & 1 << 0 != 0],
+			[lo & 1 << 7 != 0, lo & 1 << 6 != 0, lo & 1 << 5 != 0, lo & 1 << 4 != 0],
+			[lo & 1 << 3 != 0, lo & 1 << 2 != 0, lo & 1 << 1 != 0, lo & 1 << 0 != 0],
+		]
+	}
+}
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct FillPatternFlags(u8);
+
+bitflags! {
+    impl FillPatternFlags: u8 {
+		/// Enables transparency
+        const TRANSPARENT = 1 << 0;
+		/// When drawing sprites, fill pattern will determine nibble of secondary palette to use
+        const SPRITES_REMAP = 1 << 1;
+		/// All drawing functions that accept fill pattern will use it to determine nibble of secondary palette to use
+        const ALL_REMAP = 1 << 2;
+		
+        const _ = !0;
+    }
+}
+
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
 #[repr(transparent)]

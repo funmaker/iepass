@@ -1,7 +1,7 @@
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 
 /// 0x3000..=0x30ff
-pub struct SpriteFlags<'a>(#[allow(dead_code)] pub(super) &'a mut [u8; 256]);
+pub struct SpriteFlags<'m>(#[allow(dead_code)] pub(super) &'m mut [u8; 256]);
 
 impl Deref for SpriteFlags<'_> {
 	type Target = [u8; 256];

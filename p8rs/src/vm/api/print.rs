@@ -2,7 +2,8 @@ use core::alloc::Allocator;
 use core::pin::Pin;
 use gc_arena::Collect;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
-use crate::vm::api::gfx::{set_cursor_color};
+use p8rs_types::p8num::P8Num;
+
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
 use crate::vm::Runtime;
@@ -10,13 +11,14 @@ use crate::vm::Runtime;
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
 		let rt = rt.downcast::<Runtime>();
-		let (text, mut x, y, mut color): (Value, Option<i16>, Option<i16>, Option<i16>) = stack.consume(ctx).unwrap();
+		let (text, mut x, y, mut col): (Value, Option<P8Num>, Option<P8Num>, Option<P8Num>) = stack.consume(ctx).unwrap();
 		if y.is_none() {
-			color = x;
+			col = x;
 			x = None;
 		}
 		
-		set_cursor_color(&mut rt.memory.machine_state(), x, y, color);
+		if let Some((x, y)) = x.zip(y) { *rt.memory.machine_state().cursor_position() = [x.to_integer() as u8, y.to_integer() as u8]; }
+		if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 		
 		let text = if let Value::String(text) = text {
 			text
@@ -202,7 +204,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 				if bit {
 					let pixel_x = cursor_x.overflowing_add(x).0;
 					let pixel_y = cursor_y.overflowing_add(y).0;
-					rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color).ok();
+					rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color);
 				}
 			}
 		}

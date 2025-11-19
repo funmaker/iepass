@@ -2,8 +2,8 @@ use core::ops::{Deref, DerefMut};
 
 /// Usually 0x0000..=0x1fff
 #[allow(dead_code)] 
-pub struct Map<'a> {
-	pub(super) memory: &'a mut [u8; 0x2000],
+pub struct Map<'m> {
+	pub(super) memory: &'m mut [u8; 0x2000],
 	pub(super) width: usize,
 	pub(super) height: usize,
 }

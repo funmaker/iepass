@@ -148,4 +148,6 @@ do
 			printh("SCR | " .. name .. " | " .. leftpad .. row .. " | " .. stringifyMemory(0x6000 + row * 64, 64))
 		end
 	end
+	
+	poke(0x5f44, 0, 0, 0, 0, 0, 0, 0, 0) -- reset rnd seed
 end

@@ -4,7 +4,8 @@
 #![feature(int_from_ascii)]
 #![feature(slice_split_once)]
 #![feature(type_alias_impl_trait)]
-
+#![feature(range_into_bounds)]
+#![feature(range_bounds_is_empty)]
 #[macro_use] extern crate p8rs_log;
 extern crate alloc;
 extern crate core;
