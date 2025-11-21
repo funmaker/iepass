@@ -397,8 +397,8 @@ bitflags! {
         const TRANSPARENT = 1 << 0;
 		/// When drawing sprites, fill pattern will determine nibble of secondary palette to use
         const REMAP_SPRITES = 1 << 1;
-		/// All drawing functions that accept fill pattern will use it to determine nibble of secondary palette to use
-        const REMAP_ALL = 1 << 2;
+		/// Other drawing functions that accept fill pattern will use it to determine nibble of secondary palette to use
+        const REMAP_OTHER = 1 << 2;
 		
         const _ = !0;
     }

@@ -15,10 +15,13 @@ const PADDING_X: usize = 8;
 const PADDING_Y: usize = 16;
 const CELL_WIDTH: usize = 128 + PADDING_X * 2;
 const CELL_HEIGHT: usize = 128 + PADDING_Y * 2;
-const DELAY: u16 = 20; // * 10ms
+const DELAY: u16 = 5; // * 10ms
 const FONT: Font = Font::SYSTEM;
 
 fn main() {
+	let args = std::env::args().skip(1).collect::<Vec<_>>();
+	let do_summary = !args.iter().any(|arg| arg == "--no-summary");
+	
 	let palette: Vec<_> = PALETTE.iter()
 	                             .flat_map(|col| { let (r, g, b) = col.rgb(); [r, g, b] })
 	                             .collect();
@@ -26,8 +29,9 @@ fn main() {
 	let results = load_results(TMP_DIR).expect("Failed to load results from tmp dir");
 	let gif_path = Path::new(TMP_DIR).join("tests.gif");
 	let mut gif = fs::File::create(&gif_path).expect("Could not create gif file");
-	let grid_height = (results.len() + 1).isqrt();
-	let grid_width = (results.len() + 1).div_ceil(grid_height);
+	let extra_cells = if do_summary { 1 } else { 0 };
+	let grid_height = (results.len() + extra_cells).isqrt();
+	let grid_width = (results.len() + extra_cells).div_ceil(grid_height);
 	let image_width = u16::try_from(grid_width * CELL_WIDTH).expect("Output too large to fit in a gif file");
 	let image_height = u16::try_from(grid_height * CELL_HEIGHT).expect("Output too large to fit in a gif file");
 	let mut encoder = Encoder::new(&mut gif, image_width, image_height, &palette).unwrap();
@@ -48,13 +52,15 @@ fn main() {
 	frame.height = image_height;
 	frame.buffer = vec![0_u8; image_width as usize * image_height as usize].into();
 	
-	draw_summary(
-		frame.buffer.to_mut(),
-		(results.len() % grid_width) * CELL_WIDTH,
-		(results.len() / grid_width) * CELL_HEIGHT,
-		grid_width * CELL_WIDTH,
-		&results,
-	);
+	if do_summary {
+		draw_summary(
+			frame.buffer.to_mut(),
+			(results.len() % grid_width) * CELL_WIDTH,
+			(results.len() / grid_width) * CELL_HEIGHT,
+			grid_width * CELL_WIDTH,
+			&results,
+		);
+	}
 	
 	for frame_id in 0..frames {
 		println!("Frame {}/{frames}", frame_id + 1);

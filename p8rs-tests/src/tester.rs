@@ -15,12 +15,15 @@ use crate::utils::replace;
 static SETUP: Once = Once::new();
 fn setup() {
 	SETUP.call_once(|| {
-		match fs::remove_dir_all(TMP_DIR) {
-			Ok(_) => {},
-			Err(err) if err.kind() == ErrorKind::NotFound => {},
-			err => err.expect("Unable to remove tmp dir"),
+		if !std::env::args().any(|arg| arg == "--keep-tmp") {
+			match fs::remove_dir_all(TMP_DIR) {
+				Ok(_) => {},
+				Err(err) if err.kind() == ErrorKind::NotFound => {},
+				err => err.expect("Unable to remove tmp dir"),
+			}
+			
+			fs::create_dir_all(TMP_DIR).expect("Unable to create tmp dir");
 		}
-		fs::create_dir_all(TMP_DIR).expect("Unable to create tmp dir");
 		
 		env_logger::init();
 	});
@@ -229,22 +232,24 @@ fn print_scr(screen_name: &str, test_name: &str, pal: &[u8; 16], pixels: &[[u8; 
 		}
 		
 		for x in 0..128 {
-			let grid = match (row % 16 == 0 && row > 0, x % 16 == 0 && x > 0) {
+			let mut grid = match (row % 16 == 0 && row > 0, x % 16 == 0 && x > 0) {
 				(true, true) => Some("┼"),
 				(true, false) => Some("┄"),
 				(false, true) => Some("┊"),
 				_ => None
 			};
 			
+			grid = None;
+			
 			if SHOULD_COLORIZE.should_colorize() {
 				let uc = palette::color_from_index(pal[upper[x] as usize & 0x0F]).rgb();
 				let lc = palette::color_from_index(pal[lower[x] as usize & 0x0F]).rgb();
 				if let Some(grid) = grid && uc == lc {
-					let gc = if uc.0 / 3 + uc.1 / 3 + uc.2 / 3 > 128 {
-						(uc.0.saturating_sub(64), uc.1.saturating_sub(64), uc.2.saturating_sub(64))
-					} else {
-						(uc.0.saturating_add(64), uc.1.saturating_add(64), uc.2.saturating_add(64))
-					};
+					let gc = (
+						if uc.0 > 128 { uc.0 - 64 } else { uc.0 + 64 },
+						if uc.1 > 128 { uc.1 - 64 } else { uc.1 + 64 },
+						if uc.2 > 128 { uc.2 - 64 } else { uc.2 + 64 },
+					);
 					
 					print!("{}", grid.truecolor(gc.0, gc.1, gc.2).on_truecolor(lc.0, lc.1, lc.2));
 				} else {
