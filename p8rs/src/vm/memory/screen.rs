@@ -4,24 +4,24 @@ use core::ops::{Deref, DerefMut};
 pub struct Screen<'m>(pub(super) &'m mut [u8; 0x2000]);
 
 impl Screen<'_> {
-	fn get_addr(x: i16, y: i16) -> Option<(usize, bool)> {
-		if x < 0 || y < 0 || x >= 128 || y >= 128 { return None }
+	fn get_addr(x: u8, y: u8) -> Option<(usize, bool)> {
+		if x >= 128 || y >= 128 { return None }
 		Some((
-			((x / 2) + y * 64) as usize,
+			(x as usize / 2) + y as usize * 64,
 			x & 1 == 0,
 		))
 	}
 	
-	pub fn get_pixel(&self, x: i16, y: i16) -> Option<u8> {
+	pub fn get_pixel(&self, x: u8, y: u8) -> Option<u8> {
 		let (addr, high) = Self::get_addr(x, y)?;
-		Some(if high {
-			self.0[addr] & 0xF
+		if high {
+			Some(self.0[addr] & 0xF)
 		} else {
-			self.0[addr] >> 4
-		})
+			Some(self.0[addr] >> 4)
+		}
 	}
 	
-	pub fn set_pixel(&mut self, x: i16, y: i16, value: u8) -> bool {
+	pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
 		let Some((addr, high)) = Self::get_addr(x, y) else { return false };
 		
 		let old = self.0[addr];

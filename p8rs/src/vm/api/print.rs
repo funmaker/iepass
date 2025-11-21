@@ -204,7 +204,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 				if bit {
 					let pixel_x = cursor_x.overflowing_add(x).0;
 					let pixel_y = cursor_y.overflowing_add(y).0;
-					rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color);
+					rt.memory.screen().set_pixel(pixel_x, pixel_y, pen_color);
 				}
 			}
 		}
