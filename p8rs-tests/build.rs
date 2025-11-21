@@ -76,7 +76,7 @@ fn traverse(dir: ReadDir, output: &mut impl Write, depth: usize) {
 			
 			if !first { writeln_ident!(output, depth, ""); }
 			writeln_ident!(output, depth, "#[test]");
-			writeln_ident!(output, depth, "fn {name}() {{");
+			writeln_ident!(output, depth, "fn r#{name}() {{");
 			writeln_ident!(output, depth + 1, "crate::tester::test_cartridge({cart_path:?})");
 			writeln_ident!(output, depth, "}}");
 			first = false;

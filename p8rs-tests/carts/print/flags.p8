@@ -5,37 +5,39 @@ __lua__
 
 local short_text = "short test"
 local long_text = "testing print with a really long input text that will wrap twice"
-
 function do_print(text)
-  for offset=0,15 do
-    cls()
-    print("(initial) "..text, 12, offset)
-    for i=1,11 do
-      print("("..i..") "..text)
-    end
+  cls()
+  print("(initial) "..text, 12, 20)
+  for i=1,2 do
+    print("("..i..") "..text)
   end
 end
 
-poke(0x5f36, 0x00)
-do_print(short_text)
-p8rs.test_scr("Flag not set ([0x5f36] = 0x00), short text")
-do_print(long_text)
-p8rs.test_scr("Flag not set ([0x5f36] = 0x00), long text")
+function do_test(name)
+  do_print(short_text)
+  p8rs.test_scr("[0x5f36] = 0x00, short text, "..name)
+  do_print(long_text)
+  p8rs.test_scr("[0x5f36] = 0x00, long text, "..name)
+end
 
-poke(0x5f36, 0x40)
-do_print(short_text)
-p8rs.test_scr("Flag NO_PRINT_SCROLL ([0x5f36] = 0x40), short text")
-do_print(long_text)
-p8rs.test_scr("Flag NO_PRINT_SCROLL ([0x5f36] = 0x40), long text")
+do_test("plain")
 
-poke(0x5f36, 0x80)
-do_print(short_text)
-p8rs.test_scr("Flag PRINT_WRAP ([0x5f36] = 0x80), short text")
-do_print(long_text)
-p8rs.test_scr("Flag PRINT_WRAP ([0x5f36] = 0x80), long text")
+local flags = { "PADDING", "WIDE", "TALL", "SOLID_BG", "INVERT", "DOTTY", "CUSTOM_FONT" }
+local tested = {
+        { 1 | 1<<2 | 1<<3 | 0<<5 | 1<<6, "Dotty" },
+        { 1 | 1<<2 | 1<<3 | 1<<5 | 1<<6, "Dotty Invert" },
+        { 1 | 1<<2 | 0<<3 | 0<<5 | 1<<6, "Dotty Wide" },
+        { 1 | 0<<2 | 1<<3 | 0<<5 | 1<<6, "Dotty Tall" },
+}
 
-poke(0x5f36, 0xc0)
-do_print(short_text)
-p8rs.test_scr("Flags NO_PRINT_SCROLL + PRINT_WRAP ([0x5f36] = 0xc0), short text")
-do_print(long_text)
-p8rs.test_scr("Flags NO_PRINT_SCROLL + PRINT_WRAP ([0x5f36] = 0xc0), long text")
+for k, v in ipairs(flags) do
+  local val = 1 | (1 << k)
+  tested[#tested+1] = { val, v }
+end
+
+for k, v in ipairs(tested) do
+  local val = v[1]
+  local name = v[2]
+  poke(0x5f58, val)
+  do_test("[0x5f58] = 0x" .. sub(tostr(val, 1), 5, 6) .. " (" .. name .. ")")
+end
