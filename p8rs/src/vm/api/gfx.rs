@@ -119,7 +119,7 @@ pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'g
 
 #[api_callback]
 pub fn fillp<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
-	let pat = pat.unwrap().saturating_add(P8Num::ZERO);
+	let pat = pat.unwrap_or(P8Num::ZERO);
 	let flags = (pat.to_raw() >> 8) as u8;
 	let flags = flags.reverse_bits() & 0b0000_0111;
 	let flags = FillPatternFlags::from_bits_retain(flags);

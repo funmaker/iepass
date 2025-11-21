@@ -5,47 +5,48 @@ __lua__
 circfill(32, 96)
 circfill(96, 96, 16, 8)
 circfill(64, 64, 16)
-p8rs.test_scr("Basic");
+p8rs.test_scr("basic");
 
 cls()
 color(11)
 circfill(32, 96)
 circfill(96, 96, 16, 8)
 circfill(64, 64, 16)
-p8rs.test_scr("Color");
+p8rs.test_scr("color");
 
 cls()
 color(8)
 circfill(32)
 color(11)
 circfill()
-p8rs.test_scr("Less args");
+p8rs.test_scr("less args");
 
 cls()
-for _, x in ipairs({16, 48.2, 80.5, 112.7}) do
+for _, x in ipairs({ 10, 42.2, 74.5, 106.7 }) do
 	for k, r in ipairs({ 8, 8.2, 8.5, 8.7, 9, 9.2, 9.5, 9.7 }) do
-		circfill(x + (k % 2) * 16, k * 16, r)
+		circfill(x + (k % 2) * 16, k * 16 - 6, r, 6)
 	end
 end
-p8rs.test_scr("Frac");
+p8rs.test_scr("frac");
 
 cls()
 flags = peek(0x5f36)
 poke(0x5f36, flags | 0x2)
-for _, x in ipairs({16, 48.2, 80.5, 112.7}) do
-	for k, r in ipairs({ 8, 8.2, 8.5, 8.7, 9, 9.2, 9.5, 9.7 }) do
-		circfill(x + (k % 2) * 16, k * 16, r)
+for _, x in ipairs({ 10, 42.2, 74.5, 106.7 }) do
+	for k, r in ipairs({ 8, 8.4, 8.5, 8.9, 9, 9.1, 9.5, 9.6 }) do
+		circfill(x + (k % 2) * 16, k * 16 - 6, r, 6)
 	end
 end
 poke(0x5f36, flags)
-p8rs.test_scr("Frac 0x5f36 flag");
+p8rs.test_scr("frac 0x5f36 flag");
 
 cls()
 camera(-63, -65)
 circfill(-32, 16)
 circfill(32, 16, 16, 8)
 circfill(0, 0, 16)
-p8rs.test_scr("Camera");
+camera()
+p8rs.test_scr("camera");
 
 cls()
 camera(-63, -65)
@@ -53,7 +54,9 @@ clip(30, 34, 64, 50)
 circfill(-32, 16)
 circfill(32, 16, 16, 8)
 circfill(0, 0, 16)
-p8rs.test_scr("Clip");
+camera()
+clip()
+p8rs.test_scr("clip");
 
 cls()
 camera(-63, -65)
@@ -66,4 +69,26 @@ fillp(♥)
 circfill(0, 0, 16)
 fillp(…)
 circfill(0, 0, 32, 0x0c)
-p8rs.test_scr("Fill Pattern");
+camera()
+fillp()
+clip()
+p8rs.test_scr("fill pattern");
+
+for s = 0,3.5,0.5 do
+  cls()
+  for i = 24,0,-1 do
+    circfill(64, 64, i * 4 + s, i % 15 + 1)
+  end
+  p8rs.test_scr("concentric " .. s);
+end
+
+flags = peek(0x5f36)
+for s = 0,3.5,0.5 do
+  cls()
+  for i = 24,0,-1 do
+    circfill(64, 64, i * 4 + s, i % 15 + 1)
+  end
+  p8rs.test_scr("concentric 0x5f36 " .. s);
+end
+poke(0x5f36, flags)
+
