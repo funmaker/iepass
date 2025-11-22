@@ -27,6 +27,11 @@ dependencies = ["build-assets"]
 command = "cargo"
 args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib", "${@}"]
 
+[tasks.test-carts]
+cwd = "./p8rs-tests"
+command = "cargo"
+args = ["test", "${@}"]
+
 [tasks.test-ci]
 dependencies = ["build-assets"]
 command = "cargo"

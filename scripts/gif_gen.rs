@@ -40,16 +40,21 @@ fn main() {
 	opts.optflag("s", "summary", "Include test summary");
 	opts.optflag("o", "open", "Open generated gif");
 	opts.optopt("f", "fps", "Target framerate of the gif", "20");
+	opts.optopt("", "scale", "Gif scale", "1");
 	
 	let matches = opts.parse(&args[1..]).expect("Could not parse command line arguments");
-	let help = matches.opt_present("h");
-	let summary = matches.opt_present("s");
-	let open = matches.opt_present("o");
-	let delay = match matches.opt_str("fps").map(|arg| arg.parse::<f32>()) {
-		Some(Ok(fps)) if fps.is_normal() => (100.0 / fps).round().clamp(1.0, u16::MAX as f32) as u16,
-		Some(Ok(fps)) => panic!("Invalid fps value: {fps}"),
-		Some(Err(err)) => panic!("Could not parse fps argument: {err}"),
-		None => 5,
+	let help = matches.opt_present("help");
+	let summary = matches.opt_present("summary");
+	let open = matches.opt_present("open");
+	let delay = match matches.opt_get::<f32>("fps").expect("Could not parse fps argument") {
+		Some(fps) if fps.is_normal() => (100.0 / fps).round().clamp(1.0, u16::MAX as f32) as u16,
+		None => 10,
+		Some(fps) => panic!("Invalid fps value: {fps}"),
+	};
+	let scale = match matches.opt_get::<usize>("scale").expect("Could not parse scale argument") {
+		Some(scale) if scale > 0 => scale,
+		None => 1,
+		Some(scale) => panic!("Invalid scale value: {scale}"),
 	};
 	let error = matches.free.len() != 2;
 	
@@ -75,28 +80,31 @@ fn main() {
 	let extra_cells = if summary { 1 } else { 0 };
 	let grid_height = (results.len() + extra_cells).isqrt();
 	let grid_width = (results.len() + extra_cells).div_ceil(grid_height);
-	let image_width = u16::try_from(grid_width * CELL_WIDTH).expect("Output too large to fit in a gif file");
-	let image_height = u16::try_from(grid_height * CELL_HEIGHT).expect("Output too large to fit in a gif file");
-	let mut encoder = Encoder::new(&mut gif, image_width, image_height, &palette).unwrap();
+	let fb_width = grid_width * CELL_WIDTH;
+	let fb_height = grid_height * CELL_HEIGHT;
+	let im_width = u16::try_from(fb_width * scale).expect("Output too large to fit in a gif file");
+	let im_height = u16::try_from(fb_height * scale).expect("Output too large to fit in a gif file");
+	let mut encoder = Encoder::new(&mut gif, im_width, im_height, &palette).unwrap();
 	encoder.set_repeat(gif::Repeat::Infinite).unwrap();
 	
 	let mut last_step = vec![usize::MAX; results.len()];
 	let mut screen_cache = vec![ResultCache::new(); results.len()];
+	let mut framebuffer = vec![0_u8; fb_width as usize * fb_height as usize];
 	let frames = results.iter().map(|res| res.steps).max().unwrap_or(0);
 	
 	let mut frame = Frame::default();
 	frame.dispose = gif::DisposalMethod::Any;
 	frame.delay = delay;
-	frame.width = image_width;
-	frame.height = image_height;
-	frame.buffer = vec![0_u8; image_width as usize * image_height as usize].into();
+	frame.width = im_width;
+	frame.height = im_height;
+	frame.buffer = vec![0_u8; framebuffer.len() * scale.pow(2)].into();
 	
 	if summary {
 		draw_summary(
-			frame.buffer.to_mut(),
+			&mut framebuffer,
 			(results.len() % grid_width) * CELL_WIDTH,
 			(results.len() / grid_width) * CELL_HEIGHT,
-			grid_width * CELL_WIDTH,
+			fb_width,
 			&results,
 		);
 	}
@@ -109,14 +117,29 @@ fn main() {
 			if last_step[cell_id] != step {
 				last_step[cell_id] = step;
 				draw_step(
-					frame.buffer.to_mut(),
+					&mut framebuffer,
 					(cell_id % grid_width) * CELL_WIDTH,
 					(cell_id / grid_width) * CELL_HEIGHT,
-					grid_width * CELL_WIDTH,
+					fb_width,
 					&mut screen_cache[cell_id],
 					&result,
 					step,
 				);
+			}
+		}
+		
+		for y in 0..fb_height {
+			for x in 0..fb_width {
+				for ys in 0..scale {
+					for xs in 0..scale {
+						frame.buffer.to_mut()[
+							y * im_width as usize * scale
+							+ ys * im_width as usize
+							+ x * scale
+							+ xs
+						] = framebuffer[y * fb_width + x];
+					}
+				}
 			}
 		}
 		

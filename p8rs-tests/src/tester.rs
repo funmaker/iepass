@@ -79,7 +79,7 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 		tmp_cart_path: tmp_cart_path.to_string_lossy(),
 	};
 	let json_file = File::create(&json_path).expect("Can't create json log");
-	serde_json::to_writer(json_file, &summary).expect("Can't write to json log");
+	serde_json::to_writer_pretty(json_file, &summary).expect("Can't write to json log");
 	
 	match (pico8.timeout, p8rs.timeout) {
 		(true, true) => panic!("pico8 and p8rs timeout"),
