@@ -1,13 +1,29 @@
+//! ```cargo
+//! [dependencies]
+//! p8rs = { path = "../p8rs", features = ["log-04", "std"] }
+//! p8rs-types = { path = "../p8rs-types" }
+//! p8rs-tests = { path = "../p8rs-tests" }
+//! anyhow = "1.0.98"
+//! gif = "0.14.0"
+//! opener = "0.8.3"
+//! serde = "1.0.228"
+//! serde_json = "1.0.145"
+//! getopts = "0.2.24"
+//! ```
+
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;
+use std::process;
+use std::env;
+use getopts::Options;
 use anyhow::Result;
 use gif::{Encoder, Frame};
+use p8rs::macros::p8;
 use p8rs::vm::font::Font;
 use p8rs::vm::palette::PALETTE;
 use p8rs_tests::log::Log;
 use p8rs_tests::summary::Summary;
-use p8rs_tests::TMP_DIR;
 use p8rs_types::p8scii;
 use p8rs_types::p8scii::LossyIteratorEx;
 
@@ -15,21 +31,48 @@ const PADDING_X: usize = 8;
 const PADDING_Y: usize = 16;
 const CELL_WIDTH: usize = 128 + PADDING_X * 2;
 const CELL_HEIGHT: usize = 128 + PADDING_Y * 2;
-const DELAY: u16 = 5; // * 10ms
 const FONT: Font = Font::SYSTEM;
 
 fn main() {
-	let args = std::env::args().skip(1).collect::<Vec<_>>();
-	let do_summary = !args.iter().any(|arg| arg == "--no-summary");
+	let args: Vec<String> = env::args().collect();
+	let mut opts = Options::new();
+	opts.optflag("h", "help", "Print this help menu");
+	opts.optflag("s", "summary", "Include test summary");
+	opts.optflag("o", "open", "Open generated gif");
+	opts.optopt("f", "fps", "Target framerate of the gif", "20");
+	
+	let matches = opts.parse(&args[1..]).expect("Could not parse command line arguments");
+	let help = matches.opt_present("h");
+	let summary = matches.opt_present("s");
+	let open = matches.opt_present("o");
+	let delay = match matches.opt_str("fps").map(|arg| arg.parse::<f32>()) {
+		Some(Ok(fps)) if fps.is_normal() => (100.0 / fps).round().clamp(1.0, u16::MAX as f32) as u16,
+		Some(Ok(fps)) => panic!("Invalid fps value: {fps}"),
+		Some(Err(err)) => panic!("Could not parse fps argument: {err}"),
+		None => 5,
+	};
+	let error = matches.free.len() != 2;
+	
+	if help || error {
+		let brief = format!("Usage: gif-gen p8rs-tests/tmp p8rs-tests/tmp/tests.gif [Options...]");
+		if error {
+			eprint!("{}", opts.usage(&brief));
+			process::exit(-1);
+		} else {
+			print!("{}", opts.usage(&brief));
+			return;
+		}
+	}
+	
+	let [tmp_path, output_path] = matches.free.try_into().unwrap();
 	
 	let palette: Vec<_> = PALETTE.iter()
 	                             .flat_map(|col| { let (r, g, b) = col.rgb(); [r, g, b] })
 	                             .collect();
 	
-	let results = load_results(TMP_DIR).expect("Failed to load results from tmp dir");
-	let gif_path = Path::new(TMP_DIR).join("tests.gif");
-	let mut gif = fs::File::create(&gif_path).expect("Could not create gif file");
-	let extra_cells = if do_summary { 1 } else { 0 };
+	let results = load_results(tmp_path).expect("Failed to load results from tmp dir");
+	let mut gif = fs::File::create(&output_path).expect("Could not create gif file");
+	let extra_cells = if summary { 1 } else { 0 };
 	let grid_height = (results.len() + extra_cells).isqrt();
 	let grid_width = (results.len() + extra_cells).div_ceil(grid_height);
 	let image_width = u16::try_from(grid_width * CELL_WIDTH).expect("Output too large to fit in a gif file");
@@ -37,22 +80,18 @@ fn main() {
 	let mut encoder = Encoder::new(&mut gif, image_width, image_height, &palette).unwrap();
 	encoder.set_repeat(gif::Repeat::Infinite).unwrap();
 	
-	for result in results.iter() {
-		println!("{} {} {}", result.summary.orig_cart_path, result.pico8_logs.len(), result.p8rs_logs.len());
-	}
-	
 	let mut last_step = vec![usize::MAX; results.len()];
 	let mut screen_cache = vec![ResultCache::new(); results.len()];
 	let frames = results.iter().map(|res| res.steps).max().unwrap_or(0);
 	
 	let mut frame = Frame::default();
 	frame.dispose = gif::DisposalMethod::Any;
-	frame.delay = DELAY;
+	frame.delay = delay;
 	frame.width = image_width;
 	frame.height = image_height;
 	frame.buffer = vec![0_u8; image_width as usize * image_height as usize].into();
 	
-	if do_summary {
+	if summary {
 		draw_summary(
 			frame.buffer.to_mut(),
 			(results.len() % grid_width) * CELL_WIDTH,
@@ -86,7 +125,9 @@ fn main() {
 	
 	drop(encoder);
 	
-	opener::open(gif_path).expect("Failed to open gif file");
+	if open {
+		opener::open(output_path).expect("Failed to open gif file");
+	}
 }
 
 fn load_results(path: impl AsRef<Path>) -> Result<Vec<TestResults>> {
@@ -115,9 +156,10 @@ struct TestResults {
 
 impl TestResults {
 	fn from_json(path: impl AsRef<Path>) -> Result<Self> {
-		let summary: Summary = serde_json::from_reader(fs::File::open(path)?)?;
-		let pico8_logs: Vec<Log> = Log::parse(&fs::read_to_string(summary.pico8.log_path.as_ref())?);
-		let p8rs_logs: Vec<Log> = Log::parse(&fs::read_to_string(summary.p8rs.log_path.as_ref())?);
+		let dir = path.as_ref().parent().unwrap();
+		let summary: Summary = serde_json::from_reader(fs::File::open(path.as_ref())?)?;
+		let pico8_logs: Vec<Log> = Log::parse(&fs::read_to_string(dir.join(summary.pico8.log_name.as_ref()))?);
+		let p8rs_logs: Vec<Log> = Log::parse(&fs::read_to_string(dir.join(summary.p8rs.log_name.as_ref()))?);
 		let steps = pico8_logs.len().max(p8rs_logs.len());
 		let valid = (0..steps).position(|step| pico8_logs.get(step) != p8rs_logs.get(step)).unwrap_or(steps);
 		
@@ -185,7 +227,7 @@ impl ResultCache {
 			}
 			
 			self.screen[self.next_print * 128 .. (self.next_print + line_height + 1) * 128].fill(bg);
-			draw_p8scii(&mut self.screen, Self::TEXT_PAD_X, self.next_print, 128, fg, bg, line.iter().copied());
+			draw_p8scii(&mut self.screen, Self::TEXT_PAD_X, self.next_print, 128, fg, bg, None, line.iter().copied());
 			
 			self.next_print += FONT.height() as usize;
 		}
@@ -247,22 +289,19 @@ fn draw_step(framebuffer: &mut [u8], cell_x: usize, cell_y: usize, stride: usize
 		_ => {}
 	}
 	
-	let border_col = if error { 8 } else { 6 };
+	let border_col = if error { 8 } else  { 6 };
 	let subtext_col = if error { 8 } else { 7 };
 	let step_counter = format!("{}/{}", step + 1, results.steps());
-	let max_chars = 128 / FONT.width() as usize;
 	
-	if step_name.len() + step_counter.len() > max_chars {
-		let mut p8scii: Vec<_> = p8scii::from_str(step_name).lossy().collect();
-		p8scii.truncate(max_chars - step_counter.len() - 3);
-		p8scii.push(p8scii::from_char('…').unwrap().unwrap());
-		draw_p8scii(framebuffer, cell_x + PADDING_X, cell_y + PADDING_Y + 132, stride, subtext_col, 0, p8scii);
+	if results.valid == results.steps {
+		draw_str(framebuffer, cell_x + PADDING_X + 129 - 4 * 4, cell_y + PADDING_Y - 8, stride, 26, 0, None, "done");
 	} else {
-		draw_str(framebuffer, cell_x + PADDING_X, cell_y + PADDING_Y + 132, stride, subtext_col, 0, step_name);
-	}
+		draw_str(framebuffer, cell_x + PADDING_X + 129 - 4 * 4, cell_y + PADDING_Y - 8, stride, 14, 0, None, "fail");
+	};
 	
-	draw_str(framebuffer, cell_x + PADDING_X, cell_y + PADDING_Y - 8, stride, 7, 0, name);
-	draw_str(framebuffer, cell_x + PADDING_X + 129 - step_counter.len() * 4, cell_y + PADDING_Y + 132, stride, 7, 0, &step_counter);
+	draw_str(framebuffer, cell_x + PADDING_X, cell_y + PADDING_Y - 8, stride, 7, 0, Some(130 - 16), name);
+	draw_str(framebuffer, cell_x + PADDING_X, cell_y + PADDING_Y + 132, stride, subtext_col, 0, Some(130 - step_counter.len() as u8 * 4), step_name);
+	draw_str(framebuffer, cell_x + PADDING_X + 129 - step_counter.len() * 4, cell_y + PADDING_Y + 132, stride, 7, 0, None, &step_counter);
 	draw_rect(framebuffer, cell_x + PADDING_X - 1, cell_y + PADDING_Y - 1, stride, 130, 130, border_col);
 	for row in 0..128 {
 		framebuffer[pos(PADDING_X, PADDING_Y + row) .. pos(PADDING_X + 128, PADDING_Y + row)].copy_from_slice(&cache.screen[row * 128 .. (row + 1) * 128]);
@@ -295,24 +334,39 @@ fn draw_rect(framebuffer: &mut [u8], orig_x: usize, orig_y: usize, stride: usize
 	framebuffer[pos(0, height - 1) .. pos(width, height - 1)].fill(col);
 }
 
-fn draw_str(framebuffer: &mut [u8], x: usize, y: usize, stride: usize, fg: u8, bg: u8, text: impl AsRef<str>) {
-	draw_p8scii(framebuffer, x, y, stride, fg, bg, p8scii::from_str(text.as_ref()).lossy())
+fn draw_str(framebuffer: &mut [u8], x: usize, y: usize, stride: usize, fg: u8, bg: u8, max_len: Option<u8>, text: impl AsRef<str>) {
+	draw_p8scii(framebuffer, x, y, stride, fg, bg, max_len, p8scii::from_str(text.as_ref()).lossy())
 }
 
-fn draw_p8scii(framebuffer: &mut [u8], mut x: usize, y: usize, stride: usize, fg: u8, bg: u8, text: impl IntoIterator<Item = u8>) {
+fn draw_p8scii(framebuffer: &mut [u8], x: usize, y: usize, stride: usize, fg: u8, bg: u8, max_len: Option<u8>, text: impl IntoIterator<Item = u8>) {
+	const ELLIPSIS_CH: u8 = p8!('…');
+	let ellipsis_width = FONT.width_chr(ELLIPSIS_CH);
+	
+	let mut len = 0;
 	for char in text {
-		let bitmap = FONT.char(char);
-		let width = FONT.width_chr(char) as usize;
-		let height = FONT.height() as usize;
+		let width = FONT.width_chr(char);
 		
-		for row in 0..height {
-			for col in 0..width {
-				framebuffer[(x + col) + (y + row) * stride] = if bitmap[row] & 1 << col == 0 { bg } else { fg };
-			}
+		if max_len.is_some_and(|max_len| len as u8 + width > max_len - ellipsis_width) {
+			draw_p8scii_char(framebuffer, x + len, y, stride, fg, bg, ELLIPSIS_CH);
+			return;
+		} else {
+			len += draw_p8scii_char(framebuffer, x + len, y, stride, fg, bg, char) as usize;
 		}
-		
-		x += width;
 	}
+}
+
+fn draw_p8scii_char(framebuffer: &mut [u8], x: usize, y: usize, stride: usize, fg: u8, bg: u8, char: u8) -> u8 {
+	let bitmap = FONT.char(char);
+	let width = FONT.width_chr(char);
+	let height = FONT.height();
+	
+	for row in 0..height as usize {
+		for col in 0..width as usize {
+			framebuffer[(x + col) + (y + row) * stride] = if bitmap[row] & 1 << col == 0 { bg } else { fg };
+		}
+	}
+	
+	width
 }
 
 fn draw_str_large(framebuffer: &mut [u8], x: usize, y: usize, stride: usize, fg: u8, bg: u8, text: impl AsRef<str>) {

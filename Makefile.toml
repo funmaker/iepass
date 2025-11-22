@@ -16,6 +16,10 @@ script = { file = "./scripts/rle_decode.rs" }
 extend = "script-base"
 script = { file = "./scripts/font_gen.rs" }
 
+[tasks.gif-gen]
+extend = "script-base"
+script = { file = "./scripts/gif_gen.rs" }
+
 
 # Testing
 [tasks.test]

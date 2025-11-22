@@ -30,6 +30,7 @@ p8rs-piccolo = { path = "./p8rs-piccolo", default-features = false }
 p8rs-log = { path = "p8rs-log" }
 p8rs-types = { path = "./p8rs-types" }
 p8rs-macros = { path = "./p8rs-macros" }
+p8rs-tests = { path = "./p8rs-tests" }
 iepass = { path = "./iepass" }
 
 embedded-io = { version = "0.6.1", features = ["alloc"] }
