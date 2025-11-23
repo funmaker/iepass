@@ -46,7 +46,7 @@ do_test("plain")
 local flags = { "WIDE", "TALL" }
 
 for k, v in ipairs(flags) do
-  local val = 1 | (1 << k)
+  local val = 1 | (1 << (k+1))
   poke(0x5f58, val)
   do_test("[0x5f58] = 0x" .. sub(tostr(val, 1), 5, 6) .. " (" .. v .. ")")
 end

@@ -16,7 +16,7 @@ impl MachineState<'_> {
 		
 		*self.pen_color() = 6;
 		*self.clip_rect() = [0, 0, 128, 128];
-		*self.cursor_position() = [0, 6];
+		*self._cursor_position() = [0, 6];
 		*self.sprite_addr_map() = SpriteScreenMemoryMap::SPRITE_SHEET;
 		*self.screen_addr_map() = SpriteScreenMemoryMap::SCREEN;
 		*self.map_addr_map() = 0x20;
@@ -42,7 +42,7 @@ impl MachineState<'_> {
 		self.const_slice(0x20)
 	}
 	
-	pub fn cursor_home_x(&mut self) -> &mut u8 {
+	pub fn _cursor_home_x(&mut self) -> &mut u8 {
 		&mut self[0x24]
 	}
 	
@@ -50,7 +50,7 @@ impl MachineState<'_> {
 		&mut self[0x25]
 	}
 	
-	pub fn cursor_position(&mut self) -> &mut [u8; 2] {
+	pub fn _cursor_position(&mut self) -> &mut [u8; 2] {
 		self.const_slice(0x26)
 	}
 	

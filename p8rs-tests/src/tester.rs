@@ -232,6 +232,7 @@ fn print_scr(screen_name: &str, test_name: &str, pal: &[u8; 16], pixels: &[[u8; 
 		}
 		
 		for x in 0..128 {
+			#[allow(unused)]
 			let mut grid = match (row % 16 == 0 && row > 0, x % 16 == 0 && x > 0) {
 				(true, true) => Some("┼"),
 				(true, false) => Some("┄"),

@@ -8,12 +8,15 @@ use crate::utils;
 use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
 
+
 pub struct Runtime<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Box<Memory, A>,
 	pub buttons: Buttons,
 	pub target_fps: u16,
 	pub callbacks: Box<dyn Callbacks>,
+	cursor: [i16; 2],
+	cursor_home: i16,
 }
 
 impl<A> Runtime<A>
@@ -26,6 +29,8 @@ where A: Allocator + Clone
 			buttons: Buttons::new(),
 			target_fps: 30,
 			callbacks: Box::new(DefaultCallbacks),
+			cursor: [0, 6],
+			cursor_home: 0,
 		}
 	}
 }
@@ -40,6 +45,36 @@ where A: Allocator
 			self.memory[0x5f4c + i] = buttons[i] & 0x3f;
 		}
 		self.buttons.update(self.target_fps, &buttons);
+	}
+	
+	/// Returns actual cursor position (memory only contains lower u8 of each coordinate)
+	pub fn get_cursor_position(&self) -> [i16; 2] {
+		self.cursor
+	}
+	
+	pub fn set_cursor_position(&mut self, pos: [i16; 2]) {
+		self.set_cursor_x(pos[0]);
+		self.set_cursor_y(pos[1]);
+	}
+	
+	pub fn set_cursor_x(&mut self, val: i16) {
+		self.cursor[0] = val;
+		self.memory.machine_state()._cursor_position()[0] = val as u8;
+	}
+
+	pub fn set_cursor_y(&mut self, val: i16) {
+		self.cursor[1] = val;
+		self.memory.machine_state()._cursor_position()[1] = val as u8;
+	}
+	
+	
+	pub fn get_cursor_home(&self) -> i16 {
+		self.cursor_home
+	}
+	
+	pub fn set_cursor_home(&mut self, x: i16) {
+		self.cursor_home = x;
+		*self.memory.machine_state()._cursor_home_x() = x as u8;
 	}
 }
 

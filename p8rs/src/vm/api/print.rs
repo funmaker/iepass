@@ -18,8 +18,8 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 		}
 		
 		if let Some((x, y)) = x.zip(y) {
-			*rt.memory.machine_state().cursor_home_x() = x.to_integer() as u8;
-			*rt.memory.machine_state().cursor_position() = [x.to_integer() as u8, y.to_integer() as u8];
+			rt.set_cursor_home(x.to_integer());
+			rt.set_cursor_position([x.to_integer(), y.to_integer()]);
 		}
 		if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 		
@@ -54,8 +54,11 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 		
 		if y.is_none() {
 			let (line_height, font_height) = get_line_height(rt, flags);
+			println!("print({}) - cursor: {:?}", text, rt.get_cursor_position());
 			println!("print: scrolling in case line would not fit, line_height={}, font_height={}", line_height, font_height);
-			screen_scroll(rt, line_height, font_height, true);
+			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, flags, y.is_some());
+		}else{
+			println!("print({}, {}, {}) - cursor: {:?}", text, x.unwrap(), y.unwrap(), rt.get_cursor_position());
 		}
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
@@ -100,42 +103,54 @@ fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
 		return;
 	}
 	
-	rt.memory.machine_state().cursor_position()[1] -= shift;
+	rt.set_cursor_y(rt.get_cursor_position()[1].overflowing_sub(shift as i16).0);
 	rt.memory.screen().shift_up(shift, 0);
 }
 
-/// Scroll the screen up if needed
-/// If `accommodate_current_line` is true, will scroll to fit line_height exactly, otherwise will scroll to fit font height (for trailing newlines)
-fn screen_scroll(rt: &mut Runtime, line_height: u8, font_height: u8, accommodate_current_line: bool) {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum NewlineRequest {
+	MakeSpaceBeforePrint,
+	WrappingNewline,
+	ContentNewline,
+	PrintEndNewline
+}
+
+fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
+	println!("handle_newline({:?})", request);
 	
-	let current_y = rt.memory.machine_state().cursor_position()[1];
-	let max_y = 128 - if accommodate_current_line { line_height } else { font_height };
-	if current_y >= 128 { return }
+	let (line_height, font_height) = get_line_height(rt, flags);
 	
-	let new_y = current_y.saturating_add(line_height);
-	if new_y <= max_y { return }
+	let (reset_x, align_shift, advance_y, considered_height) = match request {
+		NewlineRequest::MakeSpaceBeforePrint => (false, false,           0, line_height),
+		NewlineRequest::WrappingNewline =>      (true,  false, line_height, line_height),
+		NewlineRequest::ContentNewline =>       (true,  true,  line_height, line_height),
+		NewlineRequest::PrintEndNewline =>      (true,  true,  line_height, font_height),
+	};
 	
-	let mut shift = new_y - max_y;
-	println!("screen_scroll: scrolling, max_y={}, new_y={}, shift={}", max_y, new_y, shift);
-	if !accommodate_current_line {
-		shift = ((shift + font_height - 1) / font_height) * font_height;
+	if reset_x {
+		rt.set_cursor_x(rt.get_cursor_home());
 	}
 	
-	screen_shift_up_exact(rt, shift);
-}
-
-fn cursor_new_line(rt: &mut Runtime, flags: PrintDefaultsFlags, accommodate_current_line: bool, no_scroll: bool) {
-	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
+	let curr_y = rt.get_cursor_position()[1];
+	let new_y = curr_y.overflowing_add(advance_y as i16).0;
 	
-	println!("cursor_new_line, initial y={}", rt.memory.machine_state().cursor_position()[1]);
-	let (line_height, font_height) = get_line_height(rt, flags);
-	if !no_scroll { screen_scroll(rt, line_height, font_height, accommodate_current_line); }
-	println!("cursor_new_line, after scroll y={}", rt.memory.machine_state().cursor_position()[1]);
-	rt.memory.machine_state().cursor_position()[1] = rt.memory.machine_state().cursor_position()[1].overflowing_add(line_height).0;
-	println!("cursor_new_line, final y={}", rt.memory.machine_state().cursor_position()[1]);
+	rt.set_cursor_y(new_y);
+	
+	if !y_passed && !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) && new_y >= 0 && new_y < 256 {
+		let new_y = new_y as u8;
+		let max_y = 128 - considered_height;
+		if new_y > max_y {
+			let mut shift = new_y - max_y;
+			if align_shift && shift < font_height {
+				shift = font_height;
+			}
+			println!("handle_newline - shifting - new_y: {}, max_y: {}, shift: {}", new_y, max_y, shift);
+			screen_shift_up_exact(rt, shift);
+		}
+	}
 }
 
-fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
@@ -161,7 +176,7 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 			}
 		},
 		10 => {
-			cursor_new_line(rt, flags, true, false);
+			handle_newline(rt, NewlineRequest::ContentNewline, flags, y_passed);
 			EscapeSequenceAction::Nop
 		}
 		_ => {
@@ -191,7 +206,7 @@ fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
 	}
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, dry_run: bool) -> (i16, i16, bool) {
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
 	let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
 	let is_tall = flags.contains(PrintDefaultsFlags::TALL);
 	let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
@@ -211,19 +226,18 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	let draw_width = font_width * x_stride;
 	let draw_height = font_height * y_stride;
 	
-	let overflowed_x = rt.memory.machine_state().cursor_position()[0].overflowing_add(font_width).0 > 128
+	let x_wrapped = rt.get_cursor_position()[0].overflowing_add(font_width as i16).0 > 128
 		&& rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP);
 	
-	if overflowed_x {
-		cursor_new_line(rt, flags, true, false);
+	if x_wrapped {
+		handle_newline(rt, NewlineRequest::WrappingNewline, flags, y_passed);
 	}
-	
-	let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
 	
 	assert!(font_width <= 8, "Char width cannot be >8");
 	assert!(font_height <= 8, "Char height cannot be >8");
 	
 	if !dry_run {
+		let [cursor_x, cursor_y] = rt.get_cursor_position();
 		for y in 0..font_height {
 			let mut font_line = char_font[y as usize];
 			for x in 0..font_width {
@@ -233,8 +247,8 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 				for dy in 0..y_stride {
 					for dx in 0..x_stride {
 						if (font_bit && !(is_dotty_x && dx == 0) && !(is_dotty_y && dy == 1)) != is_inverted {
-							let pixel_x = cursor_x.overflowing_add(x * x_stride + dx).0;
-							let pixel_y = cursor_y.overflowing_add(y * y_stride + dy).0;
+							let pixel_x = cursor_x.overflowing_add((x * x_stride + dx) as i16).0;
+							let pixel_y = cursor_y.overflowing_add((y * y_stride + dy) as i16).0;
 							let _ = rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color);
 						}
 					}
@@ -244,7 +258,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 		}
 	}
 	
-	(draw_width as i16, draw_height as i16, overflowed_x)
+	(draw_width as i16, draw_height as i16, x_wrapped)
 }
 
 
@@ -292,20 +306,20 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				self.next_char = None;
 				
 				let chipset_flags = *rt.memory.machine_state().misc_chipset_flags();
-				let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
+				let [cursor_x, cursor_y] = rt.get_cursor_position();
 
-				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL)) 
+				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL))
 				|| (cursor_x >= 128 && !chipset_flags.contains(MiscChipsetFeatureFlags::PRINT_WRAP)) {
 					if self.drawn { self.clipping = true; }
 				} else {
 					self.drawn = true;
 				}
 				
-				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.clipping);
+				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.y_provided, self.clipping);
 				
 				self.x_wrapped = x_overflowed;
 				
-				rt.memory.machine_state().cursor_position()[0] = rt.memory.machine_state().cursor_position()[0].overflowing_add(w as u8).0;
+				rt.set_cursor_x(rt.get_cursor_position()[0].overflowing_add(w).0);
 			}
 			
 			let part = self.text.next();
@@ -317,7 +331,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 						self.skip_frames = self.letter_frame_skip;
 					}
 					TextPart::EscapeSequence(bytes) => {
-						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes)? {
+						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes, self.y_provided)? {
 							EscapeSequenceAction::Nop => {}
 							EscapeSequenceAction::SkipFrames(n) => {
 								self.skip_frames = n;
@@ -341,7 +355,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		}
 		
 		if !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_NEWLINE) {
-			cursor_new_line(rt, PrintDefaultsFlags::from_bits_truncate(self.flags), false, self.y_provided);
+			handle_newline(rt, NewlineRequest::PrintEndNewline, PrintDefaultsFlags::from_bits_truncate(self.flags), self.y_provided);
 		}
 		
 		// todo - return values
