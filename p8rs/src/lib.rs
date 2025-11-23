@@ -11,6 +11,7 @@ extern crate alloc;
 extern crate core;
 
 pub use p8rs_log::*;
+pub use p8rs_macros as macros;
 pub use p8rs_piccolo as piccolo;
 pub use p8rs_types as types;
 

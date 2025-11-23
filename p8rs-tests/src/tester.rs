@@ -52,8 +52,10 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	                                   .replace(|c: char| !c.is_ascii_alphanumeric(), "_");
 	let tmp_cart_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.p8"));
 	let json_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.json"));
-	let pico8_log_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.pico8.log"));
-	let p8rs_log_path = PathBuf::from(TMP_DIR).join(format!("{sanitized_name}.p8rs.log"));
+	let pico8_log_name = format!("{sanitized_name}.pico8.log");
+	let p8rs_log_name = format!("{sanitized_name}.p8rs.log");
+	let pico8_log_path = PathBuf::from(TMP_DIR).join(&pico8_log_name);
+	let p8rs_log_path = PathBuf::from(TMP_DIR).join(&p8rs_log_name);
 	
 	println!("pico8 log: {}", pico8_log_path.display());
 	println!("p8rs  log: {}", p8rs_log_path.display());
@@ -71,13 +73,13 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	let p8rs_logs = Log::parse(&p8rs.output);
 	
 	let summary = Summary {
-		pico8: SummarySubject::new(&pico8_log_path, &pico8),
-		p8rs: SummarySubject::new(&p8rs_log_path, &p8rs),
+		pico8: SummarySubject::new(&pico8_log_name, &pico8),
+		p8rs: SummarySubject::new(&p8rs_log_name, &p8rs),
 		orig_cart_path: orig_cart_path.to_string_lossy(),
 		tmp_cart_path: tmp_cart_path.to_string_lossy(),
 	};
 	let json_file = File::create(&json_path).expect("Can't create json log");
-	serde_json::to_writer(json_file, &summary).expect("Can't write to json log");
+	serde_json::to_writer_pretty(json_file, &summary).expect("Can't write to json log");
 	
 	match (pico8.timeout, p8rs.timeout) {
 		(true, true) => panic!("pico8 and p8rs timeout"),
@@ -232,15 +234,12 @@ fn print_scr(screen_name: &str, test_name: &str, pal: &[u8; 16], pixels: &[[u8; 
 		}
 		
 		for x in 0..128 {
-			#[allow(unused)]
-			let mut grid = match (row % 16 == 0 && row > 0, x % 16 == 0 && x > 0) {
+			let grid = match (row % 16 == 0 && row > 0, x % 16 == 0 && x > 0) {
 				(true, true) => Some("┼"),
 				(true, false) => Some("┄"),
 				(false, true) => Some("┊"),
 				_ => None
 			};
-			
-			grid = None;
 			
 			if SHOULD_COLORIZE.should_colorize() {
 				let uc = palette::color_from_index(pal[upper[x] as usize & 0x0F]).rgb();

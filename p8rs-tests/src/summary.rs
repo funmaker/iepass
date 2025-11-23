@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -29,15 +28,15 @@ pub struct Summary<'a> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SummarySubject<'a> {
-	pub log_path: Cow<'a, str>,
+	pub log_name: Cow<'a, str>,
 	pub runtime_error: Option<Cow<'a, str>>,
 	pub timeout: bool,
 }
 
 impl<'a> SummarySubject<'a> {
-	pub fn new(log_path: &'a Path, run_result: &'a RunResult) -> Self {
+	pub fn new(log_name: &'a str, run_result: &'a RunResult) -> Self {
 		Self {
-			log_path: log_path.to_string_lossy(),
+			log_name: Cow::Borrowed(log_name),
 			runtime_error: run_result.runtime_error.as_deref().map(|err: &str| err.into()),
 			timeout: run_result.timeout,
 		}

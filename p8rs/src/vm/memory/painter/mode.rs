@@ -18,7 +18,7 @@ impl PainterMode for PenMode {
 		let pen_color = *memory.machine_state().pen_color();
 		let fill_flags = *memory.machine_state().fill_pattern().flags();
 		let pal = *memory.machine_state().palette(Palette::Draw);
-		let bg_opque = fill_flags.contains(FillPatternFlags::TRANSPARENT);
+		let bg_opque = !fill_flags.contains(FillPatternFlags::TRANSPARENT);
 		
 		if fill_flags.contains(FillPatternFlags::REMAP_OTHER) {
 			let pal2 = *memory.machine_state().palette(Palette::Secondary);

@@ -1,22 +1,40 @@
 //! ```cargo
 //! [dependencies]
 //! p8rs = { path = "../p8rs", features = ["std"] }
+//! getopts = "0.2.24"
 //! ```
 
 use std::fs::File;
+use std::process;
+use std::env;
+use getopts::Options;
 use p8rs::rle;
 
 fn main() {
-	let args: Vec<_> = std::env::args().collect();
+	let args: Vec<String> = env::args().collect();
+	let mut opts = Options::new();
+	opts.optflag("h", "help", "Print this help menu");
 	
-	if let [_, input, output] = args.as_slice() {
-		println!("RLE Encoding {input} -> {output}");
-		std::io::copy(
-			&mut File::open(input).expect("Failed to create output file"),
-			&mut rle::Encoder::new_std(&mut File::create(output).expect("Failed to open input file")),
-		).unwrap();
-	} else {
-		eprintln!("Usage: rle_encode <input file> <output file>");
-		std::process::exit(1);
+	let matches = opts.parse(&args[1..]).expect("Could not parse command line arguments");
+	let help = matches.opt_present("h");
+	let error = matches.free.len() != 2;
+	
+	if help || error {
+		let brief = format!("Usage: rle-encode <input file> <output file> [Options...]");
+		if error {
+			eprint!("{}", opts.usage(&brief));
+			process::exit(-1);
+		} else {
+			print!("{}", opts.usage(&brief));
+			return;
+		}
 	}
+	
+	let [input, output] = matches.free.try_into().unwrap();
+	
+	println!("RLE Encoding {input} -> {output}");
+	std::io::copy(
+		&mut File::open(input).expect("Failed to create output file"),
+		&mut rle::Encoder::new_std(&mut File::create(output).expect("Failed to open input file")),
+	).unwrap();
 }

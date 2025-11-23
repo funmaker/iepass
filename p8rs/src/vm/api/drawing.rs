@@ -1,14 +1,18 @@
+// Circle algorithms taken from https://github.com/egordorichev/pemsa/blob/master/src/pemsa/graphics/pemsa_graphics_api.cpp
+
 use core::alloc::Allocator;
-use p8rs_macros::api_callback;
+use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::Context;
 use p8rs_types::p8num::P8Num;
 
+use crate::vm::memory::machine_state::MiscChipsetFeatureFlags;
 use crate::vm::Runtime;
 
 pub fn install_pico8_drawing<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("rectfill", rectfill::callback::<A>(ctx));
 	ctx.set_global("rect", rect::callback::<A>(ctx));
 	ctx.set_global("circfill", circfill::callback::<A>(ctx));
+	ctx.set_global("circ", circ::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -23,7 +27,7 @@ pub fn rectfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0
 	
 	rt.memory
 	  .painter()
-	  .paint_range(x0..=x1, y0..=y1);
+	  .paint(x0..=x1, y0..=y1);
 }
 
 #[api_callback]
@@ -38,32 +42,93 @@ pub fn rect<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Op
 	
 	rt.memory
 	  .painter()
-	  .paint_range(x0..=x1, y0..=y0)
-	  .paint_range(x0..=x1, y1..=y1)
-	  .paint_range(x0..=x0, y0..=y1)
-	  .paint_range(x1..=x1, y0..=y1);
+	  .paint(x0..=x1, y0)
+	  .paint(x0..=x1, y1)
+	  .paint(x0, y0..=y1)
+	  .paint(x1, y0..=y1);
 }
 
 #[api_callback]
-pub fn circfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, r: Option<i16>, col: Option<P8Num>) {
+pub fn circfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
 	let (Some(x), Some(y)) = (x, y) else { return };
-	let r = r.unwrap_or(4);
-	if r < 0 { return }
-	
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	
-	let painter = rt.memory.painter();
-	let x0 = x.saturating_sub(r);
-	let y0 = y.saturating_sub(r);
-	let x1 = x.saturating_add(r);
-	let y1 = y.saturating_add(r);
-	let (x_mid, y_mid) = painter.to_abs(x, y);
-	let r2 = (r as u32 * 2 + 1).pow(2) / 4;
+	let r = r.unwrap_or(p8!(4));
+	if r < p8!(0) { return }
 	
-	rt.memory
-	  .painter()
-	  .with_callback(|x, y| (x as i32).abs_diff(x_mid as i32).pow(2) + (y as i32).abs_diff(y_mid as i32).pow(2) <= r2)
-	  .paint_range(x0..=x1, y0..=y1);
+	let even_flag = rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::EVEN_RADIUS_CIRC);
+	let mut painter = rt.memory.painter();
+	
+	let (x0, y0) = painter.to_abs(x, y);
+	let (x1, y1) = if r.fract() >= p8!(0.5) && even_flag {
+		(x0.wrapping_add(1), y0.wrapping_add(1))
+	} else {
+		(x0, y0)
+	};
+	
+	let mut x = r.to_integer();
+	let mut y = 0;
+	let mut e = 1 - x;
+	while x >= y {
+		painter.paint_abs(x0.wrapping_sub(x)..=x1.wrapping_add(x), y0.wrapping_sub(y));
+		painter.paint_abs(x0.wrapping_sub(x)..=x1.wrapping_add(x), y1.wrapping_add(y));
+		
+		if e < 0 {
+			y += 1;
+			e += 2 * y + 1;
+		} else {
+			if x != y {
+				painter.paint_abs(x0.wrapping_sub(y)..=x1.wrapping_add(y), y0.wrapping_sub(x));
+				painter.paint_abs(x0.wrapping_sub(y)..=x1.wrapping_add(y), y1.wrapping_add(x));
+			}
+			
+			y += 1;
+			x -= 1;
+			e += 2 * (y - x) + 1;
+		}
+	}
+}
+
+
+#[api_callback]
+pub fn circ<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
+	let (Some(x), Some(y)) = (x, y) else { return };
+	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
+	
+	let r = r.unwrap_or(p8!(4));
+	if r < p8!(0) { return }
+	
+	let even_flag = rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::EVEN_RADIUS_CIRC);
+	let mut painter = rt.memory.painter();
+	
+	let (x0, y0) = painter.to_abs(x, y);
+	let (x1, y1) = if r.fract() >= p8!(0.5) && even_flag {
+		(x0.wrapping_add(1), y0.wrapping_add(1))
+	} else {
+		(x0, y0)
+	};
+	
+	let mut x = r.to_integer();
+	let mut y = 0;
+	let mut e = 1 - x;
+	while x >= y {
+		painter.paint_abs(x1.wrapping_add(x), y1.wrapping_add(y));
+		painter.paint_abs(x1.wrapping_add(y), y1.wrapping_add(x));
+		painter.paint_abs(x1.wrapping_add(x), y0.wrapping_sub(y));
+		painter.paint_abs(x1.wrapping_add(y), y0.wrapping_sub(x));
+		painter.paint_abs(x0.wrapping_sub(x), y1.wrapping_add(y));
+		painter.paint_abs(x0.wrapping_sub(y), y1.wrapping_add(x));
+		painter.paint_abs(x0.wrapping_sub(x), y0.wrapping_sub(y));
+		painter.paint_abs(x0.wrapping_sub(y), y0.wrapping_sub(x));
+		
+		y += 1;
+		if e < 0 {
+			e += 2 * y + 1;
+		} else {
+			x -= 1;
+			e += 2 * (y - x) + 1;
+		}
+	}
 }
 
 

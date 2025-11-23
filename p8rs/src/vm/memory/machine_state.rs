@@ -448,7 +448,7 @@ bitflags! {
 		/// The undocumented multiscreen feature is enabled
         const MULTI_SCREEN       = 1 << 0;
 		/// The diameter of circles drawn using circ() and circfill() will be increased by 1 pixel rightward and 1 pixel downward if the fractional part of the radius is .5 or greater
-        const FRACT_CIRCLE       = 1 << 1;
+        const EVEN_RADIUS_CIRC       = 1 << 1;
 		/// Automatic newlines are no longer added after each call to print()
         const NO_PRINT_NEWLINE   = 1 << 2;
 		/// Causes sprite 0 in map() and tline() to be rendered as opaque (like other sprites) instead of the usual transparent

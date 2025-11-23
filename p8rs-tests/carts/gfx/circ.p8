@@ -83,6 +83,7 @@ for s = 0,3.5,0.5 do
 end
 
 flags = peek(0x5f36)
+poke(0x5f36, flags | 0x2)
 for s = 0,3.5,0.5 do
   cls()
   for i = 24,0,-1 do

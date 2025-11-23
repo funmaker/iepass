@@ -5,18 +5,17 @@ mod utils;
 use core::ops::Range;
 
 use crate::vm::memory::Memory;
-pub use callback::{PainterCallback, Noop};
+pub use callback::{PainterCallback, CallbackResult, Noop};
 pub use mode::{PainterMode, PenMode, SpriteMode};
-pub use utils::IntoClip;
+pub use utils::PaintRange;
 use utils::Vector;
-use crate::vm::memory::painter::callback::CallbackResult;
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Painter<'a, Mode = PenMode, CB = Noop> {
 	memory: &'a mut Memory,
-	clip_x: Range<i16>,
-	clip_y: Range<i16>,
+	clip_x: Range<u8>,
+	clip_y: Range<u8>,
 	camera: Vector<i16>,
 	fill: Option<[[bool; 4]; 4]>,
 	mode: Mode,
@@ -30,8 +29,8 @@ impl<'m> Painter<'m, PenMode, Noop> {
 		let fill = memory.machine_state().fill_pattern().expand();
 		
 		Painter {
-			clip_x: clip[0] as i16 .. clip[2].min(128) as i16,
-			clip_y: clip[1] as i16 .. clip[3].min(128) as i16,
+			clip_x: clip[0] .. clip[2].min(128),
+			clip_y: clip[1] .. clip[3].min(128),
 			camera: Vector::from(camera),
 			fill,
 			mode: PenMode::new(memory),
@@ -74,39 +73,34 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		(x, y)
 	}
 	
-	pub fn paint(&mut self, x: i16, y: i16) -> &mut Self {
-		let (x, y) = self.to_abs(x, y);
+	pub fn paint(&mut self, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
+		let x = x.cam_range(self.clip_x.clone(), self.camera.x);
+		let y = y.cam_range(self.clip_y.clone(), self.camera.y);
 		
-		self.paint_abs_impl(x, y);
-		
-		self
-	}
-	
-	pub fn paint_abs(&mut self, x: i16, y: i16) -> &mut Self {
-		if self.clip_x.contains(&x) && self.clip_y.contains(&y) {
-			self.paint_abs_impl(x, y);
-		}
-		
-		self
-	}
-	
-	pub fn paint_range(&mut self, x: impl IntoClip, y: impl IntoClip) -> &mut Self {
-		let x = range_intersect(x.into_clip(self.camera.x), self.clip_x.clone());
-		let y = range_intersect(y.into_clip(self.camera.y), self.clip_y.clone());
-		
-		if !x.is_empty() && !y.is_empty() {
-			for y in y {
-				for x in x.clone() {
-					self.paint_abs_impl(x, y);
-				}
+		for y in y {
+			for x in x.clone() {
+				self.paint_abs_pixel(x, y);
 			}
 		}
 		
 		self
 	}
 	
-	fn paint_abs_impl(&mut self, x: i16, y: i16) {
-		let col = match self.callback.check(x as u8, y as u8) {
+	pub fn paint_abs(&mut self, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
+		let x = x.abs_range(self.clip_x.clone());
+		let y = y.abs_range(self.clip_y.clone());
+		
+		for y in y {
+			for x in x.clone() {
+				self.paint_abs_pixel(x, y);
+			}
+		}
+		
+		self
+	}
+	
+	fn paint_abs_pixel(&mut self, x: u8, y: u8) {
+		let col = match self.callback.check(x, y) {
 			CallbackResult::Discard => return,
 			CallbackResult::Keep => None,
 			CallbackResult::Color(col) => Some(col),
@@ -122,8 +116,4 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 			self.memory.screen().set_pixel(x, y, col);
 		}
 	}
-}
-
-fn range_intersect<T: Ord>(a: Range<T>, b: Range<T>) -> Range<T> {
-	a.start.max(b.start) .. a.end.min(b.end)
 }
