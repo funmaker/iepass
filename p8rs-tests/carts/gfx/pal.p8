@@ -60,9 +60,11 @@ p8rs.test_mem("table", 0x5f00, 0x80)
 
 pal()
 pal({ 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 })
-pal({ 19, 20, [-10] = 5, [22] = 6 }, 1)
+p8rs.test_mem("table overflow 1", 0x5f00, 0x80)
+pal({ 19, 20, [-10] = 5, [23] = 6 }, 1)
+p8rs.test_mem("table overflow 2", 0x5f00, 0x80)
 pal({ -2.5, -10, 100, 5 }, 2)
-p8rs.test_mem("table overflow", 0x5f00, 0x80)
+p8rs.test_mem("table overflow 3", 0x5f00, 0x80)
 
 pal()
 poke(0x5f02, 0xFF)
