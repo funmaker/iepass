@@ -17,6 +17,10 @@ pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("palt", palt::callback::<A>(ctx));
 	ctx.set_global("fset", fset::callback::<A>(ctx));
 	ctx.set_global("fget", fget::callback::<A>(ctx));
+	ctx.set_global("pset", pset::callback::<A>(ctx));
+	ctx.set_global("pget", pget::callback::<A>(ctx));
+	ctx.set_global("sset", sset::callback::<A>(ctx));
+	ctx.set_global("sget", sget::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -189,14 +193,14 @@ pub fn fget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f:
 
 #[api_callback]
 pub fn fset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Option<i16>, v: Option<bool>) {
-	let n = match n {
-		Some(n) if n >= 0 && n <= 255 => n,
+	let (n, f) = match n.zip(f) {
+		Some((n, f)) => (n, f),
 		_ => return,
 	};
-	let f = match f {
-		Some(f) => f,
-		_ => return,
-	};
+	
+	if n < 0 || n > 255 {
+		return;
+	}
 	
 	let flags = &mut rt.memory.sprite_flags()[n as u8];
 	
@@ -212,4 +216,57 @@ pub fn fset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f:
 	} else {
 		*flags = f as u8;
 	}
+}
+
+#[api_callback]
+pub fn pset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) {
+	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
+	let (x, y) = match x.zip(y) {
+		Some((x, y)) => (x, y),
+		_ => return,
+	};
+	
+	rt.memory.painter().paint(x, y);
+}
+
+#[api_callback]
+pub fn pget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+	let (x, y) = match x.zip(y) {
+		Some((x, y)) => (x, y),
+		_ => return 0,
+	};
+	
+	let (x, y) = rt.memory.painter().to_abs(x, y);
+	
+	if x < 0 || x > 127 || y < 0 || y > 127 {
+		return 0;
+	}
+	
+	rt.memory.screen().get_pixel(x as u8, y as u8).unwrap_or(0)
+}
+
+#[api_callback]
+pub fn sset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
+	let x = x.unwrap_or(0);
+	let y = y.unwrap_or(0);
+	
+	let col = col.unwrap_or(*rt.memory.machine_state().pen_color());
+	
+	if x < 0 || x > 127 || y < 0 || y > 127 {
+		return;
+	}
+	
+	rt.memory.sprites().set_pixel(x as u8, y as u8, col);
+}
+
+#[api_callback]
+pub fn sget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+	let x = x.unwrap_or(0);
+	let y = y.unwrap_or(0);
+	
+	if x < 0 || x > 127 || y < 0 || y > 127 {
+		return 0;
+	}
+	
+	rt.memory.sprites().get_pixel(x as u8, y as u8).unwrap_or(0)
 }
