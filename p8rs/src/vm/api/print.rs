@@ -1,11 +1,13 @@
 use core::alloc::Allocator;
 use core::pin::Pin;
+use std::ops::Not;
 use gc_arena::Collect;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
-
+use p8rs_types::p8scii::Display;
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
+use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
@@ -72,6 +74,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			y_provided: y.is_some(),
 			clipping: false,
 			drawn: false,
+			max_x: None,
 		})))
 	}));
 }
@@ -92,8 +95,7 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
-	#[allow(unused)]
-	ModifyFlags(PrintDefaultsFlags), // TODO:
+	ModifyFlags(PrintDefaultsFlags),
 }
 
 fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
@@ -150,11 +152,23 @@ fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefault
 	}
 }
 
+fn escape_to_print_flags(val: u8) -> Option<PrintDefaultsFlags> {
+	match val {
+		b'b' => Some(PrintDefaultsFlags::PADDING),
+		b'w' => Some(PrintDefaultsFlags::WIDE),
+		b't' => Some(PrintDefaultsFlags::TALL),
+		b'#' => Some(PrintDefaultsFlags::SOLID_BG),
+		b'i' => Some(PrintDefaultsFlags::INVERT),
+		b'=' => Some(PrintDefaultsFlags::DOTTY),
+		b'p' => Some(PrintDefaultsFlags::WIDE | PrintDefaultsFlags::TALL | PrintDefaultsFlags::DOTTY),
+		_ => None
+	}
+}
+
 fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
-	
 	Ok(match escape_code {
 		0 => EscapeSequenceAction::Stop,
 		6 => {
@@ -169,16 +183,46 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 					let arg = control_arg_to_number(bytes[2]).unwrap(); // TODO: safety
 					EscapeSequenceAction::SetLetterFrameSkip(arg as usize)
 				}
+				b'-' => {
+					if let Some(flag) = escape_to_print_flags(bytes[2]) {
+						println!("Escape: ^- {}", Display(bytes));
+						EscapeSequenceAction::ModifyFlags(flags & flag.not())
+					}else{
+						println!("Escape UNPARSED: {}", Display(bytes));
+						debug!("unparsed sequence {:?}", bytes);
+						EscapeSequenceAction::Nop
+					}
+				},
 				_ => {
+					if let Some(flag) = escape_to_print_flags(arg) {
+						println!("Escape parsed: ^ {}", Display(bytes));
+						return Ok(EscapeSequenceAction::ModifyFlags(flags | flag | PrintDefaultsFlags::ENABLE))
+					}
 					debug!("Unimplemented escape sequence! {:?}", bytes);
 					EscapeSequenceAction::Nop
 				}
 			}
 		},
-		10 => {
+		8 => { // \b
+			let x = rt.get_cursor_position()[0];
+			let font_width = get_font(rt, flags).width();
+			rt.set_cursor_x(x.overflowing_sub(font_width as i16).0);
+			EscapeSequenceAction::Nop
+		},
+		9 => { // \t
+			let tab_stop = 16; // TODO: check if configurable
+			let x = rt.get_cursor_position()[0];
+			rt.set_cursor_x((x / tab_stop + 1) * tab_stop);
+			EscapeSequenceAction::Nop
+		},
+		10 => { // \n
 			handle_newline(rt, NewlineRequest::ContentNewline, flags, y_passed);
 			EscapeSequenceAction::Nop
-		}
+		},
+		13 => { // \r
+			rt.set_cursor_x(rt.get_cursor_home());
+			EscapeSequenceAction::Nop
+		},
 		_ => {
 			debug!("Unimplemented escape sequence! {:?}", bytes);
 			EscapeSequenceAction::Nop
@@ -214,8 +258,6 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	let is_dotty_x = is_dotty && is_wide && !is_tall;
 	let is_dotty_y = is_dotty && is_tall;
 	
-	let pen_color = *rt.memory.machine_state().pen_color();
-	
 	let font = get_font(rt, flags);
 	
 	let font_width = font.width_chr(letter);
@@ -238,24 +280,46 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	
 	if !dry_run {
 		let [cursor_x, cursor_y] = rt.get_cursor_position();
-		for y in 0..font_height {
-			let mut font_line = char_font[y as usize];
-			for x in 0..font_width {
-				let font_bit = font_line & 1 != 0;
-				font_line >>= 1;
-				
-				for dy in 0..y_stride {
-					for dx in 0..x_stride {
-						if (font_bit && !(is_dotty_x && dx == 0) && !(is_dotty_y && dy == 1)) != is_inverted {
-							let pixel_x = cursor_x.overflowing_add((x * x_stride + dx) as i16).0;
-							let pixel_y = cursor_y.overflowing_add((y * y_stride + dy) as i16).0;
-							let _ = rt.memory.screen().set_pixel(pixel_x as i16, pixel_y as i16, pen_color);
-						}
-					}
-				}
-				
+		let (abs_cursor_x, abs_cursor_y) = rt.memory.painter().to_abs(cursor_x, cursor_y);
+
+		let mut painter = rt.memory.painter().with_callback(|x: u8, y: u8| {
+			let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
+			let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
+			let font_x = if is_wide { local_x / 2 } else { local_x };
+			let font_y = if is_tall { local_y / 2 } else { local_y };
+			let font_line = char_font[font_y as usize];
+			let font_bit = (font_line >> font_x) & 1 != 0;
+			
+			if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
+				CallbackResult::Keep
+			}else{
+				CallbackResult::Discard
 			}
-		}
+		});
+		
+		painter.set_fill(None).paint(
+			cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
+			cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
+		);
+		
+		// for y in 0..font_height {
+		// 	let mut font_line = char_font[y as usize];
+		// 	for x in 0..font_width {
+		// 		let font_bit = font_line & 1 != 0;
+		// 		font_line >>= 1;
+		//
+		// 		for dy in 0..y_stride {
+		// 			for dx in 0..x_stride {
+		// 				if (font_bit && !(is_dotty_x && dx == 0) && !(is_dotty_y && dy == 1)) != is_inverted {
+		// 					let pixel_x = cursor_x.overflowing_add((x * x_stride + dx) as i16).0;
+		// 					let pixel_y = cursor_y.overflowing_add((y * y_stride + dy) as i16).0;
+		// 					// painter.paint(pixel_x, pixel_y);
+		// 				}
+		// 			}
+		// 		}
+		//
+		// 	}
+		// }
 	}
 	
 	(draw_width as i16, draw_height as i16, x_wrapped)
@@ -282,8 +346,10 @@ struct PrintSeq<'gc> {
 	clipping: bool,
 	/// has ever drawn (without clipping)
 	drawn: bool,
-	// was y-coord provided when calling print()
+	/// was y-coord provided when calling print()
 	y_provided: bool,
+	/// maximum cursor x during printing - for return
+	max_x: Option<i16>,
 }
 
 impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
@@ -291,7 +357,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		mut self: Pin<&mut Self>,
 		ctx: Context<'gc>,
 		_exec: Execution<'gc, '_>,
-		_stack: Stack<'gc, '_>,
+		mut stack: Stack<'gc, '_>,
 		rt: RuntimeRef<'_>,
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
 		let rt = rt.downcast::<Runtime>();
@@ -315,11 +381,13 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 					self.drawn = true;
 				}
 				
-				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.y_provided, self.clipping);
+				let (w, _, x_wrapped) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.y_provided, self.clipping);
 				
-				self.x_wrapped = x_overflowed;
+				self.x_wrapped = x_wrapped;
 				
-				rt.set_cursor_x(rt.get_cursor_position()[0].overflowing_add(w).0);
+				let x = rt.get_cursor_position()[0].overflowing_add(w).0;
+				rt.set_cursor_x(x);
+				self.max_x = self.max_x.max(Some(x));
 			}
 			
 			let part = self.text.next();
@@ -358,7 +426,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			handle_newline(rt, NewlineRequest::PrintEndNewline, PrintDefaultsFlags::from_bits_truncate(self.flags), self.y_provided);
 		}
 		
-		// todo - return values
+		stack.replace(ctx, P8Num::from(self.max_x.unwrap_or(0)));
 		Ok(SequencePoll::Return)
 	}
 }
