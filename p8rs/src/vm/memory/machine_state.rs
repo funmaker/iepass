@@ -23,13 +23,21 @@ impl MachineState<'_> {
 		*self.map_width() = 128;
 		*self.bitplane_mask() = 0xff;
 		
-		self.reset_palette();
+		self.reset_palettes();
 	}
 	
-	pub fn reset_palette(&mut self) {
-		*self.palette(Palette::Draw)      = [0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
-		*self.palette(Palette::Screen)    = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
-		*self.palette(Palette::Secondary) = [0x00, 0x01, 0x12, 0x13, 0x24, 0x15, 0xd6, 0x67, 0x48, 0x49, 0x9a, 0x3b, 0xdc, 0x5d, 0x8e, 0xef];
+	pub fn reset_palettes(&mut self) {
+		self.reset_palette(Palette::Draw);
+		self.reset_palette(Palette::Screen);
+		self.reset_palette(Palette::Secondary);
+	}
+	
+	pub fn reset_palette(&mut self, idx: Palette) {
+		match idx {
+			Palette::Draw      => *self.palette(idx) = [0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f],
+			Palette::Screen    => *self.palette(idx) = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f],
+			Palette::Secondary => *self.palette(idx) = [0x00, 0x01, 0x12, 0x13, 0x24, 0x15, 0xd6, 0x67, 0x48, 0x49, 0x9a, 0x3b, 0xdc, 0x5d, 0x8e, 0xef],
+		}
 	}
 	
 	pub fn palette(&mut self, idx: Palette) -> &mut [u8; 16] {
@@ -114,16 +122,24 @@ impl MachineState<'_> {
 		self.const_slice(0x3a)
 	}
 	
-	pub fn get_line_endpoint(&self) -> [i16; 2] {
-		[ self.read::<i16>(0x3c), self.read::<i16>(0x3e) ]
+	pub fn get_line_endpoint(&mut self) -> Option<[i16; 2]> {
+		match *self.line_state() {
+			LineState::ENDPOINT_UNSET => None,
+			_ => Some([ self.read::<i16>(0x3c), self.read::<i16>(0x3e) ]),
+		}
 	}
 	
-	pub fn set_line_x(&mut self, value: i16) {
-		self.write(0x3c, value);
-	}
-	
-	pub fn set_line_y(&mut self, value: i16) {
-		self.write(0x3e, value);
+	pub fn set_line_endpoint(&mut self, value: Option<[i16; 2]>) {
+		match value {
+			Some([x, y]) => {
+				*self.line_state() = LineState::ENDPOINT_SET;
+				self.write(0x3c, x);
+				self.write(0x3e, y);
+			},
+			None => {
+				*self.line_state() = LineState::ENDPOINT_UNSET;
+			},
+		}
 	}
 	
 	pub fn audio_effects_flags(&mut self) -> &mut [u8; 4] {

@@ -100,10 +100,11 @@ fn main() {
 	frame.buffer = vec![0_u8; framebuffer.len() * scale.pow(2)].into();
 	
 	if summary {
+		let summary_pos = grid_height * grid_width - 1;
 		draw_summary(
 			&mut framebuffer,
-			(results.len() % grid_width) * CELL_WIDTH,
-			(results.len() / grid_width) * CELL_HEIGHT,
+			(summary_pos % grid_width) * CELL_WIDTH,
+			(summary_pos / grid_width) * CELL_HEIGHT,
 			fb_width,
 			&results,
 		);

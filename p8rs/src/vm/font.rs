@@ -47,7 +47,7 @@ impl<'a> Font<'a> {
 
 bitflags! {
 	pub struct FontFlags: u8 {
-		const SIZE_ADUST_EN = 0b0000_0001;
-		const TAB_RELATIVE  = 0b0000_0010;
+		const SIZE_ADUST_EN = 1 << 0;
+		const TAB_RELATIVE  = 1 << 1;
 	}
 }

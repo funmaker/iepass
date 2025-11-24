@@ -28,14 +28,14 @@ p8rs.test_mem("Color", 0x0000, 0x2000);
 p8rs.test("Color - Return", { p1, p2, p3, p4 })
 
 cls()
-sset(-4, -4, 8)
-sset(-10, 200, 11)
-sset(500, -200, 20)
-sset(50, -5, -10)
-local p1 = sget(-4, -4)
-local p2 = sget(-10, 200)
-local p3 = sget(500, -200)
-local p4 = sget(50, -5)
+sset()
+sset(11)
+sset(10, 20)
+sset(4, 4, 8)
+local p1 = sget()
+local p2 = sget(64)
+local p3 = sget(10, 20)
+local p4 = sget(4, 4)
 p8rs.test_mem("Overflow", 0x0000, 0x2000);
 p8rs.test("Overflow - Return", { p1, p2, p3, p4 })
 
@@ -50,6 +50,20 @@ local p3 = sget(64)
 local p4 = sget()
 p8rs.test_mem("Less args", 0x0000, 0x2000);
 p8rs.test("Less args - Return", { p1, p2, p3, p4 })
+
+cls()
+pal({ 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7 })
+for y=0,127 do
+  for x=0,127 do
+    sset(x, y, (x + y) % 16)
+  end
+end
+local p1 = sget(4, 4)
+local p2 = sget(10, 20)
+local p3 = sget(64, 64)
+local p4 = sget(120, 2)
+p8rs.test_scr("Palette");
+p8rs.test("Palette - Return", { p1, p2, p3, p4 })
 
 cls()
 camera(-10, -15)

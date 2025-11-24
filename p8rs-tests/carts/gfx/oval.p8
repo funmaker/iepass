@@ -71,20 +71,22 @@ fillp()
 clip()
 p8rs.test_scr("fill pattern");
 
-for e = -2,2,0.1 do
+scales = {
+  0x0000.4000, 0x0000.4984, 0x0000.5472, 0x0000.6101, 0x0000.6f6e, 0x0000.7fff, 0x0000.9308, 0x0000.a8e5, 0x0000.c203, 0x0000.dedc, 0x0000.ffff, 0x0001.2611, 0x0001.51cb, 0x0001.8406, 0x0001.bdb8, 0x0001.ffff, 0x0002.4c22, 0x0002.a396, 0x0003.080c, 0x0003.7b71, 0x0003.ffff,
+}
+
+for _, s in ipairs(scales) do
   cls()
-  s = 2^e
   for i = 64,0,-1 do
     oval(64 - i * 4 * s, 64 - i * 4 / s, 64 + i * 4 * s, 64 + i * 4 / s, i % 15 + 1)
   end
   p8rs.test_scr("concentric " .. s);
 end
 
-for e = -2,2,0.1 do
+for _, s in ipairs(scales) do
   cls()
-  s = 2^e
   for i = 64,0,-1 do
     oval(64 - i * 4 * s, 64 - i * 4 / s, 65 + i * 4 * s, 65 + i * 4 / s, i % 15 + 1)
   end
-  p8rs.test_scr("concentric offcenter " .. s);
+  p8rs.test_scr("concentric off " .. s);
 end
