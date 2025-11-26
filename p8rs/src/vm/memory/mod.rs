@@ -13,7 +13,7 @@ pub mod music;
 pub mod sound_effects;
 pub mod machine_state;
 pub mod screen;
-mod painter;
+pub mod painter;
 
 use crate::utils;
 use sprites::Sprites;

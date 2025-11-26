@@ -4,10 +4,10 @@ mod utils;
 
 use core::ops::Range;
 
-use crate::vm::memory::Memory;
 pub use callback::{PainterCallback, CallbackResult, Noop};
 pub use mode::{PainterMode, PenMode, SpriteMode};
 pub use utils::PaintRange;
+use super::Memory;
 use utils::Vector;
 
 #[derive(Debug)]
@@ -100,7 +100,7 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 	}
 	
 	fn paint_abs_pixel(&mut self, x: u8, y: u8) {
-		let col = match self.callback.check(x, y) {
+		let col = match self.callback.check(self.memory, x, y) {
 			CallbackResult::Discard => return,
 			CallbackResult::Keep => None,
 			CallbackResult::Color(col) => Some(col),

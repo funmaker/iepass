@@ -6,6 +6,7 @@ use p8rs_piccolo::Context;
 use p8rs_types::p8num::P8Num;
 
 use crate::vm::memory::machine_state::MiscChipsetFeatureFlags;
+use crate::vm::memory::Memory;
 use crate::vm::Runtime;
 
 pub fn install_pico8_drawing<A: Allocator + 'static>(ctx: Context) {
@@ -16,6 +17,7 @@ pub fn install_pico8_drawing<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("ovalfill", ovalfill::callback::<A>(ctx));
 	ctx.set_global("oval", oval::callback::<A>(ctx));
 	ctx.set_global("line", line::callback::<A>(ctx));
+	ctx.set_global("spr", spr::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -326,5 +328,31 @@ pub fn line<A: Allocator + 'static>(rt: &mut Runtime<A>, p1: Option<P8Num>, p2: 
 			y += if y1 > y0 { 1 } else { -1 };
 			err -= dx * 2;
 		}
+	}
+}
+
+#[api_callback]
+pub fn spr<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: Option<P8Num>, h: Option<P8Num>, flip_x: Option<bool>, flip_y: Option<bool>) {
+	let n = n.unwrap_or(0);
+	let sx = (n % 16) * 8;
+	let sy = (n / 16) * 8;
+	let x = x.unwrap_or(0);
+	let y = y.unwrap_or(0);
+	let w = (w.unwrap_or(p8!(1)) * p8!(8)).to_integer().clamp(0, 128 - sx);
+	let h = (h.unwrap_or(p8!(1)) * p8!(8)).to_integer().clamp(0, 128 - sy);
+	let flip_x = flip_x.unwrap_or(false);
+	let flip_y = flip_y.unwrap_or(false);
+	if n < 0 || n > 255 || w <= 0 || h <= 0 { return; }
+	
+	let painter = rt.memory.painter().sprite_mode();
+	let (x0, y0) = painter.to_abs(x, y);
+	let x1 = x0 + w - 1;
+	let y1 = y0 + h - 1;
+	
+	match (flip_x, flip_y) {
+		(false, false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x as i16 - x0) as u8, (sy + y as i16 - y0) as u8)).paint_abs(x0..=x1, y0..=y1); },
+		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)).paint_abs(x0..=x1, y0..=y1); },
+		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
+		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
 	}
 }
