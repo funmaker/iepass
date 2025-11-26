@@ -12,11 +12,26 @@ pub fn install_pico8_memory<A: Allocator + 'static>(ctx: Context) {
 #[api_callback]
 pub fn poke<A: Allocator + 'static>(rt: &mut Runtime<A>, addr: i16, bytes: Variadic<alloc::vec::Vec<u8>>) {
 	let addr = addr.cast_unsigned() as usize;
+	let range = addr..(addr + bytes.len().max(1));
+	
+	if range.end > 0x5f24 && range.start <= 0x5f27 {
+		let handlers: &[(usize, fn(&mut Runtime<A>, u8))] = &[
+			(0x5f24, |rt, val| rt.set_cursor_home(val as i16)),
+			(0x5f26, |rt, val| rt.set_cursor_x(val as i16)),
+			(0x5f27, |rt, val| rt.set_cursor_y(val as i16)),
+		];
+		
+		for &(addr, handler) in handlers {
+			if range.contains(&addr) {
+				handler(rt, if bytes.is_empty() { 0 } else { bytes[addr - range.start] });
+			}
+		}
+	}
 	
 	if bytes.is_empty() {
 		rt.memory[addr] = 0;
 	} else {
-		rt.memory[addr..addr+bytes.len()].copy_from_slice(bytes.as_slice());
+		rt.memory[range].copy_from_slice(bytes.as_slice());
 	}
 }
 

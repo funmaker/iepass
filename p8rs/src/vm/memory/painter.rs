@@ -54,6 +54,11 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		}
 	}
 	
+	pub fn set_fill(&mut self, fill: Option<[[bool; 4]; 4]>) -> &mut Self {
+		self.fill = fill;
+		self
+	}
+	
 	pub fn sprite_mode(self) -> Painter<'m, SpriteMode, CB> {
 		Painter {
 			mode: SpriteMode::new(self.memory),

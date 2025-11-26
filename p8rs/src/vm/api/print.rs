@@ -1,11 +1,14 @@
 use core::alloc::Allocator;
 use core::pin::Pin;
+use std::ops::Not;
+use bitflags::bitflags;
 use gc_arena::Collect;
+use p8rs_macros::TransparentRef;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
-
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
+use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
 pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
@@ -17,7 +20,10 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			x = None;
 		}
 		
-		if let Some((x, y)) = x.zip(y) { *rt.memory.machine_state().cursor_position() = [x.to_integer() as u8, y.to_integer() as u8]; }
+		if let Some((x, y)) = x.zip(y) {
+			rt.set_cursor_home(x.to_integer());
+			rt.set_cursor_position([x.to_integer(), y.to_integer()]);
+		}
 		if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 		
 		let text = if let Value::String(text) = text {
@@ -50,8 +56,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 		let flags = *rt.memory.machine_state().print_defaults().flags();
 		
 		if y.is_none() {
-			let font_height = get_font_height(rt, flags);
-			screen_scroll(rt, font_height, false);
+			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, flags, y.is_some());
 		}
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
@@ -62,7 +67,10 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 			stopped: false,
 			flags: flags.bits(),
 			x_wrapped: false,
+			y_provided: y.is_some(),
 			clipping: false,
+			drawn: false,
+			max_x: None,
 		})))
 	}));
 }
@@ -83,47 +91,100 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
-	#[allow(unused)]
-	ModifyFlags(PrintDefaultsFlags), // TODO:
+	ModifyFlags(PrintDefaultsFlags),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct  PrintStateFlags(u16);
 
-/// Scroll the screen up if needed, so that at least `font_height` new pixels will fit, unless `MiscChipsetFeatureFlags::NO_PRINT_SCROLL` is set.
-/// The screen is scrolled up by multiples of `font_height` unless `exact` is true.
-fn screen_scroll(rt: &mut Runtime, font_height: u8, exact: bool) {
-	if rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) { return }
-	
-	let current_y = rt.memory.machine_state().cursor_position()[1];
-	let max_y = 128 - font_height;
-	if current_y > max_y { return }
-	
-	let new_y = current_y.saturating_add(font_height);
-	if new_y <= max_y { return }
-	
-	let mut shift = new_y - max_y;
-	if !exact {
-		shift = ((shift + font_height - 1) / font_height) * font_height;
+bitflags! {
+    impl PrintStateFlags: u16 {
+        // const ENABLE        = 1 << 0;
+        const PADDING       = 1 << 1;
+        const WIDE          = 1 << 2;
+        const TALL          = 1 << 3;
+        const SOLID_BG      = 1 << 4;
+        const INVERT        = 1 << 5;
+        const DOTTY         = 1 << 6;
+        const CUSTOM_FONT   = 1 << 7;
+		
+		const PINBALL_DOTTY = 1 << 8;
+		const WRAP          = 1 << 9;
+		const SCROLL        = 1 << 10;
+		const END_NEWLINE   = 1 << 11;
+		// TODO: finish internal print state
+		
+        const _ = !0;
+    }
+}
+
+fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
+	if rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) {
+		return;
 	}
 	
-	rt.memory.machine_state().cursor_position()[1] -= shift;
+	rt.set_cursor_y(rt.get_cursor_position()[1].overflowing_sub(shift as i16).0);
 	rt.memory.screen().shift_up(shift, 0);
 }
 
-fn cursor_new_line(rt: &mut Runtime, flags: PrintDefaultsFlags, scroll_exact: bool) {
-	rt.memory.machine_state().cursor_position()[0] = *rt.memory.machine_state().cursor_home_x();
-	
-	let font_height = get_font_height(rt, flags);
-	screen_scroll(rt, font_height, scroll_exact);
-	let current_y = rt.memory.machine_state().cursor_position()[1];
-	let new_y = current_y.overflowing_add(font_height).0;
-	rt.memory.machine_state().cursor_position()[1] = new_y;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum NewlineRequest {
+	MakeSpaceBeforePrint,
+	WrappingNewline,
+	ContentNewline,
+	PrintEndNewline
 }
 
-fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8]) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
+fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
+	let (line_height, font_height) = get_line_height(rt, flags);
+	
+	let (reset_x, align_shift, advance_y, considered_height) = match request {
+		NewlineRequest::MakeSpaceBeforePrint => (false, false,           0, line_height),
+		NewlineRequest::WrappingNewline =>      (true,  false, line_height, line_height),
+		NewlineRequest::ContentNewline =>       (true,  true,  line_height, line_height),
+		NewlineRequest::PrintEndNewline =>      (true,  true,  line_height, font_height),
+	};
+	
+	if reset_x {
+		rt.set_cursor_x(rt.get_cursor_home());
+	}
+	
+	let curr_y = rt.get_cursor_position()[1];
+	let new_y = curr_y.overflowing_add(advance_y as i16).0;
+	
+	rt.set_cursor_y(new_y);
+	
+	if !y_passed && !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) && new_y >= 0 && new_y < 256 {
+		let new_y = new_y as u8;
+		let max_y = 128 - considered_height;
+		if new_y > max_y {
+			let mut shift = new_y - max_y;
+			if align_shift && shift < font_height {
+				shift = font_height;
+			}
+			screen_shift_up_exact(rt, shift);
+		}
+	}
+}
+
+fn escape_to_print_flags(val: u8) -> Option<PrintDefaultsFlags> {
+	match val {
+		b'b' => Some(PrintDefaultsFlags::PADDING),
+		b'w' => Some(PrintDefaultsFlags::WIDE),
+		b't' => Some(PrintDefaultsFlags::TALL),
+		b'#' => Some(PrintDefaultsFlags::SOLID_BG),
+		b'i' => Some(PrintDefaultsFlags::INVERT),
+		b'=' => Some(PrintDefaultsFlags::DOTTY),
+		b'p' => Some(PrintDefaultsFlags::WIDE | PrintDefaultsFlags::TALL | PrintDefaultsFlags::DOTTY),
+		_ => None
+	}
+}
+
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
-	
 	Ok(match escape_code {
 		0 => EscapeSequenceAction::Stop,
 		6 => {
@@ -138,16 +199,43 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 					let arg = control_arg_to_number(bytes[2]).unwrap(); // TODO: safety
 					EscapeSequenceAction::SetLetterFrameSkip(arg as usize)
 				}
+				b'-' => {
+					if let Some(flag) = escape_to_print_flags(bytes[2]) {
+						EscapeSequenceAction::ModifyFlags(flags & flag.not())
+					}else{
+						debug!("unparsed sequence {:?}", bytes);
+						EscapeSequenceAction::Nop
+					}
+				},
 				_ => {
+					if let Some(flag) = escape_to_print_flags(arg) {
+						return Ok(EscapeSequenceAction::ModifyFlags(flags | flag | PrintDefaultsFlags::ENABLE))
+					}
 					debug!("Unimplemented escape sequence! {:?}", bytes);
 					EscapeSequenceAction::Nop
 				}
 			}
 		},
-		10 => {
-			cursor_new_line(rt, flags, false);
+		8 => { // \b
+			let x = rt.get_cursor_position()[0];
+			let font_width = get_font(rt, flags).width();
+			rt.set_cursor_x(x.overflowing_sub(font_width as i16).0);
 			EscapeSequenceAction::Nop
-		}
+		},
+		9 => { // \t
+			let tab_stop = 16; // TODO: check if configurable
+			let x = rt.get_cursor_position()[0];
+			rt.set_cursor_x((x / tab_stop + 1) * tab_stop);
+			EscapeSequenceAction::Nop
+		},
+		10 => { // \n
+			handle_newline(rt, NewlineRequest::ContentNewline, flags, y_passed);
+			EscapeSequenceAction::Nop
+		},
+		13 => { // \r
+			rt.set_cursor_x(rt.get_cursor_home());
+			EscapeSequenceAction::Nop
+		},
 		_ => {
 			debug!("Unimplemented escape sequence! {:?}", bytes);
 			EscapeSequenceAction::Nop
@@ -155,9 +243,16 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 	})
 }
 
-fn get_font_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> u8 {
-	get_font(rt, flags).height()
+/// Returns: (line_height, font_height)
+fn get_line_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> (u8, u8) {
+	let font_height = get_font(rt, flags).height();
+	if flags.contains(PrintDefaultsFlags::TALL) && flags.contains(PrintDefaultsFlags::ENABLE) {
+		(font_height * 2, font_height)
+	} else {
+		(font_height, font_height)
+	}
 }
+
 
 fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
 	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
@@ -168,49 +263,79 @@ fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
 	}
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, dry_run: bool) -> (i16, i16, bool) {
-	// let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
-	// let is_tall = flags.contains(PrintDefaultsFlags::TALL);
-	// let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
-	// let is_dotty = flags.contains(PrintDefaultsFlags::DOTTY);
-	// TODO: Use flags
-	
-	let pen_color = *rt.memory.machine_state().pen_color();
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
+	let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
+	let is_tall = flags.contains(PrintDefaultsFlags::TALL);
+	let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
+	let is_dotty = flags.contains(PrintDefaultsFlags::DOTTY);
+	let is_dotty_x = is_dotty && is_wide && !is_tall;
+	let is_dotty_y = is_dotty && is_tall;
 	
 	let font = get_font(rt, flags);
-	let char_width = font.width_chr(letter);
-	let char_height = font.height();
-	let char_font = &font.char(letter);
 	
-	let overflowed_x = rt.memory.machine_state().cursor_position()[0].overflowing_add(char_width).0 > 128
+	let font_width = font.width_chr(letter);
+	let font_height = font.height();
+	let char_font = &font.char(letter);
+	let x_stride = if is_wide { 2 } else { 1 };
+	let y_stride = if is_tall { 2 } else { 1 };
+	let draw_width = font_width * x_stride;
+	let draw_height = font_height * y_stride;
+	
+	let x_wrapped = rt.get_cursor_position()[0].overflowing_add(font_width as i16).0 > 128
 		&& rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP);
 	
-	if overflowed_x {
-		cursor_new_line(rt, flags, true);
+	if x_wrapped {
+		handle_newline(rt, NewlineRequest::WrappingNewline, flags, y_passed);
 	}
 	
-	let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
-	
-	assert!(char_width <= 8, "Char width cannot be >8");
-	assert!(char_height <= 8, "Char height cannot be >8");
+	assert!(font_width <= 8, "Char width cannot be >8");
+	assert!(font_height <= 8, "Char height cannot be >8");
 	
 	if !dry_run {
-		for y in 0..char_height {
-			let mut font_line = char_font[y as usize];
-			for x in 0..char_width {
-				let bit = font_line & 1 != 0;
-				font_line >>= 1;
-				
-				if bit {
-					let pixel_x = cursor_x.overflowing_add(x).0;
-					let pixel_y = cursor_y.overflowing_add(y).0;
-					rt.memory.screen().set_pixel(pixel_x, pixel_y, pen_color);
-				}
+		let [cursor_x, cursor_y] = rt.get_cursor_position();
+		let (abs_cursor_x, abs_cursor_y) = rt.memory.painter().to_abs(cursor_x, cursor_y);
+
+		let mut painter = rt.memory.painter().with_callback(|x: u8, y: u8| {
+			let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
+			let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
+			let font_x = if is_wide { local_x / 2 } else { local_x };
+			let font_y = if is_tall { local_y / 2 } else { local_y };
+			let font_line = char_font[font_y as usize];
+			let font_bit = (font_line >> font_x) & 1 != 0;
+			
+			if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
+				CallbackResult::Keep
+			}else{
+				CallbackResult::Discard
 			}
-		}
+		});
+		
+		painter.set_fill(None).paint(
+			cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
+			cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
+		);
+		
+		// for y in 0..font_height {
+		// 	let mut font_line = char_font[y as usize];
+		// 	for x in 0..font_width {
+		// 		let font_bit = font_line & 1 != 0;
+		// 		font_line >>= 1;
+		//
+		// 		for dy in 0..y_stride {
+		// 			for dx in 0..x_stride {
+		// 				if (font_bit && !(is_dotty_x && dx == 0) && !(is_dotty_y && dy == 1)) != is_inverted {
+		// 					let pixel_x = cursor_x.overflowing_add((x * x_stride + dx) as i16).0;
+		// 					let pixel_y = cursor_y.overflowing_add((y * y_stride + dy) as i16).0;
+		// 					// painter.paint(pixel_x, pixel_y);
+		// 				}
+		// 			}
+		// 		}
+		//
+		// 	}
+		// }
 	}
 	
-	(char_width as i16, char_height as i16, overflowed_x)
+	(draw_width as i16, draw_height as i16, x_wrapped)
 }
 
 
@@ -232,6 +357,12 @@ struct PrintSeq<'gc> {
 	x_wrapped: bool,
 	/// should print stop drawing because we ran out either x-space (without character wrapping) or y-space (without line scrolling)
 	clipping: bool,
+	/// has ever drawn (without clipping)
+	drawn: bool,
+	/// was y-coord provided when calling print()
+	y_provided: bool,
+	/// maximum cursor x during printing - for return
+	max_x: Option<i16>,
 }
 
 impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
@@ -239,7 +370,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		mut self: Pin<&mut Self>,
 		ctx: Context<'gc>,
 		_exec: Execution<'gc, '_>,
-		_stack: Stack<'gc, '_>,
+		mut stack: Stack<'gc, '_>,
 		rt: RuntimeRef<'_>,
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
 		let rt = rt.downcast::<Runtime>();
@@ -254,20 +385,22 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				self.next_char = None;
 				
 				let chipset_flags = *rt.memory.machine_state().misc_chipset_flags();
-				let [cursor_x, cursor_y] = *rt.memory.machine_state().cursor_position();
+				let [cursor_x, cursor_y] = rt.get_cursor_position();
 
-				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL)) 
+				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL))
 				|| (cursor_x >= 128 && !chipset_flags.contains(MiscChipsetFeatureFlags::PRINT_WRAP)) {
-					self.clipping = true;
+					if self.drawn { self.clipping = true; }
+				} else {
+					self.drawn = true;
 				}
 				
-				let (w, _, x_overflowed) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.clipping);
+				let (w, _, x_wrapped) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.y_provided, self.clipping);
 				
-				if x_overflowed {
-					self.x_wrapped = true;
-				}
+				self.x_wrapped = x_wrapped;
 				
-				rt.memory.machine_state().cursor_position()[0] = rt.memory.machine_state().cursor_position()[0].overflowing_add(w as u8).0;
+				let x = rt.get_cursor_position()[0].overflowing_add(w).0;
+				rt.set_cursor_x(x);
+				self.max_x = self.max_x.max(Some(x));
 			}
 			
 			let part = self.text.next();
@@ -279,7 +412,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 						self.skip_frames = self.letter_frame_skip;
 					}
 					TextPart::EscapeSequence(bytes) => {
-						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes)? {
+						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes, self.y_provided)? {
 							EscapeSequenceAction::Nop => {}
 							EscapeSequenceAction::SkipFrames(n) => {
 								self.skip_frames = n;
@@ -303,10 +436,10 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 		}
 		
 		if !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_NEWLINE) {
-			cursor_new_line(rt, PrintDefaultsFlags::from_bits_truncate(self.flags), self.x_wrapped);
+			handle_newline(rt, NewlineRequest::PrintEndNewline, PrintDefaultsFlags::from_bits_truncate(self.flags), self.y_provided);
 		}
 		
-		// todo - return values
+		stack.replace(ctx, P8Num::from(self.max_x.unwrap_or(0)));
 		Ok(SequencePoll::Return)
 	}
 }

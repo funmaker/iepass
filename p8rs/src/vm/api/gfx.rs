@@ -29,20 +29,20 @@ pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) {
 	let col = (col << 4) | col;
 	
 	rt.memory.screen().fill(col);
-	*rt.memory.machine_state().cursor_home_x() = 0;
-	*rt.memory.machine_state().cursor_position() = [0, 0];
+	rt.set_cursor_x(0);
+	rt.set_cursor_position([0, 0]);
 	*rt.memory.machine_state().clip_rect() = [0, 0, 128, 128];
 }
 
 #[api_callback]
-pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<u8>, y: Option<u8>, col: Option<P8Num>) -> (u8, u8, u8) {
-	let [prev_x, prev_y] = *rt.memory.machine_state().cursor_position();
+pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) -> (i16, i16, u8) {
+	let [prev_x, prev_y] = rt.get_cursor_position();
 	let prev_col = *rt.memory.machine_state().pen_color();
 	let x = x.unwrap_or(0);
 	let y = y.unwrap_or(0);
 	
-	*rt.memory.machine_state().cursor_home_x() = x;
-	*rt.memory.machine_state().cursor_position() = [x, y];
+	rt.set_cursor_home(x);
+	rt.set_cursor_position([x, y]);
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	
 	(prev_x, prev_y, prev_col)

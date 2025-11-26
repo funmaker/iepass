@@ -16,7 +16,8 @@ impl MachineState<'_> {
 		
 		*self.pen_color() = 6;
 		*self.clip_rect() = [0, 0, 128, 128];
-		*self.cursor_position() = [0, 6];
+		self._set_cursor_y(6);
+		
 		*self.sprite_addr_map() = SpriteScreenMemoryMap::SPRITE_SHEET;
 		*self.screen_addr_map() = SpriteScreenMemoryMap::SCREEN;
 		*self.map_addr_map() = 0x20;
@@ -50,16 +51,23 @@ impl MachineState<'_> {
 		self.const_slice(0x20)
 	}
 	
-	pub fn cursor_home_x(&mut self) -> &mut u8 {
-		&mut self[0x24]
+	/// Cursor must be controlled via methods in `Runtime` instead of changing memory directly!
+	pub(crate) fn _set_cursor_home_x(&mut self, value: u8) {
+		self.write(0x24, value);
 	}
 	
 	pub fn pen_color(&mut self) -> &mut u8 {
 		&mut self[0x25]
 	}
 	
-	pub fn cursor_position(&mut self) -> &mut [u8; 2] {
-		self.const_slice(0x26)
+	/// Cursor must be controlled via methods in `Runtime` instead of changing memory directly!
+	pub(crate) fn _set_cursor_x(&mut self, val: u8) {
+		self.write(0x26, val);
+	}
+	
+	/// Cursor must be controlled via methods in `Runtime` instead of changing memory directly!
+	pub(crate) fn _set_cursor_y(&mut self, val: u8) {
+		self.write(0x27, val);
 	}
 	
 	pub fn get_camera_position(&self) -> [i16; 2] {
