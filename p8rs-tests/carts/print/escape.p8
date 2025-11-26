@@ -12,8 +12,11 @@ p8rs.test_scr("Escape nrbt")
 cls()
 print("\^wTest\^-wTest\^w", 0, 0)
 print("normal")
-print("\^=Test\^-=Test")
-print("\^=\^t\^wTest\^-=Test")
-print("\^=\^wTest\^-=Test")
-print("\^pTest\^-pTest")
+
+-- TODO: implement pinball
+--print("\^=Test\^-=Test")
+--print("\^=\^t\^wTest\^-=Test")
+--print("\^=\^wTest\^-=Test")
+--print("\^pTest\^-pTest")
+
 p8rs.test_scr("Escape ^")

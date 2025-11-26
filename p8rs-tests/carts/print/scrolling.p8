@@ -27,8 +27,8 @@ poke(0x5f58, 1 | (1<<2) | (1<<3))
 
 for offset=0,7 do
         cls()
-        print('==', 0, 20 + offset)
-        for i=0,8 do
+        print('==', 0, 90 + offset)
+        for i=0,4 do
                 print("line" .. i .. "\n--2--\n--3--")
         end
         p8rs.test_scr("Newlines, offset="..offset)

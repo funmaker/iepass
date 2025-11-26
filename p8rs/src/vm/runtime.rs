@@ -59,12 +59,12 @@ where A: Allocator
 	
 	pub fn set_cursor_x(&mut self, val: i16) {
 		self.cursor[0] = val;
-		self.memory.machine_state()._cursor_position()[0] = val as u8;
+		self.memory.machine_state()._set_cursor_x(val as u8);
 	}
 
 	pub fn set_cursor_y(&mut self, val: i16) {
 		self.cursor[1] = val;
-		self.memory.machine_state()._cursor_position()[1] = val as u8;
+		self.memory.machine_state()._set_cursor_y(val as u8);
 	}
 	
 	
@@ -74,7 +74,7 @@ where A: Allocator
 	
 	pub fn set_cursor_home(&mut self, x: i16) {
 		self.cursor_home = x;
-		*self.memory.machine_state()._cursor_home_x() = x as u8;
+		self.memory.machine_state()._set_cursor_home_x(x as u8);
 	}
 }
 

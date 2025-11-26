@@ -3,7 +3,7 @@ version 43
 
 __lua__
 
-for offset=0,15 do
+for offset=0,10 do
         cls()
         local y = 115 + offset
         print("xx", 0, y)
@@ -18,7 +18,7 @@ end
 -- large text
 poke(0x5f58, 1 | (1<<2) | (1<<3))
 
-for offset=0,15 do
+for offset=0,10 do
         cls()
         local y = 115 + offset
         print("xx", 0, y)

@@ -1,10 +1,11 @@
 use core::alloc::Allocator;
 use core::pin::Pin;
 use std::ops::Not;
+use bitflags::bitflags;
 use gc_arena::Collect;
+use p8rs_macros::TransparentRef;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
-use p8rs_types::p8scii::Display;
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
 use crate::vm::memory::painter::CallbackResult;
@@ -55,12 +56,7 @@ pub fn install_pico8_print<A: Allocator + 'static>(ctx: Context) {
 		let flags = *rt.memory.machine_state().print_defaults().flags();
 		
 		if y.is_none() {
-			let (line_height, font_height) = get_line_height(rt, flags);
-			println!("print({}) - cursor: {:?}", text, rt.get_cursor_position());
-			println!("print: scrolling in case line would not fit, line_height={}, font_height={}", line_height, font_height);
 			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, flags, y.is_some());
-		}else{
-			println!("print({}, {}, {}) - cursor: {:?}", text, x.unwrap(), y.unwrap(), rt.get_cursor_position());
 		}
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
@@ -98,10 +94,33 @@ enum EscapeSequenceAction {
 	ModifyFlags(PrintDefaultsFlags),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
+#[repr(transparent)]
+pub struct  PrintStateFlags(u16);
+
+bitflags! {
+    impl PrintStateFlags: u16 {
+        // const ENABLE        = 1 << 0;
+        const PADDING       = 1 << 1;
+        const WIDE          = 1 << 2;
+        const TALL          = 1 << 3;
+        const SOLID_BG      = 1 << 4;
+        const INVERT        = 1 << 5;
+        const DOTTY         = 1 << 6;
+        const CUSTOM_FONT   = 1 << 7;
+		
+		const PINBALL_DOTTY = 1 << 8;
+		const WRAP          = 1 << 9;
+		const SCROLL        = 1 << 10;
+		const END_NEWLINE   = 1 << 11;
+		// TODO: finish internal print state
+		
+        const _ = !0;
+    }
+}
+
 fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
-	println!("screen_shift_up_exact: scrolling, shift={}", shift);
 	if rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) {
-		println!("screen_shift_up_exact: jk actually NO_PRINT_SCROLL");
 		return;
 	}
 	
@@ -118,8 +137,6 @@ enum NewlineRequest {
 }
 
 fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
-	println!("handle_newline({:?})", request);
-	
 	let (line_height, font_height) = get_line_height(rt, flags);
 	
 	let (reset_x, align_shift, advance_y, considered_height) = match request {
@@ -146,7 +163,6 @@ fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefault
 			if align_shift && shift < font_height {
 				shift = font_height;
 			}
-			println!("handle_newline - shifting - new_y: {}, max_y: {}, shift: {}", new_y, max_y, shift);
 			screen_shift_up_exact(rt, shift);
 		}
 	}
@@ -185,17 +201,14 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 				}
 				b'-' => {
 					if let Some(flag) = escape_to_print_flags(bytes[2]) {
-						println!("Escape: ^- {}", Display(bytes));
 						EscapeSequenceAction::ModifyFlags(flags & flag.not())
 					}else{
-						println!("Escape UNPARSED: {}", Display(bytes));
 						debug!("unparsed sequence {:?}", bytes);
 						EscapeSequenceAction::Nop
 					}
 				},
 				_ => {
 					if let Some(flag) = escape_to_print_flags(arg) {
-						println!("Escape parsed: ^ {}", Display(bytes));
 						return Ok(EscapeSequenceAction::ModifyFlags(flags | flag | PrintDefaultsFlags::ENABLE))
 					}
 					debug!("Unimplemented escape sequence! {:?}", bytes);
