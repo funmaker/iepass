@@ -18,6 +18,7 @@ pub fn install_pico8_drawing<A: Allocator + 'static>(ctx: Context) {
 	ctx.set_global("oval", oval::callback::<A>(ctx));
 	ctx.set_global("line", line::callback::<A>(ctx));
 	ctx.set_global("spr", spr::callback::<A>(ctx));
+	ctx.set_global("sspr", sspr::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -354,5 +355,38 @@ pub fn spr<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, x: Optio
 		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)).paint_abs(x0..=x1, y0..=y1); },
 		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
 		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
+	}
+}
+
+#[api_callback]
+pub fn sspr<A: Allocator + 'static>(rt: &mut Runtime<A>, mut sx: i16, mut sy: i16, mut sw: i16, mut sh: i16, mut dx: i16, mut dy: i16, dw: Option<i16>, dh: Option<i16>, flip_x: Option<bool>, flip_y: Option<bool>) {
+	let dw = dw.unwrap_or(sw);
+	let dh = dh.unwrap_or(sw);
+	let flip_x = flip_x.unwrap_or(false);
+	let flip_y = flip_y.unwrap_or(false);
+	if sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 { return; }
+	
+	let painter = rt.memory.painter().sprite_mode();
+	let (dx0, dy0) = painter.to_abs(dx, dy);
+	let sx0 = sx;
+	let sy0 = sy;
+	let sx1 = sx + sw - 1;
+	let sy1 = sy + sh - 1;
+	let dxf = (sw > dw && sw % dw == 0).then_some(sw / dw);
+	let dyf = (sh > dh && sh % dh == 0).then_some(sh / dh);
+	
+	match (flip_x, flip_y) {
+		(false, false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx0 + sample(x as i16 - dx0, dw, sw, dxf)) as u8, (sy0 + sample(y as i16 - dy0, dh, sh, dyf)) as u8)).paint_abs(dx0..dx0+dw, dy0..dy0+dh); },
+		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx1 - sample(x as i16 - dx0, dw, sw, dxf)) as u8, (sy0 + sample(y as i16 - dy0, dh, sh, dyf)) as u8)).paint_abs(dx0..dx0+dw, dy0..dy0+dh); },
+		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx0 + sample(x as i16 - dx0, dw, sw, dxf)) as u8, (sy1 - sample(y as i16 - dy0, dh, sh, dyf)) as u8)).paint_abs(dx0..dx0+dw, dy0..dy0+dh); },
+		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx1 - sample(x as i16 - dx0, dw, sw, dxf)) as u8, (sy1 - sample(y as i16 - dy0, dh, sh, dyf)) as u8)).paint_abs(dx0..dx0+dw, dy0..dy0+dh); },
+	}
+}
+
+fn sample(x: i16, dw: i16, sw: i16, factor: Option<i16>) -> i16 {
+	if let Some(factor) = factor {
+		x * factor + factor / 2
+	} else {
+		((2 * x + 1) * sw - 1) / (2 * dw)
 	}
 }
