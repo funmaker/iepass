@@ -20,7 +20,6 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
 	ctx.set_global("type", get_type::callback(ctx));
-	ctx.set_global("btn", btn::callback(ctx));
 	ctx.set_global("stat", stat::callback(ctx));
 	ctx.set_global("trace", trace::callback(ctx));
 }
@@ -75,21 +74,6 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, 
 		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
 	})
 }
-
-#[api_callback]
-pub fn btn<'gc>(rt: &mut Runtime, btn_idx: Option<i16>, player_idx: Option<i16>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
-	match btn_idx {
-		None => Ok(Some(Value::Number(P8Num::from((rt.buttons.get_bits_for_player(0) as u16 | (rt.buttons.get_bits_for_player(1) as u16) << 8).cast_signed())))),
-		Some(button_idx) => {
-			let player_idx = player_idx.unwrap_or(0);
-			if player_idx < 0 || player_idx > 7 { return Ok(Some(Value::Boolean(false))) }
-			
-			Ok(Some(Value::Boolean(rt.buttons.is_down(player_idx as usize, button_idx as usize))))
-		}
-	}
-}
-
-// TODO: btnp - observe 0x5f5c and 0x5f5d
 
 #[api_callback]
 pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {

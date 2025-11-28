@@ -118,7 +118,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 						executor.resume(ctx, ()).unwrap();
 					}
 					
-					self.runtime.update();
+					self.runtime.start_frame();
 					
 					if !executor.step(ctx, &mut fuel, &mut self.runtime).unwrap() {
 						if fuel.is_interrupted() {

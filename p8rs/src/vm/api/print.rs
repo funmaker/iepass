@@ -298,7 +298,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 		
 		rt.memory
 		  .painter()
-		  .with_callback(|memory: &mut Memory, x: u8, y: u8| {
+		  .with_callback(|_: &mut Memory, x: u8, y: u8| {
 			  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
 			  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
 			  let font_x = if is_wide { local_x / 2 } else { local_x };
