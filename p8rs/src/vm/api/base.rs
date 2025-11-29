@@ -22,6 +22,8 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("type", get_type::callback(ctx));
 	ctx.set_global("stat", stat::callback(ctx));
 	ctx.set_global("trace", trace::callback(ctx));
+	ctx.set_global("time", time::callback(ctx));
+	ctx.set_global("t", time::callback(ctx));
 }
 
 #[api_callback]
@@ -125,6 +127,11 @@ pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Option<Value<'gc>> {
 #[api_callback]
 pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
 	rt.callbacks.printh(&text, filename.as_deref(), overwrite, save_to_desktop);
+}
+
+#[api_callback]
+pub fn time(rt: &mut Runtime) -> P8Num {
+	rt.time
 }
 
 

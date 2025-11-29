@@ -104,6 +104,16 @@ pub struct Block<S> {
     pub closed_on: LineNumber,
 }
 
+impl<S> From<LineAnnotated<Statement<S>>> for Block<S> {
+    fn from(inner: LineAnnotated<Statement<S>>) -> Self {
+        Self {
+            closed_on: inner.line_number,
+            statements: vec![inner],
+            return_statement: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Statement<S> {
@@ -546,33 +556,63 @@ impl<S: StringInterner> Parser<'_, S> {
 
     fn parse_if_statement(&mut self) -> Result<IfStatement<S::String>, ParseError> {
         self.expect_next(Token::If)?;
+        
+        let paren_cond = self.check_ahead(0, Token::LeftParen)?;
         let if_cond = self.parse_expression()?;
-        self.expect_next(Token::Then)?;
-        let if_block = self.parse_block()?;
-
-        let mut else_if_parts = Vec::new();
-        while self.check_ahead(0, Token::ElseIf)? {
-            self.take_next()?;
-            let cond = self.parse_expression()?;
-            self.expect_next(Token::Then)?;
-            let block = self.parse_block()?;
-            else_if_parts.push((cond, block));
-        }
-
-        let else_part = if self.check_ahead(0, Token::Else)? {
-            self.take_next()?;
-            Some(self.parse_block()?)
+        
+        if paren_cond && !self.check_ahead(0, Token::Then)? {
+            let line_number = self.lexer.line_number();
+            let if_stmt = LineAnnotated::new(line_number, self.parse_statement()?).into();
+            
+            let mut else_if_parts = Vec::new();
+            while self.check_ahead(0, Token::ElseIf)? {
+                self.take_next()?;
+                let cond = self.parse_expression()?;
+                self.expect_next(Token::Then)?;
+                let stmt = LineAnnotated::new(line_number, self.parse_statement()?).into();
+                else_if_parts.push((cond, stmt));
+            }
+            
+            let else_part = if self.check_ahead(0, Token::Else)? {
+                self.take_next()?;
+                Some(LineAnnotated::new(line_number, self.parse_statement()?).into())
+            } else {
+                None
+            };
+            
+            Ok(IfStatement {
+                if_part: (if_cond, if_stmt),
+                else_if_parts,
+                else_part,
+            })
         } else {
-            None
-        };
-
-        self.expect_next(Token::End)?;
-
-        Ok(IfStatement {
-            if_part: (if_cond, if_block),
-            else_if_parts,
-            else_part,
-        })
+            self.expect_next(Token::Then)?;
+            let if_block = self.parse_block()?;
+            
+            let mut else_if_parts = Vec::new();
+            while self.check_ahead(0, Token::ElseIf)? {
+                self.take_next()?;
+                let cond = self.parse_expression()?;
+                self.expect_next(Token::Then)?;
+                let block = self.parse_block()?;
+                else_if_parts.push((cond, block));
+            }
+            
+            let else_part = if self.check_ahead(0, Token::Else)? {
+                self.take_next()?;
+                Some(self.parse_block()?)
+            } else {
+                None
+            };
+            
+            self.expect_next(Token::End)?;
+            
+            Ok(IfStatement {
+                if_part: (if_cond, if_block),
+                else_if_parts,
+                else_part,
+            })
+        }
     }
 
     fn parse_while_statement(&mut self) -> Result<WhileStatement<S::String>, ParseError> {

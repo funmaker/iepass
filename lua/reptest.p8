@@ -1,6 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
+printh("REPTEST, press left arrow to measure delays.")
 
 printh("start===")
 for fps=1,60 do

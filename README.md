@@ -24,12 +24,17 @@ IE Pass - The Console The Pass
 $ cargo make build
 ```
 
+### Run Emulator:
+```bash
+$ cargo make run -- path/to/cart.p8
+```
+
+### Build and flash for ESP32-S3:
+```bash
+$ cargo make flash
+```
+
 ### Run Tests:
 ```bash
 $ cargo make test
-```
-
-### Build and flash:
-```bash
-$ cargo make flash
 ```

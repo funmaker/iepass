@@ -2,7 +2,8 @@ use core::alloc::Allocator;
 use core::any::Any;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
-
+use p8rs_macros::p8;
+use p8rs_types::p8num::P8Num;
 use crate::utils;
 use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
@@ -13,6 +14,7 @@ pub struct Runtime<A: Allocator = Global> {
 	pub memory: Box<Memory, A>,
 	pub buttons: Buttons,
 	pub target_fps: u16,
+	pub time: P8Num,
 	pub callbacks: Box<dyn Callbacks>,
 	cursor: [i16; 2],
 	cursor_home: i16,
@@ -27,6 +29,7 @@ where A: Allocator + Clone
 			memory: Memory::new_in(alloc),
 			buttons: Buttons::new(),
 			target_fps: 30,
+			time: p8!(0),
 			callbacks: Box::new(DefaultCallbacks),
 			cursor: [0, 6],
 			cursor_home: 0,
@@ -56,6 +59,8 @@ where A: Allocator
 		let interval = interval * self.target_fps as u32 / 30;
 		
 		self.buttons.update(buttons, delay, interval);
+		
+		self.time += P8Num::from(self.target_fps as i16).recip();
 	}
 	
 	/// Returns actual cursor position (memory only contains lower u8 of each coordinate)

@@ -10,6 +10,7 @@ use super::MemoryAccess;
 /// 0x5f00..=0x5f80
 pub struct MachineState<'m>(pub(super) &'m mut [u8; 0x80]);
 
+
 impl MachineState<'_> {
 	pub fn reset(&mut self) {
 		self.fill(0);
@@ -154,7 +155,7 @@ impl MachineState<'_> {
 		self.const_slice(0x40)
 	}
 	
-	pub fn rnd_state(&mut self) -> &mut [u8; 8] {
+	pub fn rng_state(&mut self) -> &mut [u8; 8] {
 		self.const_slice(0x44)
 	}
 	

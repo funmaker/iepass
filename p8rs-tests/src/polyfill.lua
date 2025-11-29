@@ -149,5 +149,5 @@ do
 		end
 	end
 	
-	poke(0x5f44, 0, 0, 0, 0, 0, 0, 0, 0) -- reset rnd seed
+	srand(0)
 end

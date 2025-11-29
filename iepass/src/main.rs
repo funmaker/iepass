@@ -165,9 +165,9 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     let mut pico8 = P8rs::new_in(&PSRAM_ALLOCATOR)?;
     
-    info!("Loading hello.lua");
+    info!("Loading hello.p8");
     
-    pico8.load(include_bytes!("../../lua/hello.lua"))?;
+    pico8.load(include_bytes!("../../lua/hello.p8"))?;
     
     info!("Entering main loop.");
     
