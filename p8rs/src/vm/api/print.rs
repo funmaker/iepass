@@ -8,6 +8,7 @@ use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execut
 use p8rs_types::p8num::P8Num;
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
+use crate::vm::memory::Memory;
 use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
@@ -294,45 +295,28 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	if !dry_run {
 		let [cursor_x, cursor_y] = rt.get_cursor_position();
 		let (abs_cursor_x, abs_cursor_y) = rt.memory.painter().to_abs(cursor_x, cursor_y);
-
-		let mut painter = rt.memory.painter().with_callback(|x: u8, y: u8| {
-			let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
-			let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
-			let font_x = if is_wide { local_x / 2 } else { local_x };
-			let font_y = if is_tall { local_y / 2 } else { local_y };
-			let font_line = char_font[font_y as usize];
-			let font_bit = (font_line >> font_x) & 1 != 0;
-			
-			if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
-				CallbackResult::Keep
-			}else{
-				CallbackResult::Discard
-			}
-		});
 		
-		painter.set_fill(None).paint(
-			cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
-			cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
-		);
-		
-		// for y in 0..font_height {
-		// 	let mut font_line = char_font[y as usize];
-		// 	for x in 0..font_width {
-		// 		let font_bit = font_line & 1 != 0;
-		// 		font_line >>= 1;
-		//
-		// 		for dy in 0..y_stride {
-		// 			for dx in 0..x_stride {
-		// 				if (font_bit && !(is_dotty_x && dx == 0) && !(is_dotty_y && dy == 1)) != is_inverted {
-		// 					let pixel_x = cursor_x.overflowing_add((x * x_stride + dx) as i16).0;
-		// 					let pixel_y = cursor_y.overflowing_add((y * y_stride + dy) as i16).0;
-		// 					// painter.paint(pixel_x, pixel_y);
-		// 				}
-		// 			}
-		// 		}
-		//
-		// 	}
-		// }
+		rt.memory
+		  .painter()
+		  .with_callback(|_: &mut Memory, x: u8, y: u8| {
+			  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
+			  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
+			  let font_x = if is_wide { local_x / 2 } else { local_x };
+			  let font_y = if is_tall { local_y / 2 } else { local_y };
+			  let font_line = char_font[font_y as usize];
+			  let font_bit = (font_line >> font_x) & 1 != 0;
+			  
+			  if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
+				  CallbackResult::Keep
+			  }else{
+				  CallbackResult::Discard
+			  }
+		  })
+		  .set_fill(None)
+		  .paint(
+			  cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
+			  cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
+		  );
 	}
 	
 	(draw_width as i16, draw_height as i16, x_wrapped)

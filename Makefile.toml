@@ -40,9 +40,8 @@ args = ["test", "--workspace", "--exclude", "iepass", "--exclude", "iepass-calib
 # Running
 [tasks.run]
 dependencies = ["build-assets"]
-cwd = "./iepass-emu"
 command = "cargo"
-args = ["run", "${@}"]
+args = ["run", "--package", "iepass-emu", "${@}"]
 
 [tasks.flash]
 dependencies = ["build-assets"]

@@ -7,12 +7,16 @@ mod string;
 mod internal;
 mod print;
 mod drawing;
+mod input;
+mod sound;
+mod rnd;
 
 use core::alloc::Allocator;
 use p8rs_piccolo::Context;
 
 pub fn install_pico8_apis<A: Allocator + 'static>(ctx: Context) {
 	base::install_pico8_base(ctx);
+	input::install_pico8_input(ctx);
 	math::install_pico8_math(ctx);
 	gfx::install_pico8_gfx::<A>(ctx);
 	drawing::install_pico8_drawing::<A>(ctx);
@@ -20,5 +24,7 @@ pub fn install_pico8_apis<A: Allocator + 'static>(ctx: Context) {
 	memory::install_pico8_memory::<A>(ctx);
 	string::install_pico8_string(ctx);
 	table::install_pico8_table(ctx);
+	sound::install_pico8_sound(ctx);
+	rnd::install_pico8_rnd(ctx);
 	internal::install_pico8_internal::<A>(ctx);
 }

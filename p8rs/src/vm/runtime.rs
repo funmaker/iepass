@@ -1,19 +1,20 @@
 use core::alloc::Allocator;
-use core::ops::{Div, Not};
 use core::any::Any;
 use alloc::alloc::Global;
 use alloc::boxed::Box;
-
+use p8rs_macros::p8;
+use p8rs_types::p8num::P8Num;
 use crate::utils;
 use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
-
+use crate::vm::memory::machine_state::{BtnpRepDelay, BtnpRepInterval};
 
 pub struct Runtime<A: Allocator = Global> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Box<Memory, A>,
 	pub buttons: Buttons,
 	pub target_fps: u16,
+	pub time: P8Num,
 	pub callbacks: Box<dyn Callbacks>,
 	cursor: [i16; 2],
 	cursor_home: i16,
@@ -28,6 +29,7 @@ where A: Allocator + Clone
 			memory: Memory::new_in(alloc),
 			buttons: Buttons::new(),
 			target_fps: 30,
+			time: p8!(0),
 			callbacks: Box::new(DefaultCallbacks),
 			cursor: [0, 6],
 			cursor_home: 0,
@@ -39,12 +41,26 @@ impl<A> Runtime<A>
 where A: Allocator
 {
 	/// Should be called before every frame
-	pub fn update(&mut self) {
+	pub fn start_frame(&mut self) {
 		let buttons = self.callbacks.get_buttons();
-		for i in 0..8 {
-			self.memory[0x5f4c + i] = buttons[i] & 0x3f;
-		}
-		self.buttons.update(self.target_fps, &buttons);
+		*self.memory.machine_state().btn_state() = buttons;
+		
+		let delay = match *self.memory.machine_state().btnp_rep_delay() {
+			BtnpRepDelay::DEFAULT => 15,
+			BtnpRepDelay::DISABLED => 0,
+			n => n.get() as u32,
+		};
+		let delay = delay * self.target_fps as u32 / 30;
+		
+		let interval = match *self.memory.machine_state().btnp_rep_interval() {
+			BtnpRepInterval::DEFAULT => 4,
+			n => n.get() as u32,
+		};
+		let interval = interval * self.target_fps as u32 / 30;
+		
+		self.buttons.update(buttons, delay, interval);
+		
+		self.time += P8Num::from(self.target_fps as i16).recip();
 	}
 	
 	/// Returns actual cursor position (memory only contains lower u8 of each coordinate)
@@ -97,63 +113,100 @@ where A: Allocator + 'static {
 	}
 }
 
+#[derive(Debug, Copy, Clone, Hash)]
 pub struct Buttons {
-	buttons: [u8; 8],
-	buttons_repeat_state: [u8; 8],
-	buttons_held_frames: [u8; 8*8],
+	pressed: [u8; 8],
+	pressed_now: [u8; 8],
+	state: [[ButtonState; 8]; 8],
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum ButtonState {
+	Initial(u32),
+	Repeat(u32),
+	Done,
 }
 
 #[allow(dead_code)]
 impl Buttons {
 	pub fn new() -> Buttons {
 		Self {
-			buttons: [0; 8],
-			buttons_repeat_state: [0; 8],
-			buttons_held_frames: [0; 8*8],
+			pressed: [0; 8],
+			pressed_now: [0; 8],
+			state: [[ButtonState::Done; 8]; 8],
 		}
 	}
 	
-	pub fn update(&mut self, fps: u16, state: &[u8; 8]) {
-		self.buttons.copy_from_slice(state);
+	pub fn update(&mut self, buttons: [u8; 8], delay: u32, interval: u32) {
+		self.pressed = buttons;
 		
 		for player in 0..8 {
-			let buttons = self.buttons[player];
+			let mut pressed_now = 0;
 			
 			for i in 0..8 {
 				let mask = 1 << i;
-				let idx = player * 8 + i;
 				
-				if buttons & mask != 0 { // button is pressed
-					self.buttons_held_frames[idx] += 1;
+				if self.pressed[player] & mask != 0 { // pressed
+					let mut new_state = match self.state[player][i] {
+						ButtonState::Done => ButtonState::Initial(0),
+						ButtonState::Initial(n) => ButtonState::Initial(n.saturating_add(1)),
+						ButtonState::Repeat(n) => ButtonState::Repeat(n.saturating_add(1)),
+					};
 					
-					let repeating = self.buttons_repeat_state[player] & mask != 0;
-					let limit = fps.div(if repeating { 7 } else { 2 }).min(255) as u8;
-					
-					if self.buttons_held_frames[idx] >= limit {
-						self.buttons_held_frames[idx] = 0;
-						if !repeating {
-							self.buttons_held_frames[player] |= mask;
-						}
+					if let ButtonState::Initial(n) = new_state && delay > 0 && n >= delay {
+						new_state = ButtonState::Repeat(0);
+					} else if let ButtonState::Repeat(n) = new_state && interval > 0 && n >= interval {
+						new_state = ButtonState::Repeat(0);
 					}
-				} else { // button is not pressed
-					self.buttons_held_frames[idx] = 0;
-					self.buttons_repeat_state[player] &= mask.not();
+					
+					if new_state.is_pressed_now() { pressed_now |= mask; }
+					self.state[player][i] = new_state;
+				} else { // not pressed
+					self.state[player][i] = ButtonState::Done;
 				}
 			}
+			
+			self.pressed_now[player] = pressed_now;
 		}
 	}
 	
-	pub fn get_bits_for_player(&self, player: usize) -> u8 {
+	pub fn buttons_pressed(&self, player: usize) -> u8 {
 		assert!(player < 8, "player idx > 8");
-		self.buttons[player]
+		self.pressed[player]
 	}
 	
-	pub fn is_down(&self, player: usize, button: usize) -> bool {
+	pub fn button_pressed(&self, player: usize, button: usize) -> bool {
+		assert!(player < 8, "player idx > 8");
 		assert!(button < 8, "button idx > 8");
-		(self.get_bits_for_player(player) & (1 << button)) != 0
+		self.state[player][button].is_pressed()
 	}
 	
-	pub fn is_just_pressed(&self, player: usize, button: usize) -> bool {
-		self.is_down(player, button) && self.buttons_held_frames[player * 8 + button] == 1
+	pub fn buttons_pressed_now(&self, player: usize) -> u8 {
+		assert!(player < 8, "player idx > 8");
+		self.pressed_now[player]
+	}
+	
+	pub fn button_pressed_now(&self, player: usize, button: usize) -> bool {
+		assert!(player < 8, "player idx > 8");
+		assert!(button < 8, "button idx > 8");
+		self.state[player][button].is_pressed_now()
+	}
+}
+
+impl ButtonState {
+	fn is_pressed(&self) -> bool {
+		match self {
+			ButtonState::Initial(_) |
+			ButtonState::Repeat(_) => true,
+			_ => false,
+		}
+	}
+	
+	fn is_pressed_now(&self) -> bool {
+		match self {
+			ButtonState::Initial(0) |
+			ButtonState::Repeat(0) => true,
+			_ => false,
+		}
 	}
 }

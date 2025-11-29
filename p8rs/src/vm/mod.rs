@@ -73,9 +73,9 @@ impl<A: Allocator + 'static> P8rs<A> {
 	pub fn load(&mut self, source: &[u8]) -> Result<(), ExternError> {
 		let ex = self.lua.try_enter(|ctx| {
 			let env = shallow_copy_table(ctx.mutation(), ctx.fetch(&self.fresh_globals))?;
-			let prolog = Closure::load_with_env(ctx, None, include_bytes!("../../../lua/p8_prolog.lua"), env)?;
+			let kernel = Closure::load_with_env(ctx, None, include_bytes!("kernel.lua"), env)?;
 			let closure = Closure::load_with_env(ctx, None, source, env)?;
-			let ex = Executor::start(ctx, prolog.into(), (closure,));
+			let ex = Executor::start(ctx, kernel.into(), closure);
 			
 			Ok(ctx.stash(ex))
 		})?;
@@ -118,7 +118,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 						executor.resume(ctx, ()).unwrap();
 					}
 					
-					self.runtime.update();
+					self.runtime.start_frame();
 					
 					if !executor.step(ctx, &mut fuel, &mut self.runtime).unwrap() {
 						if fuel.is_interrupted() {

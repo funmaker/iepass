@@ -1,38 +1,34 @@
-
-█=█ or 0.5
-▒=▒ or 23130.5
-🐱=🐱 or 20767.5
-⬇️=⬇️ or 3
-░=░ or 32125.5
-✽=✽ or -18402.5
-●=● or -1632.5
-♥=♥ or 20927.5
-☉=☉ or -19008.5
-웃=웃 or -26208.5
-⌂=⌂ or -20192.5
+█=█ 	or 0x0000.8000
+▒=▒ 	or 0x5a5a.8000
+🐱=🐱 	or 0x511f.8000
+░=░ 	or 0x7d7d.8000
+✽=✽ 	or 0xb81d.8000
+●=● 	or 0xf99f.8000
+♥=♥ 	or 0x51bf.8000
+☉=☉ 	or 0xb5bf.8000
+웃=웃 	or 0x999f.8000
+⌂=⌂ 	or 0xb11f.8000
+😐=😐 	or 0xa0e0.8000
+♪=♪ 	or 0x9b3f.8000
+◆=◆ 	or 0xb1bf.8000
+…=… 	or 0xf5ff.8000
+★=★ 	or 0xb15f.8000
+⧗=⧗ 	or 0x1b1f.8000
+ˇ=ˇ 	or 0xf5bf.8000
+∧=∧ 	or 0x7adf.8000
+▤=▤ 	or 0x0f0f.8000
+▥=▥ 	or 0x5555.8000
 ⬅️=⬅️ or 0
-😐=😐 or -24351.5
-♪=♪ or -25792.5
-🅾️=🅾️ or 4
-◆=◆ or -20032.5
-…=… or -2560.5
 ➡️=➡️ or 1
-★=★ or -20128.5
-⧗=⧗ or 6943.5
 ⬆️=⬆️ or 2
-ˇ=ˇ or -2624.5
-∧=∧ or 31455.5
+⬇️=⬇️ or 3
+🅾️=🅾️ or 4
 ❎=❎ or 5
-▤=▤ or 3855.5
-▥=▥ or 21845.5
-;
+
 
 local args = { ... }
 
-if #args ~= 1 or type(args[1]) ~= "function" then
-    printh("[prolog] Did not get function with main code.")
-    return
-end
+assert(#args == 1 and type(args[1]) == "function", "[kernel] Did not get function with main code.")
 
 args[1]()
 
