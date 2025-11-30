@@ -1,6 +1,5 @@
 use core::num::{ParseFloatError, ParseIntError};
 use core::str::Utf8Error;
-use p8rs_piccolo::Value;
 use bitflags::bitflags;
 use thiserror::Error;
 use p8rs_types::p8num::P8Num;
@@ -41,7 +40,7 @@ fn apply_flags(num: f64, flags: NumberConversionFlags) -> f64 {
 	}
 }
 
-pub fn number_from_ascii<'gc>(s: &[u8], flags: NumberConversionFlags) -> Result<Value<'gc>, ParseNumberError> {
+pub fn number_from_ascii(s: &[u8], flags: NumberConversionFlags) -> Result<P8Num, ParseNumberError> {
 	let s = s.trim_ascii();
 	
 	let result = if let Some(s) = s.strip_prefix(b"0x") {
@@ -57,8 +56,8 @@ pub fn number_from_ascii<'gc>(s: &[u8], flags: NumberConversionFlags) -> Result<
 	};
 	
 	match result {
-		Ok(num) => Ok(Value::Number(P8Num::new_f64(apply_flags(num, flags)))),
-		Err(_) if flags.contains(NumberConversionFlags::ZERO_ON_FAIL) => Ok(Value::Number(P8Num::ZERO)),
+		Ok(num) => Ok(P8Num::new_f64(apply_flags(num, flags))),
+		Err(_) if flags.contains(NumberConversionFlags::ZERO_ON_FAIL) => Ok(P8Num::ZERO),
 		Err(err) => Err(err)
 	}
 }

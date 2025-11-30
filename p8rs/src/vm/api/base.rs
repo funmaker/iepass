@@ -116,12 +116,7 @@ pub fn tostr<'gc>(ctx: Context<'gc>, val: Value<'gc>, opts: Option<Value<'gc>>) 
 #[api_callback]
 pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Option<Value<'gc>> {
 	let flags: NumberConversionFlags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
-	let conversion = number_from_ascii(&val, flags);
-	if conversion.is_ok() {
-		Some(conversion.unwrap())
-	} else {
-		None
-	}
+	number_from_ascii(&val, flags).map(|x| Value::Number(x)).ok()
 }
 
 #[api_callback]

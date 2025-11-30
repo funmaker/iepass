@@ -75,8 +75,15 @@ do
 	end
 	
 	local function stringifyMemory(addr, count, cols)
-		local bytes = ""
-		for i = 0,count-1 do
+                local bytes = ""
+		local bulk = flr(count / 4) * 4
+                for i = 0, bulk - 1, 4 do
+			bytes = bytes .. sub(tostr(peek4(addr + i), 3), 3, 10)
+			if cols and i % cols == cols - 1 then
+				bytes = bytes .. " "
+			end
+		end
+		for i = bulk, count-1 do
 			bytes = bytes .. sub(tostr(peek(addr + i), true), 5, 6)
 			if cols and i % cols == cols - 1 then
 				bytes = bytes .. " "
