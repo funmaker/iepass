@@ -55,7 +55,6 @@ for py = 0,127 do
 			col = (log10(escaped) / log10(itermax)) * (#cols + 2) - 2
 			if (col < 0) col = 0
 			fillp(pats[flr((col - flr(col)) * #bayer) + 1])
-			printh(col - flr(col) .. " " .. flr((col - flr(col)) * #bayer) + 1 .. " " .. tostr(pats[flr((col - flr(col)) * #bayer) + 1], true))
 			col = flr(col)
 			
 			pset(px, py, col | ((col + 1) << 4))

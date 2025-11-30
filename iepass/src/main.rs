@@ -33,7 +33,7 @@ use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
 use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
-static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
+// static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -74,7 +74,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     info!("Initializing allocators.");
     
     // SRAM global allocator
-    esp_alloc::heap_allocator!(size: 150 * 1024);
+    esp_alloc::heap_allocator!(size: 140 * 1024);
     
     // PSRAM custom allocator
     {
@@ -167,7 +167,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Loading hello.p8");
     
-    pico8.load(include_bytes!("../../lua/hello.p8"))?;
+    pico8.load_cartridge(include_bytes!("../../lua/hello.p8"))?;
     
     info!("Entering main loop.");
     
@@ -186,7 +186,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             
             info!("{}", analog.read(100));
             
-            speaker.play(&*KUTASAN).await?;
+            // speaker.play(&*KUTASAN).await?;
             speaker.reset().await?;
         }
         

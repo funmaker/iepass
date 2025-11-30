@@ -2,35 +2,90 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 
 __lua__
-for sw=1,16 do
-  cls()
-  for y = 0,127 do
-    sspr(0, 0, sw, 1, 0, y, y, 1)
-    sspr(0, 0, sw, 1, y, y, 127-y, 1, true, true)
-  end
-  p8rs.test_scr("x axis "..sw);
-end
 
-for sh=1,16 do
-  cls()
-  for x = 0,127 do
-    sspr(0, 0, 1, sh, x, 0, 1, x)
-    sspr(0, 0, 1, sh, x, x, 1, 127-x, true, true)
+cls()
+for y = 0,8 do
+  for x = 0,8 do
+    xfs = (x & 0b001) >> 0
+    xfd = (x & 0b010) >> 1
+    xff = (x & 0b100) != 0
+    yfs = (y & 0b001) >> 0
+    yfd = (y & 0b010) >> 1
+    yff = (y & 0b100) != 0
+    sspr(
+      0 + xfs * 16, 0 + yfs * 16,
+      16 - xfs * 32, 16 - yfs * 32,
+      x * 16 + xfd * 16, y * 16 + yfd * 16,
+      16 - xfd * 32, 16 - yfd * 32,
+      xff, yff
+    )
   end
-  p8rs.test_scr("y axis "..sh);
 end
+p8rs.test_scr("flips");
 
-for sy = 0,3 do
-  for sx = 0,3 do
-    cls()
-    for y = 1,32 do
-      for x = 1,32 do
-        sspr(0, 0, 16, 16, x*(x-1)/2 - sx * 128, y*(y-1)/2 - sy * 128, x, y, (x+y) % 4 <= 1, (x+y) % 2 == 0)
-      end
+for o = 1, 16 do
+  cls()
+  for y = 0,8 do
+    for x = 0,8 do
+      xfs = (x & 0b001) >> 0
+      xfd = (x & 0b010) >> 1
+      xff = (x & 0b100) != 0
+      yfs = (y & 0b001) >> 0
+      yfd = (y & 0b010) >> 1
+      yff = (y & 0b100) != 0
+      sspr(
+        -o + xfs * 16, -o + yfs * 16,
+        16 - xfs * 32 + o, 16 - yfs * 32 + o,
+        x * 16 + xfd * 16, y * 16 + yfd * 16,
+        16 - xfd * 32, 16 - yfd * 32,
+        xff, yff
+      )
     end
-    p8rs.test_scr("xy axis "..sx.."X"..sy);
+  end
+  p8rs.test_scr("clipflips " .. o);
+end
+
+for o = 1, 16 do
+  cls()
+  for y = 0,8 do
+    for x = 0,8 do
+      xfs = (x & 0b001) >> 0
+      xfd = (x & 0b010) >> 1
+      xff = (x & 0b100) != 0
+      yfs = (y & 0b001) >> 0
+      yfd = (y & 0b010) >> 1
+      yff = (y & 0b100) != 0
+      sspr(
+        -o + xfs * 7, -o + yfs * 7,
+        7 - xfs * 14 + o, 7 - yfs * 14 + o,
+        x * 16 + xfd * 16, y * 16 + yfd * 16,
+        16 - xfd * 32, 16 - yfd * 32,
+        xff, yff
+      )
+    end
+  end
+  p8rs.test_scr("clipflips up " .. o);
+end
+
+cls()
+for y = 0,8 do
+  for x = 0,8 do
+    xfs = (x & 0b001) >> 0
+    xfd = (x & 0b010) >> 1
+    xff = (x & 0b100) != 0
+    yfs = (y & 0b001) >> 0
+    yfd = (y & 0b010) >> 1
+    yff = (y & 0b100) != 0
+    sspr(
+      120 + xfs * 16, 120 + yfs * 16,
+      16 - xfs * 32, 16 - yfs * 32,
+      x * 16 + xfd * 16, y * 16 + yfd * 16,
+      16 - xfd * 32, 16 - yfd * 32,
+      xff, yff
+    )
   end
 end
+p8rs.test_scr("clipflips end");
 
 __gfx__
 fedcba98765432107711111177711111717111111771111171111111777111111771111177711111777111117711111177711111771111117771111177711111

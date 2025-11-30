@@ -1,5 +1,5 @@
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Table, Stack, Value, meta_ops};
+use p8rs_piccolo::{Context, Table, Stack, Value};
 
 pub fn install_pico8_table(ctx: Context) {
 	ctx.set_global("pack", pack::callback(ctx));
@@ -31,10 +31,10 @@ fn unpack<'gc>(ctx: Context<'gc>, mut stack: Stack<'gc, '_>, table: Table<'gc>, 
 }
 
 #[api_callback]
-pub fn count<'gc>(ctx: Context<'gc>, table: Table<'gc>, value: Option<Value<'gc>>) -> i16 {
-	if let Some(value) = value {
-		let mut count = 0;
-		for i in 1..=table.length() {
+pub fn count<'gc>(_ctx: Context<'gc>, table: Table<'gc>, value: Option<Value<'gc>>) -> i16 {
+	if let Some(_value) = value {
+		let count = 0;
+		for _i in 1..=table.length() {
 			// TODO: move to kernel for ez equality?
 		}
 		count

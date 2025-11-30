@@ -1,6 +1,7 @@
 use core::ops::{Range, RangeInclusive};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Vector<T> {
 	pub x: T,
 	pub y: T,

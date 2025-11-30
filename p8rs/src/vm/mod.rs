@@ -24,6 +24,7 @@ use cart::CartLoadError;
 use traceback::write_traceback_entries;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RunResult {
 	Flip,
 	Stop,
@@ -51,7 +52,7 @@ fn shallow_copy_table<'gc>(mc: &Mutation<'gc>, src: Table<'gc>) -> Result<Table<
 	Ok(ret)
 }
 
-impl<A: Allocator + Clone + 'static> P8rs<A> {
+impl<A: Allocator + Clone + Unpin + 'static> P8rs<A> {
 	pub fn new_in(alloc: A) -> Result<P8rs<A>, InvalidTableKey> {
 		let mut lua = Lua::empty();
 		

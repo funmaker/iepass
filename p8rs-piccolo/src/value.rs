@@ -16,7 +16,7 @@ pub enum Value<'gc> {
     Nil,
     Boolean(bool),
     Number(P8Num),
-    String(#[cfg_attr(feature = "defmt", defmt(Debug2Format))] String<'gc>), // TODO: Format for piccolo Strings?
+    String(String<'gc>), // TODO: Format for piccolo Strings?
     Table(Table<'gc>),
     Function(Function<'gc>),
     Thread(Thread<'gc>),

@@ -1,14 +1,15 @@
+use core::alloc::Allocator;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Value};
 use crate::vm::Runtime;
 
-pub fn install_pico8_input(ctx: Context) {
-	ctx.set_global("btn", btn::callback(ctx));
-	ctx.set_global("btnp", btnp::callback(ctx));
+pub fn install_pico8_input<A: Allocator + 'static>(ctx: Context) {
+	ctx.set_global("btn", btn::callback::<A>(ctx));
+	ctx.set_global("btnp", btnp::callback::<A>(ctx));
 }
 
 #[api_callback]
-pub fn btn<'gc>(rt: &mut Runtime, i: Option<i16>, p: Option<i16>) -> Value<'gc> {
+pub fn btn<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, i: Option<i16>, p: Option<i16>) -> Value<'gc> {
 	if let Some(btn) = i {
 		let player = p.unwrap_or(0);
 		if player >= 0 && player < 8 {
@@ -22,7 +23,7 @@ pub fn btn<'gc>(rt: &mut Runtime, i: Option<i16>, p: Option<i16>) -> Value<'gc> 
 }
 
 #[api_callback]
-pub fn btnp<'gc>(rt: &mut Runtime, i: Option<i16>, p: Option<i16>) -> Value<'gc> {
+pub fn btnp<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, i: Option<i16>, p: Option<i16>) -> Value<'gc> {
 	if let Some(btn) = i {
 		let player = p.unwrap_or(0);
 		if player >= 0 && player < 8 {

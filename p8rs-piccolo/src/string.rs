@@ -19,7 +19,9 @@ use p8rs_types::p8scii;
 /// Unlike Rust strings, p8rs-piccolo strings are P8SCII encoded.
 #[derive(Copy, Clone, Collect)]
 #[collect(no_drop)]
-pub struct String<'gc>(Gc<'gc, StringInner>);
+pub struct String<'gc>(
+    Gc<'gc, StringInner>,
+);
 
 // We represent `String` as either a pointer to an external / owned slice pointer or a size prefixed
 // inline array.
@@ -192,6 +194,13 @@ impl<'gc> fmt::Debug for String<'gc> {
         write!(fmt, "\"")?;
         
         Ok(())
+    }
+}
+
+#[cfg(feature = "defmt")] // TODO: Format for piccolo Strings?
+impl defmt::Format for String<'_> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{}", defmt::Display2Format(self));
     }
 }
 

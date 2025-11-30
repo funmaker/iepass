@@ -1,6 +1,5 @@
 use core::alloc::Allocator;
 use core::any::Any;
-use alloc::alloc::Global;
 use alloc::boxed::Box;
 use p8rs_macros::p8;
 use p8rs_types::p8num::P8Num;
@@ -9,7 +8,7 @@ use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
 use crate::vm::memory::machine_state::{BtnpRepDelay, BtnpRepInterval};
 
-pub struct Runtime<A: Allocator = Global> {
+pub struct Runtime<A: Allocator> {
 	pub cart_memory: Box<[u8; 0x8000], A>,
 	pub memory: Box<Memory, A>,
 	pub buttons: Buttons,

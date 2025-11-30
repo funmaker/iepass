@@ -23,6 +23,10 @@ pub trait Runtime {
 	fn as_ref(&mut self) -> RuntimeRef<'_> where Self: Sized {
 		self as RuntimeRef
 	}
+	
+	fn type_name(&self) -> &'static str {
+		core::any::type_name::<Self>()
+	}
 }
 
 pub type RuntimeRef<'a> = &'a mut dyn Runtime;

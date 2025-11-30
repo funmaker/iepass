@@ -29,7 +29,7 @@ pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) {
 	let col = (col << 4) | col;
 	
 	rt.memory.screen().fill(col);
-	rt.set_cursor_x(0);
+	rt.set_cursor_home(0);
 	rt.set_cursor_position([0, 0]);
 	*rt.memory.machine_state().clip_rect() = [0, 0, 128, 128];
 }
@@ -136,7 +136,7 @@ pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'g
 }
 
 #[api_callback]
-pub fn palt<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>, t: Option<bool>) {
+pub fn palt<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>, t: Option<bool>) {
 	let col = col.map_or(0b1000_0000_0000_0000, i16::cast_unsigned);
 	let mut state = rt.memory.machine_state();
 	let pal = &mut state.palette(Palette::Draw);
@@ -160,7 +160,7 @@ pub fn palt<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>, 
 }
 
 #[api_callback]
-pub fn fillp<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
+pub fn fillp<A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
 	let pat = pat.unwrap_or(P8Num::ZERO);
 	let flags = (pat.to_raw() >> 8) as u8;
 	let flags = flags.reverse_bits() & 0b0000_0111;
@@ -192,7 +192,7 @@ pub fn fget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f:
 }
 
 #[api_callback]
-pub fn fset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Option<i16>, v: Option<bool>) {
+pub fn fset<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Option<i16>, v: Option<bool>) {
 	let (n, f) = match n.zip(f) {
 		Some((n, f)) => (n, f),
 		_ => return,
@@ -219,7 +219,7 @@ pub fn fset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f:
 }
 
 #[api_callback]
-pub fn pset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) {
+pub fn pset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let (x, y) = match x.zip(y) {
 		Some((x, y)) => (x, y),
@@ -230,7 +230,7 @@ pub fn pset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y:
 }
 
 #[api_callback]
-pub fn pget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+pub fn pget<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
 	let (x, y) = match x.zip(y) {
 		Some((x, y)) => (x, y),
 		_ => return 0,
@@ -246,7 +246,7 @@ pub fn pget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y:
 }
 
 #[api_callback]
-pub fn sset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
+pub fn sset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
 	let x = x.unwrap_or(0);
 	let y = y.unwrap_or(0);
 	
@@ -260,7 +260,7 @@ pub fn sset<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y:
 }
 
 #[api_callback]
-pub fn sget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+pub fn sget<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
 	let x = x.unwrap_or(0);
 	let y = y.unwrap_or(0);
 	

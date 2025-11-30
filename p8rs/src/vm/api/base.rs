@@ -1,14 +1,14 @@
 use core::fmt::Write;
-
-use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
-use crate::vm::Runtime;
+use core::alloc::Allocator;
 use anyhow::anyhow;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Execution, IntoValue, RuntimeError, String, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
+use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
-pub fn install_pico8_base(ctx: Context) {
+pub fn install_pico8_base<A: Allocator + 'static>(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
@@ -18,12 +18,12 @@ pub fn install_pico8_base(ctx: Context) {
 	
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
-	ctx.set_global("printh", printh::callback(ctx));
+	ctx.set_global("printh", printh::callback::<A>(ctx));
 	ctx.set_global("type", get_type::callback(ctx));
-	ctx.set_global("stat", stat::callback(ctx));
+	ctx.set_global("stat", stat::callback::<A>(ctx));
 	ctx.set_global("trace", trace::callback(ctx));
-	ctx.set_global("time", time::callback(ctx));
-	ctx.set_global("t", time::callback(ctx));
+	ctx.set_global("time", time::callback::<A>(ctx));
+	ctx.set_global("t", time::callback::<A>(ctx));
 }
 
 #[api_callback]
@@ -70,7 +70,7 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 
 
 #[api_callback]
-pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
+pub fn stat<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	Ok(match stat_cmd {
 		7 => { Some(Value::Number(P8Num::from(rt.target_fps.cast_signed()))) }
 		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
@@ -125,12 +125,12 @@ pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Option<Value<'gc>> {
 }
 
 #[api_callback]
-pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
+pub fn printh<A: Allocator + 'static>(rt: &mut Runtime<A>, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
 	rt.callbacks.printh(&text, filename.as_deref(), overwrite, save_to_desktop);
 }
 
 #[api_callback]
-pub fn time(rt: &mut Runtime) -> P8Num {
+pub fn time<A: Allocator + 'static>(rt: &mut Runtime<A>) -> P8Num {
 	rt.time
 }
 
