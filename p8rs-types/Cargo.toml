@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 gc-arena = ["dep:gc-arena"]
 defmt = ["dep:defmt"]
+bytemuck = ["dep:bytemuck"]
 
 [dependencies]
 arrayvec.workspace = true
@@ -18,3 +19,4 @@ thiserror.workspace = true
 bitflags.workspace = true
 gc-arena = { workspace = true, optional = true }
 defmt = { workspace = true, optional = true }
+bytemuck = { workspace = true, optional = true }

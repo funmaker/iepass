@@ -1,47 +1,50 @@
 use core::alloc::Allocator;
 use core::any::Any;
 use alloc::boxed::Box;
-use p8rs_macros::p8;
+use std::alloc::Global;
+use bytemuck::Zeroable;
 use p8rs_types::p8num::P8Num;
+
 use crate::utils;
 use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
 use crate::vm::memory::machine_state::{BtnpRepDelay, BtnpRepInterval};
 
-pub struct Runtime<A: Allocator> {
-	pub cart_memory: Box<[u8; 0x8000], A>,
-	pub memory: Box<Memory, A>,
+#[derive(Debug, Zeroable)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Runtime {
+	pub memory: Memory,
+	pub cart_memory: [u8; 0x8000],
 	pub buttons: Buttons,
 	pub target_fps: u16,
 	pub time: P8Num,
-	pub callbacks: Box<dyn Callbacks>,
+	callbacks: Option<Box<dyn Callbacks>>,
 	cursor: [i16; 2],
 	cursor_home: i16,
 }
 
-impl<A> Runtime<A>
-where A: Allocator + Clone
-{
-	pub fn new(alloc: A) -> Runtime<A> {
-		Self {
-			cart_memory: utils::new_zeroed_box_in(alloc.clone()),
-			memory: Memory::new_in(alloc),
-			buttons: Buttons::new(),
-			target_fps: 30,
-			time: p8!(0),
-			callbacks: Box::new(DefaultCallbacks),
-			cursor: [0, 6],
-			cursor_home: 0,
-		}
+impl Runtime {
+	pub fn new() -> Box<Runtime> {
+		Self::new_in(Global)
 	}
-}
-
-impl<A> Runtime<A>
-where A: Allocator
-{
+	
+	pub fn new_in<A: Allocator>(alloc: A) -> Box<Runtime, A> {
+		let mut this: Box<Self, A> = utils::new_zeroed_box_in(alloc);
+		
+		this.memory.reset();
+		this.target_fps = 30;
+		this.cursor = [0, 6];
+		
+		this
+	}
+	
+	pub fn set_callbacks(&mut self, callbacks: impl Callbacks + 'static) {
+		self.callbacks = Some(Box::new(callbacks));
+	}
+	
 	/// Should be called before every frame
 	pub fn start_frame(&mut self) {
-		let buttons = self.callbacks.get_buttons();
+		let buttons = self.callbacks().get_buttons();
 		*self.memory.machine_state().btn_state() = buttons;
 		
 		let delay = match *self.memory.machine_state().btnp_rep_delay() {
@@ -91,10 +94,13 @@ where A: Allocator
 		self.cursor_home = x;
 		self.memory.machine_state()._set_cursor_home_x(x as u8);
 	}
+	
+	pub fn callbacks(&mut self) -> &mut dyn Callbacks {
+		&mut **self.callbacks.get_or_insert_with(|| Box::new(DefaultCallbacks))
+	}
 }
 
-impl<A> p8rs_piccolo::Runtime for Runtime<A>
-where A: Allocator + 'static {
+impl p8rs_piccolo::Runtime for Runtime {
 	fn as_any(&mut self) -> &mut dyn Any {
 		self
 	}
@@ -112,18 +118,19 @@ where A: Allocator + 'static {
 	}
 }
 
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, Zeroable)]
 pub struct Buttons {
 	pressed: [u8; 8],
 	pressed_now: [u8; 8],
 	state: [[ButtonState; 8]; 8],
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Zeroable)]
+#[repr(u8)]
 enum ButtonState {
+	Done,
 	Initial(u32),
 	Repeat(u32),
-	Done,
 }
 
 #[allow(dead_code)]

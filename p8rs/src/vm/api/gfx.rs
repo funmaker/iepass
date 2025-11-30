@@ -6,25 +6,25 @@ use p8rs_types::p8num::P8Num;
 use crate::vm::memory::machine_state::{FillPatternFlags, FillPatternState, Palette};
 use crate::vm::Runtime;
 
-pub fn install_pico8_gfx<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("camera", camera::callback::<A>(ctx));
-	ctx.set_global("color", color::callback::<A>(ctx));
-	ctx.set_global("clip", clip::callback::<A>(ctx));
-	ctx.set_global("pal", pal::callback::<A>(ctx));
-	ctx.set_global("cls", cls::callback::<A>(ctx));
-	ctx.set_global("cursor", cursor::callback::<A>(ctx));
-	ctx.set_global("fillp", fillp::callback::<A>(ctx));
-	ctx.set_global("palt", palt::callback::<A>(ctx));
-	ctx.set_global("fset", fset::callback::<A>(ctx));
-	ctx.set_global("fget", fget::callback::<A>(ctx));
-	ctx.set_global("pset", pset::callback::<A>(ctx));
-	ctx.set_global("pget", pget::callback::<A>(ctx));
-	ctx.set_global("sset", sset::callback::<A>(ctx));
-	ctx.set_global("sget", sget::callback::<A>(ctx));
+pub fn install_pico8_gfx(ctx: Context) {
+	ctx.set_global("camera", camera::callback(ctx));
+	ctx.set_global("color", color::callback(ctx));
+	ctx.set_global("clip", clip::callback(ctx));
+	ctx.set_global("pal", pal::callback(ctx));
+	ctx.set_global("cls", cls::callback(ctx));
+	ctx.set_global("cursor", cursor::callback(ctx));
+	ctx.set_global("fillp", fillp::callback(ctx));
+	ctx.set_global("palt", palt::callback(ctx));
+	ctx.set_global("fset", fset::callback(ctx));
+	ctx.set_global("fget", fget::callback(ctx));
+	ctx.set_global("pset", pset::callback(ctx));
+	ctx.set_global("pget", pget::callback(ctx));
+	ctx.set_global("sset", sset::callback(ctx));
+	ctx.set_global("sget", sget::callback(ctx));
 }
 
 #[api_callback]
-pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) {
+pub fn cls(rt: &mut Runtime, col: Option<i16>) {
 	let col = col.unwrap_or(0) as u8 & 0xF;
 	let col = (col << 4) | col;
 	
@@ -35,7 +35,7 @@ pub fn cls<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>) {
 }
 
 #[api_callback]
-pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) -> (i16, i16, u8) {
+pub fn cursor(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) -> (i16, i16, u8) {
 	let [prev_x, prev_y] = rt.get_cursor_position();
 	let prev_col = *rt.memory.machine_state().pen_color();
 	let x = x.unwrap_or(0);
@@ -49,7 +49,7 @@ pub fn cursor<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Op
 }
 
 #[api_callback]
-pub fn color<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<P8Num>) -> u8 {
+pub fn color(rt: &mut Runtime, col: Option<P8Num>) -> u8 {
 	let prev = *rt.memory.machine_state().pen_color();
 	
 	rt.memory.machine_state().set_pen_color(col.unwrap_or(p8!(6)));
@@ -58,7 +58,7 @@ pub fn color<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<P8Num>) ->
 }
 
 #[api_callback]
-pub fn camera<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> (i16, i16) {
+pub fn camera(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> (i16, i16) {
 	let [prev_x, prev_y] = rt.memory.machine_state().get_camera_position();
 	
 	rt.memory.machine_state().set_camera_x(x.unwrap_or(0));
@@ -68,7 +68,7 @@ pub fn camera<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Op
 }
 
 #[api_callback]
-pub fn clip<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, w: Option<i16>, h: Option<i16>, clip_previous: Option<bool>) -> (i16, i16, i16, i16) {
+pub fn clip(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, w: Option<i16>, h: Option<i16>, clip_previous: Option<bool>) -> (i16, i16, i16, i16) {
 	let [prev_x_begin, prev_y_begin, prev_x_end, prev_y_end] = *rt.memory.machine_state().clip_rect();
 	
 	if let (Some(x), Some(y), Some(w), Some(h)) = (x, y, w, h) {
@@ -98,7 +98,7 @@ pub fn clip<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Opti
 }
 
 #[api_callback]
-pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'gc>>, c1: Option<Value<'gc>>, p: Option<i16>) {
+pub fn pal<'gc>(rt: &mut Runtime, c0: Option<Value<'gc>>, c1: Option<Value<'gc>>, p: Option<i16>) {
 	if c0.is_none() {
 		rt.memory.machine_state().reset_palettes();
 	} else if let Some(pal_idx) = c0.and_then(Value::to_number).and_then(Palette::new) && c1.is_none() {
@@ -136,7 +136,7 @@ pub fn pal<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, c0: Option<Value<'g
 }
 
 #[api_callback]
-pub fn palt<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>, t: Option<bool>) {
+pub fn palt(rt: &mut Runtime, col: Option<i16>, t: Option<bool>) {
 	let col = col.map_or(0b1000_0000_0000_0000, i16::cast_unsigned);
 	let mut state = rt.memory.machine_state();
 	let pal = &mut state.palette(Palette::Draw);
@@ -160,7 +160,7 @@ pub fn palt<A: Allocator + 'static>(rt: &mut Runtime<A>, col: Option<i16>, t: Op
 }
 
 #[api_callback]
-pub fn fillp<A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
+pub fn fillp(rt: &mut Runtime, pat: Option<P8Num>) {
 	let pat = pat.unwrap_or(P8Num::ZERO);
 	let flags = (pat.to_raw() >> 8) as u8;
 	let flags = flags.reverse_bits() & 0b0000_0111;
@@ -171,7 +171,7 @@ pub fn fillp<A: Allocator + 'static>(rt: &mut Runtime<A>, pat: Option<P8Num>) {
 }
 
 #[api_callback]
-pub fn fget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Option<i16>) -> Option<Value<'gc>> {
+pub fn fget<'gc>(rt: &mut Runtime, n: Option<i16>, f: Option<i16>) -> Option<Value<'gc>> {
 	let n = match n {
 		Some(n) if n >= 0 && n <= 255 => n,
 		Some(_) => return Some(false.into()),
@@ -192,7 +192,7 @@ pub fn fget<'gc, A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f:
 }
 
 #[api_callback]
-pub fn fset<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Option<i16>, v: Option<bool>) {
+pub fn fset(rt: &mut Runtime, n: Option<i16>, f: Option<i16>, v: Option<bool>) {
 	let (n, f) = match n.zip(f) {
 		Some((n, f)) => (n, f),
 		_ => return,
@@ -219,7 +219,7 @@ pub fn fset<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, f: Opti
 }
 
 #[api_callback]
-pub fn pset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) {
+pub fn pset(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let (x, y) = match x.zip(y) {
 		Some((x, y)) => (x, y),
@@ -230,7 +230,7 @@ pub fn pset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Opti
 }
 
 #[api_callback]
-pub fn pget<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+pub fn pget(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> u8 {
 	let (x, y) = match x.zip(y) {
 		Some((x, y)) => (x, y),
 		_ => return 0,
@@ -246,7 +246,7 @@ pub fn pget<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Opti
 }
 
 #[api_callback]
-pub fn sset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
+pub fn sset(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
 	let x = x.unwrap_or(0);
 	let y = y.unwrap_or(0);
 	
@@ -260,7 +260,7 @@ pub fn sset<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Opti
 }
 
 #[api_callback]
-pub fn sget<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>) -> u8 {
+pub fn sget(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> u8 {
 	let x = x.unwrap_or(0);
 	let y = y.unwrap_or(0);
 	

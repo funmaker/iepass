@@ -31,17 +31,17 @@ do
 				k=k+1
 			end
 			lp=lp-1
-		rp=rp+1
-		-- sometimes lp==rp, so 
-		-- these two lines *must*
-		-- occur in sequence;
-		-- don't combine them to
-		-- save a token!
-		a[l],a[lp]=a[lp],a[l]
-		a[r],a[rp]=a[rp],a[r]
-		qsort(a,c,l,lp-1       )
-		qsort(a,c,  lp+1,rp-1  )
-		qsort(a,c,       rp+1,r)
+			rp=rp+1
+			-- sometimes lp==rp, so 
+			-- these two lines *must*
+			-- occur in sequence;
+			-- don't combine them to
+			-- save a token!
+			a[l],a[lp]=a[lp],a[l]
+			a[r],a[rp]=a[rp],a[r]
+			qsort(a,c,l,lp-1       )
+			qsort(a,c,  lp+1,rp-1  )
+			qsort(a,c,       rp+1,r)
 		end
 	end
 	
@@ -75,15 +75,8 @@ do
 	end
 	
 	local function stringifyMemory(addr, count, cols)
-                local bytes = ""
-		local bulk = flr(count / 4) * 4
-                for i = 0, bulk - 1, 4 do
-			bytes = bytes .. sub(tostr(peek4(addr + i), 3), 3, 10)
-			if cols and i % cols == cols - 1 then
-				bytes = bytes .. " "
-			end
-		end
-		for i = bulk, count-1 do
+		local bytes = ""
+		for i = 0,count-1 do
 			bytes = bytes .. sub(tostr(peek(addr + i), true), 5, 6)
 			if cols and i % cols == cols - 1 then
 				bytes = bytes .. " "

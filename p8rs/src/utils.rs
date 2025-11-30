@@ -1,10 +1,11 @@
 use core::alloc::Allocator;
 use alloc::boxed::Box;
 use core::num::NonZeroU8;
+use bytemuck::Zeroable;
 
-pub fn new_zeroed_box_in<A: Allocator, const N: usize>(alloc: A) -> Box<[u8; N], A> {
+pub fn new_zeroed_box_in<A: Allocator, T: Zeroable>(alloc: A) -> Box<T, A> {
 	let ret = Box::new_zeroed_in(alloc);
-	unsafe { ret.assume_init() } // SAFETY: This is just a zeroed u8 array.
+	unsafe { ret.assume_init() } // SAFETY: This is fine because T is Zeroable
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

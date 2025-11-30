@@ -8,18 +8,18 @@ use crate::vm::memory::MemoryAccess;
 use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
 
-pub fn install_pico8_memory<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("peek", peek::callback::<A>(ctx));
-	ctx.set_global("peek2", peek2::callback::<A>(ctx));
-	ctx.set_global("peek4", peek4::callback::<A>(ctx));
-	ctx.set_global("poke", poke::callback::<A>(ctx));
-	ctx.set_global("poke2", poke2::callback::<A>(ctx));
-	ctx.set_global("poke4", poke4::callback::<A>(ctx));
+pub fn install_pico8_memory(ctx: Context) {
+	ctx.set_global("peek", peek::callback(ctx));
+	ctx.set_global("peek2", peek2::callback(ctx));
+	ctx.set_global("peek4", peek4::callback(ctx));
+	ctx.set_global("poke", poke::callback(ctx));
+	ctx.set_global("poke2", poke2::callback(ctx));
+	ctx.set_global("poke4", poke4::callback(ctx));
 }
 
 /// Inclusive range, end >= start.
-fn poke_mmio_range<A: Allocator + 'static>(rt: &mut Runtime<A>, start: u16, end: u16) {
-	let handlers: [(u16, fn(&mut Runtime<A>, u8)); _] = [
+fn poke_mmio_range(rt: &mut Runtime, start: u16, end: u16) {
+	let handlers: [(u16, fn(&mut Runtime, u8)); _] = [
 		(0x5f24, |rt, val| rt.set_cursor_home(val as i16)),
 		(0x5f26, |rt, val| rt.set_cursor_x(val as i16)),
 		(0x5f27, |rt, val| rt.set_cursor_y(val as i16)),
@@ -36,7 +36,7 @@ fn poke_mmio_range<A: Allocator + 'static>(rt: &mut Runtime<A>, start: u16, end:
 
 
 /// Inclusive cyclic range. If `end == start`, 1 byte is triggered. If `end == start - 1`, all memory is triggered.
-fn poke_mmio_cyclic<A: Allocator + 'static>(rt: &mut Runtime<A>, start: u16, end: u16) {
+fn poke_mmio_cyclic(rt: &mut Runtime, start: u16, end: u16) {
 	if end > start {
 		poke_mmio_range(rt, start, end);
 	} else {
@@ -58,7 +58,7 @@ fn parse_poke_args<'gc, 'a>(ctx: Context<'gc>, stack: &mut Stack<'gc, 'a>) -> Re
 }
 
 #[api_callback]
-pub fn poke<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
+pub fn poke<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
 	let (base, count, no_data) = parse_poke_args(ctx, &mut stack)?;
 	
 	if no_data {
@@ -80,7 +80,7 @@ pub fn poke<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<'
 }
 
 #[api_callback]
-pub fn poke2<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
+pub fn poke2<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
 	let (base, count, no_data) = parse_poke_args(ctx, &mut stack)?;
 	
 	if no_data {
@@ -102,7 +102,7 @@ pub fn poke2<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<
 }
 
 #[api_callback]
-pub fn poke4<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
+pub fn poke4<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc, 'a>) -> Result<(), Error<'gc>> {
 	let (base, count, no_data) = parse_poke_args(ctx, &mut stack)?;
 	
 	if no_data {
@@ -124,7 +124,7 @@ pub fn poke4<'gc, 'a, A: Allocator + 'static>(rt: &mut Runtime<A>, ctx: Context<
 }
 
 #[api_callback]
-pub fn peek<A: Allocator + 'static>(rt: &mut Runtime<A>, mut stack: Stack, addr: u16, n: Option<u16>) {
+pub fn peek(rt: &mut Runtime, mut stack: Stack, addr: u16, n: Option<u16>) {
 	let n = match n {
 		None => 1,
 		Some(n) if n > 0 => n,
@@ -143,7 +143,7 @@ pub fn peek<A: Allocator + 'static>(rt: &mut Runtime<A>, mut stack: Stack, addr:
 }
 
 #[api_callback]
-pub fn peek2<A: Allocator + 'static>(rt: &mut Runtime<A>, mut stack: Stack, addr: u16, n: Option<u16>) {
+pub fn peek2(rt: &mut Runtime, mut stack: Stack, addr: u16, n: Option<u16>) {
 	let n = match n {
 		None => 1,
 		Some(n) if n > 0 => n,
@@ -165,7 +165,7 @@ pub fn peek2<A: Allocator + 'static>(rt: &mut Runtime<A>, mut stack: Stack, addr
 }
 
 #[api_callback]
-pub fn peek4<A: Allocator + 'static>(rt: &mut Runtime<A>, mut stack: Stack, addr: u16, n: Option<u16>) {
+pub fn peek4(rt: &mut Runtime, mut stack: Stack, addr: u16, n: Option<u16>) {
 	let n = match n {
 		None => 1,
 		Some(n) if n > 0 => n,

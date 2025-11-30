@@ -6,13 +6,13 @@ use p8rs_piccolo::{Context, Value};
 use p8rs_types::p8num::P8Num;
 use crate::vm::Runtime;
 
-pub fn install_pico8_rnd<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("rnd", rnd::callback::<A>(ctx));
-	ctx.set_global("srand", srand::callback::<A>(ctx));
+pub fn install_pico8_rnd(ctx: Context) {
+	ctx.set_global("rnd", rnd::callback(ctx));
+	ctx.set_global("srand", srand::callback(ctx));
 }
 
 #[api_callback]
-pub fn rnd<'gc, A: Allocator + 'static>(ctx: Context<'gc>, rt: &mut Runtime<A>, limit: Option<Value<'gc>>) -> Value<'gc> {
+pub fn rnd<'gc>(ctx: Context<'gc>, rt: &mut Runtime, limit: Option<Value<'gc>>) -> Value<'gc> {
 	let limit = match limit {
 		Some(Value::Number(limit)) if limit != p8!(0) => limit.to_raw().cast_unsigned(),
 		None => p8!(1).to_raw().cast_unsigned(),
@@ -34,7 +34,7 @@ pub fn rnd<'gc, A: Allocator + 'static>(ctx: Context<'gc>, rt: &mut Runtime<A>, 
 }
 
 #[api_callback]
-pub fn srand<'gc, A: Allocator + 'static>(ctx: Context<'gc>, rt: &mut Runtime<A>, seed: Option<P8Num>) {
+pub fn srand<'gc>(ctx: Context<'gc>, rt: &mut Runtime, seed: Option<P8Num>) {
 	let seed = seed.map(P8Num::to_raw).unwrap_or(0).cast_unsigned() & 0x7fff_ffff;
 	let (hi, lo) = match seed {
 		0 => (0x6000_9755, 0xdead_beef),
@@ -51,7 +51,7 @@ pub fn srand<'gc, A: Allocator + 'static>(ctx: Context<'gc>, rt: &mut Runtime<A>
 	}
 }
 
-fn rnd_impl<A: Allocator + 'static>(rt: &mut Runtime<A>) -> u32 {
+fn rnd_impl(rt: &mut Runtime) -> u32 {
 	let mut ms = rt.memory.machine_state();
 	let rng_state = ms.rng_state();
 	let mut hi = u32::from_le_bytes(rng_state[0..4].try_into().unwrap());

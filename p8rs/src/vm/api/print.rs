@@ -13,9 +13,9 @@ use crate::vm::memory::Memory;
 use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
-pub fn install_pico8_print<A: Allocator + Unpin + 'static>(ctx: Context) {
+pub fn install_pico8_print(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
-		let rt = rt.downcast::<Runtime<A>>();
+		let rt = rt.downcast::<Runtime>();
 		let (text, mut x, y, mut col): (Value, Option<P8Num>, Option<P8Num>, Option<P8Num>) = stack.consume(ctx).unwrap();
 		if y.is_none() {
 			col = x;
@@ -73,7 +73,6 @@ pub fn install_pico8_print<A: Allocator + Unpin + 'static>(ctx: Context) {
 			clipping: false,
 			drawn: false,
 			max_x: None,
-			phantom_allocator: PhantomData::<A>,
 		})))
 	}));
 }
@@ -122,7 +121,7 @@ bitflags! {
     }
 }
 
-fn screen_shift_up_exact<A: Allocator>(rt: &mut Runtime<A>, shift: u8) {
+fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
 	if rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL) {
 		return;
 	}
@@ -139,7 +138,7 @@ enum NewlineRequest {
 	PrintEndNewline
 }
 
-fn handle_newline<A: Allocator>(rt: &mut Runtime<A>, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
+fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
 	let (line_height, font_height) = get_line_height(rt, flags);
 	
 	let (reset_x, align_shift, advance_y, considered_height) = match request {
@@ -184,7 +183,7 @@ fn escape_to_print_flags(val: u8) -> Option<PrintDefaultsFlags> {
 	}
 }
 
-fn execute_escape_sequence<'gc, A: Allocator>(_ctx: Context<'gc>, rt: &mut Runtime<A>, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
@@ -247,7 +246,7 @@ fn execute_escape_sequence<'gc, A: Allocator>(_ctx: Context<'gc>, rt: &mut Runti
 }
 
 /// Returns: (line_height, font_height)
-fn get_line_height<A: Allocator>(rt: &mut Runtime<A>, flags: PrintDefaultsFlags) -> (u8, u8) {
+fn get_line_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> (u8, u8) {
 	let font_height = get_font(rt, flags).height();
 	if flags.contains(PrintDefaultsFlags::TALL) && flags.contains(PrintDefaultsFlags::ENABLE) {
 		(font_height * 2, font_height)
@@ -257,7 +256,7 @@ fn get_line_height<A: Allocator>(rt: &mut Runtime<A>, flags: PrintDefaultsFlags)
 }
 
 
-fn get_font<A: Allocator>(rt: &mut Runtime<A>, flags: PrintDefaultsFlags) -> Font<'_> {
+fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
 	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
 	if use_custom_font {
 		Font::new(rt.memory.const_slice(0x5600))
@@ -266,7 +265,7 @@ fn get_font<A: Allocator>(rt: &mut Runtime<A>, flags: PrintDefaultsFlags) -> Fon
 	}
 }
 
-fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: PrintDefaultsFlags, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
+fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
 	let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
 	let is_tall = flags.contains(PrintDefaultsFlags::TALL);
 	let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
@@ -327,7 +326,7 @@ fn draw_letter<A: Allocator>(_ctx: Context, rt: &mut Runtime<A>, flags: PrintDef
 
 #[derive(Collect)]
 #[collect(no_drop)]
-struct PrintSeq<'gc, A> {
+struct PrintSeq<'gc> {
 	text: TextEscapeIterator<'gc>,
 	/// number of frames that should be skipped right now
 	skip_frames: usize,
@@ -349,12 +348,9 @@ struct PrintSeq<'gc, A> {
 	y_provided: bool,
 	/// maximum cursor x during printing - for return
 	max_x: Option<i16>,
-	
-	#[collect(require_static)]
-	phantom_allocator: PhantomData<A>,
 }
 
-impl<'gc, A: Allocator + Unpin + 'static> Sequence<'gc> for PrintSeq<'gc, A> {
+impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 	fn poll(
 		mut self: Pin<&mut Self>,
 		ctx: Context<'gc>,
@@ -362,7 +358,7 @@ impl<'gc, A: Allocator + Unpin + 'static> Sequence<'gc> for PrintSeq<'gc, A> {
 		mut stack: Stack<'gc, '_>,
 		rt: RuntimeRef<'_>,
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
-		let rt = rt.downcast::<Runtime<A>>();
+		let rt = rt.downcast::<Runtime>();
 		
 		if !self.stopped {
 			if self.skip_frames > 0 {

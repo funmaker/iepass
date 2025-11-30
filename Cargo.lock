@@ -3234,6 +3234,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitflags 2.9.4",
+ "bytemuck",
  "defmt 1.0.1",
  "embedded-io",
  "gc-arena",
@@ -3299,6 +3300,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "bitflags 2.9.4",
+ "bytemuck",
  "defmt 1.0.1",
  "gc-arena",
  "thiserror 2.0.17",

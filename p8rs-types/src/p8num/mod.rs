@@ -14,6 +14,7 @@ mod from_ascii;
 /// [P8Num] uses 16 bits for integer part and 16 bits for fractional part. It can represent values from -32768.0 to 32767.9999847412109375 inclusive.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default)]
 #[cfg_attr(feature = "gc-arena", derive(gc_arena::Collect), collect(require_static))]
+#[cfg_attr(feature = "bytemuck", derive(bytemuck::Pod), derive(bytemuck::Zeroable))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(transparent)]
 pub struct P8Num(i32);

@@ -12,9 +12,8 @@ use eframe::{egui, CreationContext};
 use eframe::epaint::TextureHandle;
 use egui::{Color32, Event, Frame, ImageSource, Key, RawInput};
 use egui::load::SizedTexture;
-use p8rs::vm::{Callbacks, P8rs, RunResult};
+use p8rs::vm::{palette, Callbacks, P8rs, RunResult};
 use p8rs::colors::Color;
-use p8rs::vm::palette::PALETTE;
 
 mod framebuffer_pool;
 
@@ -159,7 +158,7 @@ impl eframe::App for EmulatorApp {
 				
 				let map_color = |color: u8| -> Color {
 					assert!(color < 16);
-					PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
+					palette::color_from_index(screen_palette[color as usize])
 				};
 				
 				self.fb_tex.set(self.fb_pool.from_iter(

@@ -9,20 +9,20 @@ use crate::vm::memory::machine_state::MiscChipsetFeatureFlags;
 use crate::vm::memory::Memory;
 use crate::vm::Runtime;
 
-pub fn install_pico8_drawing<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("rectfill", rectfill::callback::<A>(ctx));
-	ctx.set_global("rect", rect::callback::<A>(ctx));
-	ctx.set_global("circfill", circfill::callback::<A>(ctx));
-	ctx.set_global("circ", circ::callback::<A>(ctx));
-	ctx.set_global("ovalfill", ovalfill::callback::<A>(ctx));
-	ctx.set_global("oval", oval::callback::<A>(ctx));
-	ctx.set_global("line", line::callback::<A>(ctx));
-	ctx.set_global("spr", spr::callback::<A>(ctx));
-	ctx.set_global("sspr", sspr::callback::<A>(ctx));
+pub fn install_pico8_drawing(ctx: Context) {
+	ctx.set_global("rectfill", rectfill::callback(ctx));
+	ctx.set_global("rect", rect::callback(ctx));
+	ctx.set_global("circfill", circfill::callback(ctx));
+	ctx.set_global("circ", circ::callback(ctx));
+	ctx.set_global("ovalfill", ovalfill::callback(ctx));
+	ctx.set_global("oval", oval::callback(ctx));
+	ctx.set_global("line", line::callback(ctx));
+	ctx.set_global("spr", spr::callback(ctx));
+	ctx.set_global("sspr", sspr::callback(ctx));
 }
 
 #[api_callback]
-pub fn rectfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
+pub fn rectfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let x0 = x0.unwrap_or(0);
 	let y0 = y0.unwrap_or(0);
@@ -37,7 +37,7 @@ pub fn rectfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0
 }
 
 #[api_callback]
-pub fn rect<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
+pub fn rect(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let x0 = x0.unwrap_or(0);
 	let y0 = y0.unwrap_or(0);
@@ -55,7 +55,7 @@ pub fn rect<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Op
 }
 
 #[api_callback]
-pub fn circfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
+pub fn circfill(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
 	let (Some(x), Some(y)) = (x, y) else { return };
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	
@@ -97,7 +97,7 @@ pub fn circfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: 
 
 
 #[api_callback]
-pub fn circ<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
+pub fn circ(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, col: Option<P8Num>) {
 	let (Some(x), Some(y)) = (x, y) else { return };
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	
@@ -138,7 +138,7 @@ pub fn circ<A: Allocator + 'static>(rt: &mut Runtime<A>, x: Option<i16>, y: Opti
 }
 
 #[api_callback]
-pub fn ovalfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
+pub fn ovalfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let x0 = x0.unwrap_or(0);
 	let y0 = y0.unwrap_or(0);
@@ -198,7 +198,7 @@ pub fn ovalfill<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0
 }
 
 #[api_callback]
-pub fn oval<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
+pub fn oval(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>, y1: Option<i16>, col: Option<P8Num>) {
 	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 	let x0 = x0.unwrap_or(0);
 	let y0 = y0.unwrap_or(0);
@@ -259,7 +259,7 @@ pub fn oval<A: Allocator + 'static>(rt: &mut Runtime<A>, x0: Option<i16>, y0: Op
 }
 
 #[api_callback]
-pub fn line<A: Allocator + 'static>(rt: &mut Runtime<A>, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P8Num>, p4: Option<P8Num>, p5: Option<P8Num>) {
+pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P8Num>, p4: Option<P8Num>, p5: Option<P8Num>) {
 	let (mut x0, mut y0, mut x1, mut y1) = match (p1, p2, p3, p4, p5) {
 		(Some(x0), Some(y0), Some(x1), Some(y1), col) => {
 			if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
@@ -333,7 +333,7 @@ pub fn line<A: Allocator + 'static>(rt: &mut Runtime<A>, p1: Option<P8Num>, p2: 
 }
 
 #[api_callback]
-pub fn spr<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: Option<P8Num>, h: Option<P8Num>, flip_x: Option<bool>, flip_y: Option<bool>) {
+pub fn spr(rt: &mut Runtime, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: Option<P8Num>, h: Option<P8Num>, flip_x: Option<bool>, flip_y: Option<bool>) {
 	let n = n.unwrap_or(0);
 	let sx = (n % 16) * 8;
 	let sy = (n / 16) * 8;
@@ -359,7 +359,7 @@ pub fn spr<A: Allocator + 'static>(rt: &mut Runtime<A>, n: Option<i16>, x: Optio
 }
 
 #[api_callback]
-pub fn sspr<A: Allocator + 'static>(rt: &mut Runtime<A>, sx: i16, sy: i16, sw: i16, sh: i16, mut dx: i16, mut dy: i16, dw: Option<i16>, dh: Option<i16>, flip_x: Option<bool>, flip_y: Option<bool>) {
+pub fn sspr(rt: &mut Runtime, sx: i16, sy: i16, sw: i16, sh: i16, mut dx: i16, mut dy: i16, dw: Option<i16>, dh: Option<i16>, flip_x: Option<bool>, flip_y: Option<bool>) {
 	let mut dw = dw.unwrap_or(sw);
 	let mut dh = dh.unwrap_or(sw);
 	let mut flip_x = flip_x.unwrap_or(false);

@@ -5,8 +5,8 @@ use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, Stri
 
 use crate::vm::Runtime;
 
-pub fn install_pico8_internal<A: Allocator + 'static>(ctx: Context) {
-	ctx.set_global("_set_fps", _set_fps::callback::<A>(ctx));
+pub fn install_pico8_internal(ctx: Context) {
+	ctx.set_global("_set_fps", _set_fps::callback(ctx));
 	
 	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));
 	ctx.set_global("stop", Callback::from_fn(&ctx, move |ctx, mut exec: Execution, mut stack, _| {
@@ -26,7 +26,7 @@ pub fn install_pico8_internal<A: Allocator + 'static>(ctx: Context) {
 }
 
 #[api_callback]
-pub fn _set_fps<A: Allocator + 'static>(rt: &mut Runtime<A>, new_fps: i16) -> i16 {
+pub fn _set_fps(rt: &mut Runtime, new_fps: i16) -> i16 {
 	let old_fps = rt.target_fps;
 	if new_fps <= 0 {
 		rt.target_fps = 30;

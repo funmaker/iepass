@@ -21,7 +21,7 @@ use rtt_target::ChannelMode;
 use p8rs::colors::Color;
 use p8rs::vm::palette::PALETTE;
 use p8rs::vm::memory::machine_state::Palette;
-use p8rs::vm::P8rs;
+use p8rs::vm::{palette, P8rs};
 
 mod calib;
 mod peripherials;
@@ -165,9 +165,9 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     let mut pico8 = P8rs::new_in(&PSRAM_ALLOCATOR)?;
     
-    info!("Loading hello.p8");
+    info!("Loading mandelbrot.p8");
     
-    pico8.load_cartridge(include_bytes!("../../lua/hello.p8"))?;
+    pico8.load_cartridge(include_bytes!("../../lua/mandelbrot.p8"))?;
     
     info!("Entering main loop.");
     
@@ -196,13 +196,13 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         let screen_palette = *runtime.memory.machine_state().palette(Palette::Screen);
         let map_color = |color: u8| -> Color {
             assert!(color < 16);
-            PALETTE[(screen_palette[color as usize] as usize) & 0x0F]
+            palette::color_from_index(screen_palette[color as usize])
         };
         
         let mut fb = fbs.get_empty().await;
         let screen = runtime.memory.screen();
         let pixels = screen.iter()
-                           .map(|byte| [map_color(*byte >> 4), map_color(*byte & 0x0F)])
+                           .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
                            .flatten()
                            .enumerate();
         for (id, pixel) in pixels {

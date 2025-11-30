@@ -1,4 +1,7 @@
+pico-8 cartridge // http://www.pico-8.com
+version 43
 
+__lua__
 if true then
   p8rs.test("standard then 1")
 else

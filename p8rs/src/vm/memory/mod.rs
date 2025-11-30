@@ -1,10 +1,7 @@
-use core::alloc::Allocator;
 use core::ops::{Deref, DerefMut};
-use alloc::boxed::Box;
-use alloc::alloc::Global;
 use core::fmt::{Debug, Formatter};
+use bytemuck::Zeroable;
 use p8rs_types::p8num::P8Num;
-use p8rs_macros::TransparentRef;
 
 pub mod sprites;
 pub mod map;
@@ -15,7 +12,6 @@ pub mod machine_state;
 pub mod screen;
 pub mod painter;
 
-use crate::utils;
 use sprites::Sprites;
 use map::Map;
 use sprite_flags::SpriteFlags;
@@ -25,23 +21,11 @@ use machine_state::MachineState;
 use screen::Screen;
 use painter::Painter;
 
-#[derive(Clone, TransparentRef)]
+#[derive(Clone, Zeroable)]
 #[repr(transparent)]
 pub struct Memory([u8; 0x10000]);
 
 impl Memory {
-	pub fn new() -> Box<Self> {
-		Self::new_in(Global)
-	}
-	
-	pub fn new_in<A: Allocator>(alloc: A) -> Box<Self, A> {
-		let mut mem = Memory::from_bits_boxed(utils::new_zeroed_box_in(alloc));
-		
-		mem.reset();
-		
-		mem
-	}
-	
 	pub fn reset(&mut self) {
 		self.machine_state().reset();
 	}

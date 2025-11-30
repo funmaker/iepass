@@ -9,6 +9,7 @@ use p8rs_types::p8scii::Display;
 use crate::runner::TIMEOUT_MS;
 use crate::summary::RunResult;
 
+#[derive(Debug)]
 struct RunnerCallback {
 	buffer: Rc<RefCell<String>>,
 }

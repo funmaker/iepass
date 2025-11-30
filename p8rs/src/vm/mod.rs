@@ -34,7 +34,7 @@ pub enum RunResult {
 pub struct P8rs<A: Allocator = Global> {
 	lua: Lua,
 	fresh_globals: StashedTable,
-	runtime: Runtime<A>,
+	runtime: Box<Runtime, A>,
 	executor: Option<StashedExecutor>,
 }
 
@@ -52,18 +52,18 @@ fn shallow_copy_table<'gc>(mc: &Mutation<'gc>, src: Table<'gc>) -> Result<Table<
 	Ok(ret)
 }
 
-impl<A: Allocator + Clone + Unpin + 'static> P8rs<A> {
+impl<A: Allocator> P8rs<A> {
 	pub fn new_in(alloc: A) -> Result<P8rs<A>, InvalidTableKey> {
 		let mut lua = Lua::empty();
 		
 		let fresh_globals = lua.enter(|ctx| {
-			install_pico8_apis::<A>(ctx);
+			install_pico8_apis(ctx);
 			Ok(ctx.stash(shallow_copy_table(ctx.mutation(), ctx.globals())?))
 		})?;
 		
 		Ok(Self {
 			lua,
-			runtime: Runtime::new(alloc),
+			runtime: Runtime::new_in(alloc),
 			executor: None,
 			fresh_globals
 		})
@@ -91,7 +91,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 	}
 	
 	pub fn set_callbacks(&mut self, callbacks: impl Callbacks + 'static) {
-		self.runtime.callbacks = Box::new(callbacks);
+		self.runtime.set_callbacks(callbacks);
 	}
 	
 	pub fn run(&mut self) -> Result<RunResult, ExternError> {
@@ -121,7 +121,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 					
 					self.runtime.start_frame();
 					
-					if !executor.step(ctx, &mut fuel, &mut self.runtime).unwrap() {
+					if !executor.step(ctx, &mut fuel, &mut *self.runtime).unwrap() {
 						if fuel.is_interrupted() {
 							trace!("[run_fuel] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode());
 							return Ok(RunResult::Stop)
@@ -185,7 +185,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 		result
 	}
 	
-	pub fn runtime(&mut self) -> &mut Runtime<A> {
+	pub fn runtime(&mut self) -> &mut Runtime {
 		&mut self.runtime
 	}
 }
