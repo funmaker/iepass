@@ -1,5 +1,4 @@
 use alloc::format;
-use core::alloc::Allocator;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, String};
 

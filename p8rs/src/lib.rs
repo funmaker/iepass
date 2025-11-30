@@ -7,6 +7,7 @@
 #![feature(range_into_bounds)]
 #![feature(range_bounds_is_empty)]
 #![feature(iter_array_chunks)]
+
 #[macro_use] extern crate p8rs_log;
 extern crate alloc;
 extern crate core;

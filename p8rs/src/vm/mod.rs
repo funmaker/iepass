@@ -44,14 +44,6 @@ impl P8rs<Global> {
 	}
 }
 
-fn shallow_copy_table<'gc>(mc: &Mutation<'gc>, src: Table<'gc>) -> Result<Table<'gc>, InvalidTableKey> {
-	let ret = Table::new(mc);
-	for (k, v) in src.iter() {
-		ret.set_raw(mc, k, v)?;
-	}
-	Ok(ret)
-}
-
 impl<A: Allocator> P8rs<A> {
 	pub fn new_in(alloc: A) -> Result<P8rs<A>, InvalidTableKey> {
 		let mut lua = Lua::empty();
@@ -190,38 +182,17 @@ impl<A: Allocator + 'static> P8rs<A> {
 	}
 }
 
-
-#[derive(Debug, Copy, Clone)]
-#[allow(dead_code)]
-pub enum StaticValue {
-	Nil,
-	Boolean(bool),
-	Number(P8Num),
-	String,
-	Table,
-	Function,
-	Thread,
-	UserData,
-}
-
-// todo: context for strings / tables / maybe function names
-pub fn to_static_value(x: &Value) -> StaticValue {
-	match x {
-		Value::Nil          => StaticValue::Nil,
-		Value::Boolean(b)   => StaticValue::Boolean(b.clone()),
-		Value::Number(n)    => StaticValue::Number(*n),
-		Value::String(_s)   => StaticValue::String,
-		Value::Table(_t)    => StaticValue::Table,
-		Value::Function(_f) => StaticValue::Function,
-		Value::Thread(_)    => StaticValue::Thread,
-		Value::UserData(_u) => StaticValue::UserData,
+fn shallow_copy_table<'gc>(mc: &Mutation<'gc>, src: Table<'gc>) -> Result<Table<'gc>, InvalidTableKey> {
+	let ret = Table::new(mc);
+	for (k, v) in src.iter() {
+		ret.set_raw(mc, k, v)?;
 	}
+	Ok(ret)
 }
-
 
 #[cfg(test)]
 mod test {
-	use crate::vm::{to_static_value, P8rs, RunResult, StaticValue};
+	use crate::vm::{P8rs, RunResult};
 	use alloc::vec::Vec;
 	use p8rs_macros::p8;
 	use p8rs_piccolo::{Closure, Executor, Value, Variadic};
@@ -249,16 +220,14 @@ mod test {
 			let exec = ctx.fetch(&ex);
 			let vals = exec.take_result::<Variadic<Vec<Value>>>(ctx)??;
 			
-			let results = vals.iter().map(to_static_value).collect::<Vec<_>>();
+			assert_eq!(vals.len(), 1, "expected one result");
+			let first = vals[0];
+			if let Value::Number(i) = first {
+				assert_eq!(i, p8!(39), "first element should be 39");
+			}
 			
-			Ok(results)
+			Ok(())
 		}).unwrap();
-		
-		assert_eq!(res.len(), 1, "expected one result");
-		let first = res[0];
-		if let StaticValue::Number(i) = first {
-			assert_eq!(i, p8!(39), "first element should be 39");
-		}
 		
 		info!("XDD {:?}", res);
 	}

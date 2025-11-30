@@ -82,7 +82,7 @@ fn main() {
 		// ! GENERATED FILE !\n\
 		// !  DO NOT EDIT   !\n\
 		//\n\
-		// use `cargo make build-font` instead\
+		// use `cargo make build-assets` instead\
 		\n\
 		\n\
 		pub const SYSTEM_FONT: [u8; 2048] = [\n\

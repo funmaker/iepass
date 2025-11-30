@@ -12,6 +12,6 @@ pub trait Callbacks: Debug {
 	}
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct DefaultCallbacks;
 impl Callbacks for DefaultCallbacks {}

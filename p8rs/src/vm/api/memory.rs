@@ -1,6 +1,5 @@
 use p8rs_piccolo::{Error, Value};
 use crate::piccolo::Stack;
-use core::alloc::Allocator;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, IntoValue};
 use p8rs_types::p8num::P8Num;

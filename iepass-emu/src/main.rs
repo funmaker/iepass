@@ -46,6 +46,7 @@ fn main() -> eframe::Result {
 	)
 }
 
+#[derive(Debug)]
 struct EmulatorCallbacks {
 	buttons: Rc<Cell<[u8; 8]>>,
 }

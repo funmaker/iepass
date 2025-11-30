@@ -1,12 +1,11 @@
-use core::alloc::Allocator;
 use core::pin::Pin;
 use core::ops::Not;
-use core::marker::PhantomData;
 use bitflags::bitflags;
 use gc_arena::Collect;
 use p8rs_macros::TransparentRef;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
+
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
 use crate::vm::memory::Memory;

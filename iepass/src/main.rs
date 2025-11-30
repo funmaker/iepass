@@ -19,7 +19,6 @@ use anyhow::{anyhow, Result};
 use esp_hal::{gpio, psram};
 use rtt_target::ChannelMode;
 use p8rs::colors::Color;
-use p8rs::vm::palette::PALETTE;
 use p8rs::vm::memory::machine_state::Palette;
 use p8rs::vm::{palette, P8rs};
 

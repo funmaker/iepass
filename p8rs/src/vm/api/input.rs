@@ -1,6 +1,6 @@
-use core::alloc::Allocator;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Value};
+
 use crate::vm::Runtime;
 
 pub fn install_pico8_input(ctx: Context) {

@@ -1,6 +1,5 @@
 // Circle algorithms taken from https://github.com/egordorichev/pemsa/blob/master/src/pemsa/graphics/pemsa_graphics_api.cpp
 
-use core::alloc::Allocator;
 use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::Context;
 use p8rs_types::p8num::P8Num;
