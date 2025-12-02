@@ -1,21 +1,11 @@
-//! ```cargo
-//! [dependencies]
-//! colored = "3.0.0"
-//! eframe = "0.32.0"
-//! egui_plot = "0.33.0"
-//! serde_json = "1.0.0"
-//! serde = { version = "1.0", features = ["derive"] }
-//! 
-//! [target.'cfg(target_os = "linux")'.dependencies]
-//! ipipe = "0.11.7"
-//! ```
-
 use std::ffi::{OsStr, OsString};
 use std::process::{Child, Command, exit};
 use std::io::{BufRead, BufReader};
 use std::sync::mpsc::{self, Receiver, TryRecvError, Sender};
 use std::thread;
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+use std::sync::atomic::AtomicBool;
 use eframe::egui::{self, Color32};
 use egui_plot::{Plot, Legend, BarChart, Bar, Corner};
 use serde::Deserialize;
@@ -45,20 +35,47 @@ const COLORS: [Color32; 15] = [
 fn main() {
 	let args: Vec<_> = std::env::args_os().skip(1).collect();
 	
+	if let Err(err) = ctrlc::set_handler(ctrlc_handler) {
+		eprintln!("Failed to set up Ctrl-C handler. Backtrace might be missing: {err}");
+	}
+	
 	let (sender, receiver) = mpsc::channel();
-	let mut probe = spawn_probe(args, sender);
+	let probe = spawn_probe(args, sender);
 	
-	thread::spawn(move || {
-		let status = probe.wait().unwrap();
-		exit(status.code().unwrap_or(0));
-	});
+	thread::spawn(move || wait_for_exit(probe));
 	
-	let data = receiver.recv().unwrap();
+	let initial_data = match receiver.recv() {
+		Ok(data) => data,
+		Err(_) => return,
+	};
+	
 	let native_options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
 		..Default::default()
 	};
-	eframe::run_native("IEPass Perf", native_options, Box::new(|cc| Ok(Box::new(FlameGraph::new(cc, data, receiver))))).unwrap();
+	
+	eframe::run_native("IEPass Perf", native_options, Box::new(|cc| Ok(Box::new(FlameGraph::new(cc, initial_data, receiver))))).unwrap();
+}
+
+static CTRLC_RECEIVED: AtomicBool = AtomicBool::new(false);
+
+fn ctrlc_handler() {
+	if CTRLC_RECEIVED.swap(true, Ordering::Relaxed) {
+		eprintln!("Received second Ctrl+C, exiting.");
+		exit(-1);
+	} else {
+		eprintln!("Received Ctrl+C, waiting for probe-rs to exit.");
+	}
+}
+
+fn wait_for_exit(mut probe: Child) {
+	loop {
+		if let Some(status) = probe.try_wait().expect("Failed to wait for probe-rs process.") {
+			exit(status.code().unwrap_or(0));
+		} else {
+			std::thread::yield_now();
+		}
+	}
 }
 
 #[cfg(target_os = "linux")]

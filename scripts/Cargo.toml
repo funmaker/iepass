@@ -1,0 +1,52 @@
+[package]
+name     = "scripts"
+resolver = "3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "font-gen"
+path = "font_gen.rs"
+
+[[bin]]
+name = "gif-gen"
+path = "gif_gen.rs"
+
+[[bin]]
+name = "numbers"
+path = "numbers.rs"
+
+[[bin]]
+name = "perf-probe-rs"
+path = "perf_probe_rs.rs"
+
+[[bin]]
+name = "rle-decode"
+path = "rle_decode.rs"
+
+[[bin]]
+name = "rle-encode"
+path = "rle_encode.rs"
+
+[dependencies]
+p8rs-types.workspace = true
+p8rs-tests.workspace = true
+p8rs = { workspace = true, features = ["log-04", "std"] }
+image = "0.25.8"
+getopts = "0.2.24"
+colored = "3.0.0"
+eframe = "0.32.0"
+egui_plot = "0.33.0"
+serde_json = "1.0.0"
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0.98"
+gif = "0.14.0"
+opener = "0.8.3"
+ctrlc = "3.5.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ipipe = "0.11.7"

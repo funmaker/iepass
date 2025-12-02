@@ -1,9 +1,3 @@
-//! ```cargo
-//! [dependencies]
-//! image = "0.25.8"
-//! getopts = "0.2.24"
-//! ```
-
 use std::fs::File;
 use std::io::Write;
 use std::env;

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [".", "iepass", "p8rs", "iepass-calib", "iepass-emu", "iepass", "p8rs-types", "p8rs-tests", "p8rs-piccolo", "p8rs-macros", "p8rs-log"]
+members = [".", "iepass", "p8rs", "iepass-calib", "iepass-emu", "iepass", "p8rs-types", "p8rs-tests", "p8rs-piccolo", "p8rs-macros", "p8rs-log", "scripts"]
 
 [workspace.package]
 version = "0.1.0"
