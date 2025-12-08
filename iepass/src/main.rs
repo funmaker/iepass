@@ -16,7 +16,7 @@ use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
 use esp_hal::system::CpuControl;
 use panic_rtt_target as _;
 use anyhow::{anyhow, Result};
-use esp_hal::{gpio, psram};
+use esp_hal::{gpio, psram, ram};
 use rtt_target::ChannelMode;
 use p8rs::colors::Color;
 use p8rs::vm::memory::machine_state::Palette;
@@ -78,6 +78,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     // PSRAM custom allocator
     {
         let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
+        info!("PSRAM heap initialized at 0x{:08x}..0x{:08x} ({} bytes)", start as usize, start as usize + size, size);
         unsafe {
             PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
                 start,

@@ -22,15 +22,15 @@ path = "numbers.rs"
 
 [[bin]]
 name = "perf-probe-rs"
-path = "perf_probe_rs.rs"
+path = "perf_probe_rs/main.rs"
 
 [[bin]]
 name = "rle-decode"
-path = "rle_decode.rs"
+path = "rle/decode.rs"
 
 [[bin]]
 name = "rle-encode"
-path = "rle_encode.rs"
+path = "rle/encode.rs"
 
 [dependencies]
 p8rs-types.workspace = true
@@ -47,6 +47,8 @@ anyhow = "1.0.98"
 gif = "0.14.0"
 opener = "0.8.3"
 ctrlc = "3.5.1"
+elf = "0.8.0"
+rustc-demangle = "0.1.26"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ipipe = "0.11.7"
