@@ -6,6 +6,7 @@
 )]
 
 #[macro_use] extern crate p8rs_log;
+extern crate alloc;
 
 use panic_rtt_target as _;
 use anyhow::Result;
@@ -15,7 +16,7 @@ use embedded_hal_async::delay::DelayNs;
 use embedded_io::Read;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{self, Input, Level, Output, Pull};
-use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::timer::timg;
 use p8rs::colors::Color;
 use iepass::peripherials::{Analog, Debounce, Display, Speaker, SpiBus, Touch};
 use iepass::calib::Calib;
@@ -65,11 +66,9 @@ const ANALOG_SIZE: i16 = 50;
 //    IQR: 39
 //     CS: 40
 
-extern crate alloc;
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
 	rtt_target::rtt_init_defmt!();
 	
@@ -90,8 +89,8 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	
 	info!("Initializing embassy.");
 	
-	let timer0 = SystemTimer::new(peripherals.SYSTIMER);
-	esp_hal_embassy::init(timer0.alarm0);
+	let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
+	esp_rtos::start(timg0.timer0);
 	
 	info!("Initializing peripherals.");
 	
