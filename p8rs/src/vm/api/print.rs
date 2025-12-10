@@ -1,10 +1,6 @@
-use core::alloc::Allocator;
 use core::pin::Pin;
 use core::ops::Not;
-use core::marker::PhantomData;
-use bitflags::bitflags;
 use gc_arena::Collect;
-use p8rs_macros::TransparentRef;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
 use crate::vm::font::Font;
@@ -57,8 +53,25 @@ pub fn install_pico8_print(ctx: Context) {
 		
 		let flags = *rt.memory.machine_state().print_defaults().flags();
 		
+		let flags_enabled = flags.contains(PrintDefaultsFlags::ENABLE);
+		let state = PrintState {
+			advance_x: 0,
+			advance_x_wide: 0,
+			advance_y: 0,
+			background_color: None,
+			padding:     flags_enabled && flags.contains(PrintDefaultsFlags::PADDING),
+			wide:        flags_enabled && flags.contains(PrintDefaultsFlags::WIDE),
+			tall:        flags_enabled && flags.contains(PrintDefaultsFlags::TALL),
+			solid_bg:    flags_enabled && flags.contains(PrintDefaultsFlags::SOLID_BG),
+			invert:      flags_enabled && flags.contains(PrintDefaultsFlags::INVERT),
+			dotty:       flags_enabled && flags.contains(PrintDefaultsFlags::DOTTY),
+			custom_font: flags_enabled && flags.contains(PrintDefaultsFlags::CUSTOM_FONT),
+			pinball: false,
+			wrap: rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP),
+		};
+		
 		if y.is_none() {
-			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, flags, y.is_some());
+			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, &state, y.is_some());
 		}
 		
 		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
@@ -67,7 +80,7 @@ pub fn install_pico8_print(ctx: Context) {
 			text: TextEscapeIterator::new(text),
 			next_char: None,
 			stopped: false,
-			flags: flags.bits(),
+			state,
 			x_wrapped: false,
 			y_provided: y.is_some(),
 			clipping: false,
@@ -80,7 +93,7 @@ pub fn install_pico8_print(ctx: Context) {
 fn control_arg_to_number(arg: u8) -> Option<u8> {
 	Some(match arg {
 		b'0'..=b'9' => arg - b'0',
-		b'a'.. => arg - b'a',
+		b'a'.. => arg - b'a' + 0xa,
 		_ => {
 			debug!("Unexpected control code argument: {}", arg);
 			return None;
@@ -93,32 +106,7 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
-	ModifyFlags(PrintDefaultsFlags),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, TransparentRef)]
-#[repr(transparent)]
-pub struct  PrintStateFlags(u16);
-
-bitflags! {
-    impl PrintStateFlags: u16 {
-        // const ENABLE        = 1 << 0;
-        const PADDING       = 1 << 1;
-        const WIDE          = 1 << 2;
-        const TALL          = 1 << 3;
-        const SOLID_BG      = 1 << 4;
-        const INVERT        = 1 << 5;
-        const DOTTY         = 1 << 6;
-        const CUSTOM_FONT   = 1 << 7;
-		
-		const PINBALL_DOTTY = 1 << 8;
-		const WRAP          = 1 << 9;
-		const SCROLL        = 1 << 10;
-		const END_NEWLINE   = 1 << 11;
-		// TODO: finish internal print state
-		
-        const _ = !0;
-    }
+	ModifyState(PrintState),
 }
 
 fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
@@ -138,8 +126,8 @@ enum NewlineRequest {
 	PrintEndNewline
 }
 
-fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefaultsFlags, y_passed: bool) {
-	let (line_height, font_height) = get_line_height(rt, flags);
+fn handle_newline(rt: &mut Runtime, request: NewlineRequest, state: &PrintState, y_passed: bool) {
+	let (line_height, font_height) = get_line_height(rt, state);
 	
 	let (reset_x, align_shift, advance_y, considered_height) = match request {
 		NewlineRequest::MakeSpaceBeforePrint => (false, false,           0, line_height),
@@ -170,25 +158,31 @@ fn handle_newline(rt: &mut Runtime, request: NewlineRequest, flags: PrintDefault
 	}
 }
 
-fn escape_to_print_flags(val: u8) -> Option<PrintDefaultsFlags> {
+fn apply_escape_flag_to_print_state(val: u8, state: &mut PrintState, value: bool) -> bool {
 	match val {
-		b'b' => Some(PrintDefaultsFlags::PADDING),
-		b'w' => Some(PrintDefaultsFlags::WIDE),
-		b't' => Some(PrintDefaultsFlags::TALL),
-		b'#' => Some(PrintDefaultsFlags::SOLID_BG),
-		b'i' => Some(PrintDefaultsFlags::INVERT),
-		b'=' => Some(PrintDefaultsFlags::DOTTY),
-		b'p' => Some(PrintDefaultsFlags::WIDE | PrintDefaultsFlags::TALL | PrintDefaultsFlags::DOTTY),
-		_ => None
+		b'b' => state.padding = value,
+		b'w' => state.wide = value,
+		b't' => state.tall = value,
+		b'#' => state.solid_bg = value,
+		b'i' => state.invert = value,
+		b'=' => state.dotty = value,
+		b'p' => state.pinball = value,
+		b'$' => state.wrap = value,
+		_ => return false
 	}
+	true
 }
 
-fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: PrintDefaultsFlags, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
+fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, state: &mut PrintState, bytes: &[u8], y_passed: bool) -> Result<EscapeSequenceAction, RuntimeError<'gc>> {
 	assert!(bytes.len() > 0, "Escape sequence must not be empty");
 	
 	let escape_code = bytes[0];
 	Ok(match escape_code {
 		0 => EscapeSequenceAction::Stop,
+		2 => { // \#
+			state.background_color = control_arg_to_number(bytes[1]);
+			EscapeSequenceAction::Nop
+		},
 		6 => {
 			let arg = bytes[1];
 			match arg {
@@ -202,16 +196,18 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 					EscapeSequenceAction::SetLetterFrameSkip(arg as usize)
 				}
 				b'-' => {
-					if let Some(flag) = escape_to_print_flags(bytes[2]) {
-						EscapeSequenceAction::ModifyFlags(flags & flag.not())
+					if apply_escape_flag_to_print_state(bytes[2], state, false) {
+						// EscapeSequenceAction::ModifyState(flags & flag.not())
+						EscapeSequenceAction::Nop
 					}else{
 						debug!("unparsed sequence {:?}", bytes);
 						EscapeSequenceAction::Nop
 					}
 				},
 				_ => {
-					if let Some(flag) = escape_to_print_flags(arg) {
-						return Ok(EscapeSequenceAction::ModifyFlags(flags | flag | PrintDefaultsFlags::ENABLE))
+					if apply_escape_flag_to_print_state(arg, state, true) {
+						// return Ok(EscapeSequenceAction::ModifyState(flags | flag | PrintDefaultsFlags::ENABLE))
+						return Ok(EscapeSequenceAction::Nop)
 					}
 					debug!("Unimplemented escape sequence! {:?}", bytes);
 					EscapeSequenceAction::Nop
@@ -220,7 +216,7 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 		},
 		8 => { // \b
 			let x = rt.get_cursor_position()[0];
-			let font_width = get_font(rt, flags).width();
+			let font_width = get_font(rt, state).width();
 			rt.set_cursor_x(x.overflowing_sub(font_width as i16).0);
 			EscapeSequenceAction::Nop
 		},
@@ -231,7 +227,15 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 			EscapeSequenceAction::Nop
 		},
 		10 => { // \n
-			handle_newline(rt, NewlineRequest::ContentNewline, flags, y_passed);
+			handle_newline(rt, NewlineRequest::ContentNewline, state, y_passed);
+			EscapeSequenceAction::Nop
+		},
+		12 => { // \f
+			if let Some(arg) = control_arg_to_number(bytes[1]) {
+				*rt.memory.machine_state().pen_color() &= 0xfu8.not();
+				*rt.memory.machine_state().pen_color() |= arg & 0xfu8;
+				// TODO: check if top is zeroed
+			}
 			EscapeSequenceAction::Nop
 		},
 		13 => { // \r
@@ -246,34 +250,35 @@ fn execute_escape_sequence<'gc>(_ctx: Context<'gc>, rt: &mut Runtime, flags: Pri
 }
 
 /// Returns: (line_height, font_height)
-fn get_line_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> (u8, u8) {
-	let font_height = get_font(rt, flags).height();
-	if flags.contains(PrintDefaultsFlags::TALL) && flags.contains(PrintDefaultsFlags::ENABLE) {
+fn get_line_height(rt: &mut Runtime, state: &PrintState) -> (u8, u8) {
+	let font_height = get_font(rt, state).height();
+	if state.tall || state.pinball {
 		(font_height * 2, font_height)
 	} else {
 		(font_height, font_height)
 	}
 }
 
-
-fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
-	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
-	if use_custom_font {
+fn get_font<'a>(rt: &'a mut Runtime, state: &PrintState) -> Font<'a> {
+	if state.custom_font {
 		Font::new(rt.memory.const_slice(0x5600))
 	} else {
 		Font::SYSTEM
 	}
 }
 
-fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
-	let is_wide = flags.contains(PrintDefaultsFlags::WIDE);
-	let is_tall = flags.contains(PrintDefaultsFlags::TALL);
-	let is_inverted = flags.contains(PrintDefaultsFlags::INVERT);
-	let is_dotty = flags.contains(PrintDefaultsFlags::DOTTY);
-	let is_dotty_x = is_dotty && is_wide && !is_tall;
-	let is_dotty_y = is_dotty && is_tall;
+fn draw_letter(_ctx: Context, rt: &mut Runtime, state: &PrintState, letter: u8, y_passed: bool, dry_run: bool) -> (i16, i16, bool) {
+	let is_wide = state.pinball || state.wide;
+	let is_tall = state.pinball || state.tall;
+	let is_inverted = state.invert;
+	let is_solid = state.solid_bg;
+	let is_dotty = state.dotty;
+	let is_dotty_x = state.pinball || is_dotty && is_wide && !is_tall;
+	let is_dotty_y = state.pinball || is_dotty && is_tall;
 	
-	let font = get_font(rt, flags);
+	let bg = state.background_color.or(is_solid.then_some((*rt.memory.machine_state().pen_color() & 0xf0) >> 4));
+	
+	let font = get_font(rt, state);
 	
 	let font_width = font.width_chr(letter);
 	let font_height = font.height();
@@ -287,7 +292,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 		&& rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP);
 	
 	if x_wrapped {
-		handle_newline(rt, NewlineRequest::WrappingNewline, flags, y_passed);
+		handle_newline(rt, NewlineRequest::WrappingNewline, state, y_passed);
 	}
 	
 	assert!(font_width <= 8, "Char width cannot be >8");
@@ -299,6 +304,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 		
 		rt.memory
 		  .painter()
+		  .text_mode(bg)
 		  .with_callback(|_: &mut Memory, x: u8, y: u8| {
 			  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
 			  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
@@ -309,11 +315,12 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 			  
 			  if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
 				  CallbackResult::Keep
-			  }else{
+			  }else if bg.is_some() {
+				  CallbackResult::Color(0)
+			  } else {
 				  CallbackResult::Discard
 			  }
 		  })
-		  .set_fill(None)
 		  .paint(
 			  cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
 			  cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
@@ -323,6 +330,23 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	(draw_width as i16, draw_height as i16, x_wrapped)
 }
 
+#[derive(Copy, Clone, Debug, Collect)]
+#[collect(no_drop)]
+struct PrintState {
+	pub advance_x: u8,
+	pub advance_x_wide: u8,
+	pub advance_y: u8,
+	pub background_color: Option<u8>, // \# P0
+	pub padding: bool,
+	pub wide: bool,
+	pub tall: bool,
+	pub solid_bg: bool,
+	pub invert: bool,
+	pub dotty: bool,
+	pub custom_font: bool,
+	pub pinball: bool,
+	pub wrap: bool,
+}
 
 #[derive(Collect)]
 #[collect(no_drop)]
@@ -337,7 +361,7 @@ struct PrintSeq<'gc> {
 	/// whether a null byte has been encountered (and printing should stop)
 	stopped: bool,
 	/// current print flags
-	flags: u8,
+	state: PrintState,
 	/// has x wrapped (only if character wrapping is enabled)
 	x_wrapped: bool,
 	/// should print stop drawing because we ran out either x-space (without character wrapping) or y-space (without line scrolling)
@@ -360,7 +384,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
 		let rt = rt.downcast::<Runtime>();
 		
-		if !self.stopped {
+		while !self.stopped {
 			if self.skip_frames > 0 {
 				self.skip_frames -= 1;
 				return Ok(SequencePoll::Yield { to_thread: None, bottom: 0 })
@@ -373,13 +397,13 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				let [cursor_x, cursor_y] = rt.get_cursor_position();
 
 				if (cursor_y >= 128 && chipset_flags.contains(MiscChipsetFeatureFlags::NO_PRINT_SCROLL))
-				|| (cursor_x >= 128 && !chipset_flags.contains(MiscChipsetFeatureFlags::PRINT_WRAP)) {
+				|| (cursor_x >= 128 && !self.state.wrap) {
 					if self.drawn { self.clipping = true; }
 				} else {
 					self.drawn = true;
 				}
 				
-				let (w, _, x_wrapped) = draw_letter(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), char, self.y_provided, self.clipping);
+				let (w, _, x_wrapped) = draw_letter(ctx, rt, &self.state, char, self.y_provided, self.clipping);
 				
 				self.x_wrapped = x_wrapped;
 				
@@ -388,40 +412,38 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 				self.max_x = self.max_x.max(Some(x));
 			}
 			
-			let part = self.text.next();
+			let Some(part) = self.text.next() else { break };
 			
-			if let Some(part) = part {
-				match part {
-					TextPart::Character(char) => {
-						self.next_char = Some(char);
-						self.skip_frames = self.letter_frame_skip;
-					}
-					TextPart::EscapeSequence(bytes) => {
-						match execute_escape_sequence(ctx, rt, PrintDefaultsFlags::from_bits_truncate(self.flags), bytes, self.y_provided)? {
-							EscapeSequenceAction::Nop => {}
-							EscapeSequenceAction::SkipFrames(n) => {
-								self.skip_frames = n;
-							}
-							EscapeSequenceAction::SetLetterFrameSkip(n) => {
-								self.letter_frame_skip = n;
-							}
-							EscapeSequenceAction::Stop => {
-								self.stopped = true;
-							}
-							EscapeSequenceAction::ModifyFlags(new_flags) => {
-								self.flags = new_flags.bits();
-							}
+			match part {
+				TextPart::Character(char) => {
+					self.next_char = Some(char);
+					self.skip_frames = self.letter_frame_skip;
+				}
+				TextPart::EscapeSequence(bytes) => {
+					let y_provided = self.y_provided;
+					match execute_escape_sequence(ctx, rt, &mut self.state, bytes, y_provided)? {
+						EscapeSequenceAction::Nop => {}
+						EscapeSequenceAction::SkipFrames(n) => {
+							self.skip_frames = n;
+						}
+						EscapeSequenceAction::SetLetterFrameSkip(n) => {
+							self.letter_frame_skip = n;
+						}
+						EscapeSequenceAction::Stop => {
+							self.stopped = true;
+						}
+						EscapeSequenceAction::ModifyState(new_state) => {
+							self.state = new_state;
 						}
 					}
-					TextPart::UnterminatedEscapeSequence(_) => debug!("[PrintSeq] called on a sequence containing UnterminatedEscapeSequence!"),
 				}
-				
-				return Ok(SequencePoll::Pending)
+				TextPart::UnterminatedEscapeSequence(_) => debug!("[PrintSeq] called on a sequence containing UnterminatedEscapeSequence!"),
 			}
+		
 		}
 		
-		if !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_NEWLINE) {
-			handle_newline(rt, NewlineRequest::PrintEndNewline, PrintDefaultsFlags::from_bits_truncate(self.flags), self.y_provided);
+		if !self.stopped && !rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::NO_PRINT_NEWLINE) {
+			handle_newline(rt, NewlineRequest::PrintEndNewline, &self.state, self.y_provided);
 		}
 		
 		stack.replace(ctx, P8Num::from(self.max_x.unwrap_or(0)));

@@ -9,6 +9,7 @@ pub use mode::{PainterMode, PenMode, SpriteMode};
 pub use utils::PaintRange;
 use super::Memory;
 use utils::Vector;
+use crate::vm::memory::painter::mode::TextMode;
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -54,7 +55,7 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		}
 	}
 	
-	pub fn set_fill(&mut self, fill: Option<[[bool; 4]; 4]>) -> &mut Self {
+	pub fn set_fill(mut self, fill: Option<[[bool; 4]; 4]>) -> Self {
 		self.fill = fill;
 		self
 	}
@@ -62,6 +63,18 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 	pub fn sprite_mode(self) -> Painter<'m, SpriteMode, CB> {
 		Painter {
 			mode: SpriteMode::new(self.memory),
+			memory: self.memory,
+			clip_x: self.clip_x,
+			clip_y: self.clip_y,
+			camera: self.camera,
+			fill: self.fill,
+			callback: self.callback,
+		}
+	}
+	
+	pub fn text_mode(self, bg_color: Option<u8>) -> Painter<'m, TextMode, CB> {
+		Painter {
+			mode: TextMode::new(self.memory, bg_color),
 			memory: self.memory,
 			clip_x: self.clip_x,
 			clip_y: self.clip_y,
