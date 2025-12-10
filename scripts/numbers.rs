@@ -1,8 +1,3 @@
-//! ```cargo
-//! [dependencies]
-//! p8rs-types = { path = "../p8rs-types" }
-//! ```
-
 use p8rs_types::p8num::P8Num;
 
 fn main() {

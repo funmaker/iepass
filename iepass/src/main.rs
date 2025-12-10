@@ -6,20 +6,20 @@
 #![no_main]
 #![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]
 
+#[macro_use] extern crate p8rs_log;
 extern crate alloc;
-#[macro_use] extern crate p8rs;
 
-use esp_hal::clock::CpuClock;
-use esp_hal::timer::systimer::SystemTimer;
-use embassy_executor::Spawner;
-use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
-use esp_hal::system::CpuControl;
+use core::mem::MaybeUninit;
 use panic_rtt_target as _;
-use anyhow::{anyhow, Result};
-use esp_hal::{gpio, psram};
 use rtt_target::ChannelMode;
+use esp_hal::{gpio, psram, ram};
+use esp_hal::timer::timg;
+use esp_hal::clock::CpuClock;
+use esp_hal::gpio::{Input, InputConfig, Level, Output, Pull};
+use embassy_executor::Spawner;
+use anyhow::Result;
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use p8rs::colors::Color;
-use p8rs::vm::palette::PALETTE;
 use p8rs::vm::memory::machine_state::Palette;
 use p8rs::vm::{palette, P8rs};
 
@@ -37,7 +37,7 @@ use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
     let channels = rtt_target::rtt_init! {
         up: {
@@ -65,7 +65,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         .with_psram(psram::PsramConfig {
             ram_frequency: psram::SpiRamFreq::Freq40m,
             core_clock: Some(psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m),
-            size: psram::PsramSize::Size(2097152),
+            size: psram::PsramSize::AutoDetect,
             ..Default::default()
         });
     let calib = Calib::default();
@@ -73,31 +73,43 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Initializing allocators.");
     
-    // SRAM global allocator
-    esp_alloc::heap_allocator!(size: 140 * 1024);
-    
-    // PSRAM custom allocator
-    {
-        let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
-        unsafe {
-            PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
-                start,
-                size,
-                esp_alloc::MemoryCapability::External.into(),
-            ));
-        }
+    #[allow(static_mut_refs)]
+    unsafe {
+        use esp_alloc::MemoryCapability;
+        
+        #[ram(reclaimed)]
+        static mut HEAP_RECLAIMED: MaybeUninit<[u8; 73744]> = MaybeUninit::uninit();
+        static mut HEAP_EXTRA: MaybeUninit<[u8; 200 * 1024]> = MaybeUninit::uninit();
+        
+        let (sram_start, sram_size) = (HEAP_RECLAIMED.as_mut_ptr() as *mut u8, size_of_val(&HEAP_RECLAIMED));
+        let (sram_ex_start, sram_ex_size) = (HEAP_EXTRA.as_mut_ptr() as *mut u8, size_of_val(&HEAP_EXTRA));
+        let (psram_start, psram_size) = psram::psram_raw_parts(&peripherals.PSRAM);
+        
+        info!("SRAM heap initialized at 0x{:08x}..0x{:08x} ({} bytes)", sram_start as usize, sram_start as usize + sram_size, sram_size);
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(sram_start, sram_size, MemoryCapability::Internal.into()));
+        
+        info!("SRAM heap initialized at 0x{:08x}..0x{:08x} ({} bytes)", sram_ex_start as usize, sram_ex_start as usize + sram_ex_size, sram_ex_size);
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(sram_ex_start, sram_ex_size, MemoryCapability::Internal.into()));
+        
+        info!("PSRAM heap initialized at 0x{:08x}..0x{:08x} ({} bytes)", psram_start as usize, psram_start as usize + psram_size, psram_size);
+        PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(psram_start, psram_size, MemoryCapability::External.into()));
     }
     
     info!("Initializing embassy.");
     
-    let timer0 = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(timer0.alarm0);
+    let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
+    esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
     
-    info!("Initializing second cpu.");
-    
-    let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
-    let _guard = cpu_control.start_app_core(tasks::cpu1::STACK.take(), tasks::cpu1)
-                            .map_err(|err| anyhow!("{:?}", err))?;
+    // info!("Initializing second cpu.");
+    // 
+    // esp_rtos::start_second_core_with_stack_guard_offset(
+    //     peripherals.CPU_CTRL,
+    //     software_interrupt.software_interrupt1,
+    //     tasks::cpu1::STACK.take(),
+    //     None,
+    //     tasks::cpu1,
+    // );
     
     info!("Initializing peripherals.");
     
@@ -137,13 +149,13 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         calib.touch,
     );
     
-    let mut speaker = Speaker::new(
-        peripherals.I2S0,
-        peripherals.GPIO6,
-        peripherals.GPIO5,
-        peripherals.GPIO7,
-        peripherals.DMA_CH1,
-    )?;
+    // let mut speaker = Speaker::new(
+    //     peripherals.I2S0,
+    //     peripherals.GPIO6,
+    //     peripherals.GPIO5,
+    //     peripherals.GPIO7,
+    //     peripherals.DMA_CH1,
+    // )?;
     
     let display = Display::new(
         peripherals.SPI2,
@@ -187,7 +199,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
             info!("{}", analog.read(100));
             
             // speaker.play(&*KUTASAN).await?;
-            speaker.reset().await?;
+            // speaker.reset().await?;
         }
         
         pico8.run()?; // TODO: result.requested_fps

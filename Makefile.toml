@@ -1,24 +1,29 @@
 [config]
 skip_core_tasks = true
 default_to_workspace = false
+unstable_features = ["CTRL_C_HANDLING"]
 
 
 # Scripts
 [tasks.rle-encode]
-extend = "script-base"
-script = { file = "./scripts/rle_encode.rs" }
+extend = "script-rs"
+env.SCRIPT = "rle-encode"
 
 [tasks.rle-decode]
-extend = "script-base"
-script = { file = "./scripts/rle_decode.rs" }
+extend = "script-rs"
+env.SCRIPT = "rle-decode"
 
 [tasks.font-gen]
-extend = "script-base"
-script = { file = "./scripts/font_gen.rs" }
+extend = "script-rs"
+env.SCRIPT = "font-gen"
 
 [tasks.gif-gen]
-extend = "script-base"
-script = { file = "./scripts/gif_gen.rs" }
+extend = "script-rs"
+env.SCRIPT = "gif-gen"
+
+[tasks.perf-probe-rs]
+extend = "script-rs"
+env.SCRIPT = "perf-probe-rs"
 
 
 # Testing
@@ -95,6 +100,6 @@ args = ["make", "clean", "${@}"]
 
 
 # Abstract
-[tasks.script-base]
-script_runner = "@rust"
-script_runner_args = ["--base-path", "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts"]
+[tasks.script-rs]
+command = "cargo"
+args = ["run", "--package", "scripts", "--bin", "${SCRIPT}", "--", "${@}"]

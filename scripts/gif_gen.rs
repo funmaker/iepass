@@ -1,16 +1,3 @@
-//! ```cargo
-//! [dependencies]
-//! p8rs = { path = "../p8rs", features = ["log-04", "std"] }
-//! p8rs-types = { path = "../p8rs-types" }
-//! p8rs-tests = { path = "../p8rs-tests" }
-//! anyhow = "1.0.98"
-//! gif = "0.14.0"
-//! opener = "0.8.3"
-//! serde = "1.0.228"
-//! serde_json = "1.0.145"
-//! getopts = "0.2.24"
-//! ```
-
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;

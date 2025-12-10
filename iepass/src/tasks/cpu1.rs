@@ -1,10 +1,9 @@
 use static_cell::{ConstStaticCell, StaticCell};
 use esp_hal::system::Stack;
 use embassy_executor::Spawner;
-use esp_hal_embassy::Executor;
 use anyhow::Result;
 use embassy_time::{Duration, Timer};
-
+use esp_rtos::embassy::Executor;
 use crate::utils::PerfFutureExt;
 
 pub static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());

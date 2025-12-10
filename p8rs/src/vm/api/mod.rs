@@ -11,7 +11,6 @@ mod input;
 mod sound;
 mod rnd;
 
-use core::alloc::Allocator;
 use p8rs_piccolo::Context;
 
 pub fn install_pico8_apis(ctx: Context) {

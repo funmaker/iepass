@@ -1,9 +1,3 @@
-//! ```cargo
-//! [dependencies]
-//! p8rs = { path = "../p8rs", features = ["std"] }
-//! getopts = "0.2.24"
-//! ```
-
 use std::fs::File;
 use std::process;
 use std::env;

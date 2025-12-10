@@ -1,5 +1,4 @@
 use core::fmt::Write;
-use core::alloc::Allocator;
 use anyhow::anyhow;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Execution, IntoValue, RuntimeError, String, Value};

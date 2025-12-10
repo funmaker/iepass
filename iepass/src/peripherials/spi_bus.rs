@@ -31,7 +31,7 @@ impl<'d> SpiBus<'d> {
 	           miso: impl InputPin + 'd,
 	           dma: impl DmaChannelFor<AnyI2s<'d>> + 'd)
 	           -> Result<Self> {
-		let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+		let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(8000);
 		let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).map_err(|err| anyhow!("{err:?}"))?;
 		let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).map_err(|err| anyhow!("{err:?}"))?;
 		

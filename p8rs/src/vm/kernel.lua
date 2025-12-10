@@ -28,7 +28,7 @@
 
 local args = { ... }
 
-assert(#args == 1 and type(args[1]) == "function", "[kernel] Did not get function with main code.")
+assert(#args == 1 and type(args[1]) == "function", "[kernel] Expected function with main code.")
 
 args[1]()
 

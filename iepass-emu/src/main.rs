@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![feature(arc_is_unique)]
 
-#[macro_use] extern crate p8rs;
+#[macro_use] extern crate p8rs_log;
 
 use std::cell::Cell;
 use std::fs;
@@ -46,6 +46,7 @@ fn main() -> eframe::Result {
 	)
 }
 
+#[derive(Debug)]
 struct EmulatorCallbacks {
 	buttons: Rc<Cell<[u8; 8]>>,
 }

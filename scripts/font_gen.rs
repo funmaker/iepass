@@ -1,9 +1,3 @@
-//! ```cargo
-//! [dependencies]
-//! image = "0.25.8"
-//! getopts = "0.2.24"
-//! ```
-
 use std::fs::File;
 use std::io::Write;
 use std::env;
@@ -82,7 +76,7 @@ fn main() {
 		// ! GENERATED FILE !\n\
 		// !  DO NOT EDIT   !\n\
 		//\n\
-		// use `cargo make build-font` instead\
+		// use `cargo make build-assets` instead\
 		\n\
 		\n\
 		pub const SYSTEM_FONT: [u8; 2048] = [\n\

@@ -1,8 +1,9 @@
 [target.xtensa-esp32s3-none-elf]
-runner = "probe-rs run --chip=esp32s3 --preverify --always-print-stacktrace --no-location --catch-hardfault"
+runner = "cargo make --cwd .. perf-probe-rs run --chip=esp32s3 --preverify --always-print-stacktrace --no-location --catch-hardfault"
 
 [env]
 DEFMT_LOG="info"
+ESP_HAL_CONFIG_PSRAM_MODE="octal"
 
 [build]
 rustflags = [

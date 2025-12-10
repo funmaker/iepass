@@ -27,12 +27,13 @@ perf = ["esp-alloc/internal-heap-stats"]
 
 [dependencies]
 p8rs = { workspace = true, features = ["defmt"] }
+p8rs-log = { workspace = true, features = ["defmt"] }
 anyhow.workspace = true
 defmt.workspace = true
 esp-bootloader-esp-idf.workspace = true
 esp-alloc.workspace = true
 esp-hal.workspace = true
-esp-hal-embassy.workspace = true
+esp-rtos.workspace = true
 embassy-executor.workspace = true
 embassy-time.workspace = true
 embassy-sync.workspace = true
@@ -48,9 +49,4 @@ nb.workspace = true
 bitflags.workspace = true
 
 [dev-dependencies]
-embedded-test = { version = "0.6.0", features = [
-  "defmt",
-  "embassy",
-  "external-executor",
-  "xtensa-semihosting",
-] }
+embedded-test = { version = "0.7.0", features = ["defmt", "embassy", "external-executor", "xtensa-semihosting"] }

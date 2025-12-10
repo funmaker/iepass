@@ -1,4 +1,3 @@
-use core::alloc::Allocator;
 use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::{Context, Value};
 use p8rs_types::p8num::P8Num;

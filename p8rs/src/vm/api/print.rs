@@ -1,8 +1,10 @@
 use core::pin::Pin;
 use core::ops::Not;
+use bitflags::bitflags;
 use gc_arena::Collect;
 use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
+
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
 use crate::vm::memory::Memory;
@@ -52,6 +54,14 @@ pub fn install_pico8_print(ctx: Context) {
 		};
 		
 		let flags = *rt.memory.machine_state().print_defaults().flags();
+		#[cfg(feature = "defmt")]
+		unsafe {
+			use core::ops::Deref;
+			info!("flags 1: {}", defmt::Debug2Format(rt.memory.machine_state().deref()));
+			let callbacks = &rt.memory;
+			let callbacks = core::slice::from_raw_parts(callbacks as *const _ as *const u8, core::mem::size_of_val(callbacks));
+			info!("callbacks: {}", defmt::Debug2Format(callbacks));
+		}
 		
 		let flags_enabled = flags.contains(PrintDefaultsFlags::ENABLE);
 		let state = PrintState {
@@ -260,9 +270,13 @@ fn get_line_height(rt: &mut Runtime, state: &PrintState) -> (u8, u8) {
 }
 
 fn get_font<'a>(rt: &'a mut Runtime, state: &PrintState) -> Font<'a> {
+	#[cfg(feature = "defmt")]
+	info!("print state: {}", defmt::Debug2Format(&state));
 	if state.custom_font {
+		info!("Using custom font");
 		Font::new(rt.memory.const_slice(0x5600))
 	} else {
+		info!("Using system font");
 		Font::SYSTEM
 	}
 }
@@ -285,7 +299,9 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, state: &PrintState, letter: u8, 
 	let char_font = &font.char(letter);
 	let x_stride = if is_wide { 2 } else { 1 };
 	let y_stride = if is_tall { 2 } else { 1 };
+	info!("font_width {} x_stride {}", font_width, x_stride);
 	let draw_width = font_width * x_stride;
+	info!("font_height {} y_stride {}", font_height, y_stride);
 	let draw_height = font_height * y_stride;
 	
 	let x_wrapped = rt.get_cursor_position()[0].overflowing_add(font_width as i16).0 > 128

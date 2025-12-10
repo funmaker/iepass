@@ -1,7 +1,7 @@
 use core::alloc::Allocator;
 use core::any::Any;
 use alloc::boxed::Box;
-use std::alloc::Global;
+use alloc::alloc::Global;
 use bytemuck::Zeroable;
 use p8rs_types::p8num::P8Num;
 
@@ -18,6 +18,7 @@ pub struct Runtime {
 	pub buttons: Buttons,
 	pub target_fps: u16,
 	pub time: P8Num,
+	#[cfg_attr(feature = "defmt", defmt(Debug2Format))]
 	callbacks: Option<Box<dyn Callbacks>>,
 	cursor: [i16; 2],
 	cursor_home: i16,
@@ -44,7 +45,8 @@ impl Runtime {
 	
 	/// Should be called before every frame
 	pub fn start_frame(&mut self) {
-		let buttons = self.callbacks().get_buttons();
+		// let buttons = self.callbacks().get_buttons();
+		let buttons = Default::default();
 		*self.memory.machine_state().btn_state() = buttons;
 		
 		let delay = match *self.memory.machine_state().btnp_rep_delay() {
@@ -119,6 +121,7 @@ impl p8rs_piccolo::Runtime for Runtime {
 }
 
 #[derive(Debug, Copy, Clone, Hash, Zeroable)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Buttons {
 	pressed: [u8; 8],
 	pressed_now: [u8; 8],
@@ -126,6 +129,7 @@ pub struct Buttons {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Zeroable)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 enum ButtonState {
 	Done,

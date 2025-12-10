@@ -43,6 +43,10 @@ impl<'a> Font<'a> {
 			16.. => self.0.as_chunks().0[char as usize],
 		}
 	}
+	
+	pub fn as_bytes(&self) -> &[u8; 0x800] {
+		self.0
+	}
 }
 
 bitflags! {

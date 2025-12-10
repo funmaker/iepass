@@ -10,9 +10,9 @@ rust-version.workspace = true
 
 [features]
 default = ["std"]
-std = ["p8rs-piccolo/std", "embedded-io/std"]
-defmt = ["p8rs-piccolo/defmt", "dep:defmt"]
-log-04 = ["p8rs-piccolo/log-04"]
+std = ["p8rs-log/std", "p8rs-piccolo/std", "embedded-io/std"]
+defmt = ["p8rs-log/defmt", "p8rs-piccolo/defmt", "dep:defmt"]
+log-04 = ["p8rs-log/log-04", "p8rs-piccolo/log-04"]
 
 [dependencies]
 defmt = { workspace = true, optional = true }
@@ -26,6 +26,7 @@ anyhow.workspace = true
 bitflags.workspace = true
 thiserror.workspace = true
 bytemuck.workspace = true
+log = "0.4.28"
 
 [dev-dependencies]
 embedded-io.workspace = true
