@@ -65,7 +65,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         .with_psram(psram::PsramConfig {
             ram_frequency: psram::SpiRamFreq::Freq40m,
             core_clock: Some(psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m),
-            size: psram::PsramSize::Size(2097152),
+            size: psram::PsramSize::AutoDetect,
             ..Default::default()
         });
     let calib = Calib::default();
@@ -79,7 +79,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         
         #[ram(reclaimed)]
         static mut HEAP_RECLAIMED: MaybeUninit<[u8; 73744]> = MaybeUninit::uninit();
-        static mut HEAP_EXTRA: MaybeUninit<[u8; 128 * 1024]> = MaybeUninit::uninit();
+        static mut HEAP_EXTRA: MaybeUninit<[u8; 200 * 1024]> = MaybeUninit::uninit();
         
         let (sram_start, sram_size) = (HEAP_RECLAIMED.as_mut_ptr() as *mut u8, size_of_val(&HEAP_RECLAIMED));
         let (sram_ex_start, sram_ex_size) = (HEAP_EXTRA.as_mut_ptr() as *mut u8, size_of_val(&HEAP_EXTRA));
@@ -97,20 +97,19 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     info!("Initializing embassy.");
     
-    let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
-    
-    info!("Initializing second cpu.");
-    
     let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start_second_core_with_stack_guard_offset(
-        peripherals.CPU_CTRL,
-        software_interrupt.software_interrupt0,
-        software_interrupt.software_interrupt1,
-        tasks::cpu1::STACK.take(),
-        None,
-        tasks::cpu1,
-    );
+    let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
+    esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+    
+    // info!("Initializing second cpu.");
+    // 
+    // esp_rtos::start_second_core_with_stack_guard_offset(
+    //     peripherals.CPU_CTRL,
+    //     software_interrupt.software_interrupt1,
+    //     tasks::cpu1::STACK.take(),
+    //     None,
+    //     tasks::cpu1,
+    // );
     
     info!("Initializing peripherals.");
     

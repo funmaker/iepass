@@ -55,6 +55,14 @@ pub fn install_pico8_print(ctx: Context) {
 		};
 		
 		let flags = *rt.memory.machine_state().print_defaults().flags();
+		#[cfg(feature = "defmt")]
+		unsafe {
+			use core::ops::Deref;
+			info!("flags 1: {}", defmt::Debug2Format(rt.memory.machine_state().deref()));
+			let callbacks = &rt.memory;
+			let callbacks = core::slice::from_raw_parts(callbacks as *const _ as *const u8, core::mem::size_of_val(callbacks));
+			info!("callbacks: {}", defmt::Debug2Format(callbacks));
+		}
 		
 		if y.is_none() {
 			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, flags, y.is_some());
@@ -256,10 +264,14 @@ fn get_line_height(rt: &mut Runtime, flags: PrintDefaultsFlags) -> (u8, u8) {
 
 
 fn get_font(rt: &mut Runtime, flags: PrintDefaultsFlags) -> Font<'_> {
+	#[cfg(feature = "defmt")]
+	info!("flags: {}", defmt::Debug2Format(&flags));
 	let use_custom_font = flags.contains(PrintDefaultsFlags::CUSTOM_FONT);
 	if use_custom_font {
+		info!("Using custom font");
 		Font::new(rt.memory.const_slice(0x5600))
 	} else {
+		info!("Using system font");
 		Font::SYSTEM
 	}
 }
@@ -279,7 +291,9 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, flags: PrintDefaultsFlags, lette
 	let char_font = &font.char(letter);
 	let x_stride = if is_wide { 2 } else { 1 };
 	let y_stride = if is_tall { 2 } else { 1 };
+	info!("font_width {} x_stride {}", font_width, x_stride);
 	let draw_width = font_width * x_stride;
+	info!("font_height {} y_stride {}", font_height, y_stride);
 	let draw_height = font_height * y_stride;
 	
 	let x_wrapped = rt.get_cursor_position()[0].overflowing_add(font_width as i16).0 > 128

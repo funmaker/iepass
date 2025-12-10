@@ -3,6 +3,7 @@ runner = "cargo make --cwd .. perf-probe-rs run --chip=esp32s3 --preverify --alw
 
 [env]
 DEFMT_LOG="info"
+ESP_HAL_CONFIG_PSRAM_MODE="octal"
 
 [build]
 rustflags = [
