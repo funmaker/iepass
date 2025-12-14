@@ -2,6 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 
 __lua__
+cls(1)
 p8rs.test_mem("Draw state - initial", 0x5f00, 0x80)
 print("Initial")
 p8rs.test_mem("Draw state - basic", 0x5f00, 0x80)
@@ -15,6 +16,7 @@ p8rs.test_scr("Basic")
 
 print("Red", 8)
 print("Green", 14, 56, 11)
+print("No args")
 p8rs.test_scr("Colors")
 
 print("Clip left", -20, 60)

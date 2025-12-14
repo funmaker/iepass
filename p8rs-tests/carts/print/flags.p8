@@ -6,7 +6,7 @@ __lua__
 local short_text = "short test"
 local long_text = "testing print with a really long input text that will wrap twice"
 function do_print(text)
-  cls()
+  cls(2)
   print("(initial) "..text, 12, 20)
   for i=1,2 do
     print("("..i..") "..text)
