@@ -50,14 +50,9 @@ pub struct Graphs {
 
 impl Graphs {
 	pub fn wait_for_data(receiver: Receiver<RawPerfMessage>, get_symbols: impl FnOnce() -> Symbols) {
-		// let initial_data = match receiver.recv() {
-		// 	Ok(data) => data,
-		// 	Err(_) => return,
-		// };
-		let initial_data = RawPerfMessage {
-			sram: [0, 1],
-			psram: [0, 1],
-			trace: vec![],
+		let initial_data = match receiver.recv() {
+			Ok(data) => data,
+			Err(_) => return,
 		};
 		
 		let symbols = get_symbols();

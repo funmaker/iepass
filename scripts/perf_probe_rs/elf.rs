@@ -7,14 +7,14 @@ use elf::endian::AnyEndian;
 use rustc_demangle::demangle;
 use crate::utils::format_bytes;
 
-pub const MAPPINGS: [Mapping; 11] = [
+pub const MAPPINGS: [Mapping; 8] = [
 	Mapping::new(0x3C00_0000, 1024 * 1024, MemoryKind::FLASH,   Bus::Data,    0 * 1024), // External Flash
-	Mapping::new(0x3FF0_0000,  128 * 1024, MemoryKind::ROM,     Bus::Data,  128 * 1024), // Internal ROM 1
+	// Mapping::new(0x3FF0_0000,  128 * 1024, MemoryKind::ROM,     Bus::Data,  128 * 1024), // Internal ROM 1
 	Mapping::new(0x3FC8_8000,  416 * 1024, MemoryKind::SRAM,    Bus::Data,   32 * 1024), // Internal SRAM 1
 	Mapping::new(0x3FCF_0000,   64 * 1024, MemoryKind::SRAM,    Bus::Data,  448 * 1024), // Internal SRAM 2
 	
-	Mapping::new(0x4000_0000,  256 * 1024, MemoryKind::ROM,     Bus::Inst,    0 * 1024), // Internal ROM 0
-	Mapping::new(0x4004_0000,  128 * 1024, MemoryKind::ROM,     Bus::Inst,  128 * 1024), // Internal ROM 1
+	// Mapping::new(0x4000_0000,  256 * 1024, MemoryKind::ROM,     Bus::Inst,    0 * 1024), // Internal ROM 0
+	// Mapping::new(0x4004_0000,  128 * 1024, MemoryKind::ROM,     Bus::Inst,  128 * 1024), // Internal ROM 1
 	Mapping::new(0x4037_0000,   32 * 1024, MemoryKind::SRAM,    Bus::Inst,    0 * 1024), // Internal SRAM 0
 	Mapping::new(0x4037_8000,  416 * 1024, MemoryKind::SRAM,    Bus::Inst,   32 * 1024), // Internal SRAM 1
 	Mapping::new(0x4200_0000, 1024 * 1024, MemoryKind::FLASH,   Bus::Inst,    0 * 1024), // External Flash

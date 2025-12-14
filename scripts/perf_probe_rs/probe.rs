@@ -13,7 +13,7 @@ pub fn spawn(mut args: &[OsString], sender: Sender<RawPerfMessage>) -> Child {
 	use ipipe::Pipe;
 	
 	let pipe = Pipe::with_name("iepass_perf").unwrap();
-	let args = args.to_vec();
+	let mut args = args.to_vec();
 	args.push("--target-output-file".into());
 	args.push(pipe.path().as_os_str().into());
 	

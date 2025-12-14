@@ -29,6 +29,6 @@ pub struct BiRange<T> {
 
 impl Default for Calib {
 	fn default() -> Self {
-		Calib { screen_offset: Axes { x: 1, y: 2 }, analog: Axes { x: BiRange { min: 1783, mid: 2854, max: 3849 }, y: BiRange { min: 1807, mid: 2863, max: 3863 } }, analog_deadzone: 12, touch: Axes { x: Range { min: 192, max: 3854 }, y: Range { min: 321, max: 3629 } } }
+		Calib { screen_offset: Axes { x: 1, y: 2 }, analog: Axes { x: BiRange { min: 1610, mid: 2716, max: 3788 }, y: BiRange { min: 1726, mid: 2722, max: 3674 } }, analog_deadzone: 6, touch: Axes { x: Range { min: 186, max: 3886 }, y: Range { min: 182, max: 3856 } } }
 	}
 }

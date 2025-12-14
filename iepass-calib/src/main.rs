@@ -16,6 +16,7 @@ use embedded_hal_async::delay::DelayNs;
 use embedded_io::Read;
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{self, Input, Level, Output, Pull};
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::timer::timg;
 use p8rs::colors::Color;
 use iepass::peripherials::{Analog, Debounce, Display, Speaker, SpiBus, Touch};
@@ -54,15 +55,19 @@ const ANALOG_SIZE: i16 = 50;
 //      Y: 16
 //      A: 17
 //      B: 18
+// == SPI RAM ==
+//  Resrv: 35
+//  Resrv: 36
+//  Resrv: 37
 // == SD Card ==
-//   MOSI: 35
-//    CLK: 36
-//   MISO: 37
+//   MOSI: 47
+//    CLK: 48
+//   MISO: 45
 //     CS: 38
 // == Touch ==
-//   MOSI: 35
-//    CLK: 36
-//   MISO: 37
+//   MOSI: 47
+//    CLK: 48
+//   MISO: 45
 //    IQR: 39
 //     CS: 40
 
@@ -89,8 +94,9 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	
 	info!("Initializing embassy.");
 	
+	let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 	let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
-	esp_rtos::start(timg0.timer0);
+	esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
 	
 	info!("Initializing peripherals.");
 	
@@ -115,9 +121,9 @@ async fn try_main(_spawner: Spawner) -> Result<()> {
 	
 	let spi_bus = SpiBus::new(
 		peripherals.SPI3,
-		peripherals.GPIO35,
-		peripherals.GPIO36,
-		peripherals.GPIO37,
+		peripherals.GPIO47,
+		peripherals.GPIO48,
+		peripherals.GPIO45,
 		peripherals.DMA_CH2,
 	)?;
 	

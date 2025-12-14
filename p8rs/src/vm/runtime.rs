@@ -45,8 +45,7 @@ impl Runtime {
 	
 	/// Should be called before every frame
 	pub fn start_frame(&mut self) {
-		// let buttons = self.callbacks().get_buttons();
-		let buttons = Default::default();
+		let buttons = self.callbacks().get_buttons();
 		*self.memory.machine_state().btn_state() = buttons;
 		
 		let delay = match *self.memory.machine_state().btnp_rep_delay() {

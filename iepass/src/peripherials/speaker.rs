@@ -8,7 +8,7 @@ use esp_hal::gpio::OutputPin;
 use esp_hal::dma::{DmaChannelFor};
 use esp_hal::{dma_tx_buffer};
 
-const BUFFER_SIZE: usize = 32736;
+const BUFFER_SIZE: usize = 8184;
 
 pub struct Speaker<'d> {
 	pub transfer: I2sWriteDmaTransferAsync<'d, &'static mut [u8]>,

@@ -1,6 +1,8 @@
+use defmt::Format;
 use embassy_time::{Duration, Instant};
 use esp_hal::gpio::{Input, Level};
 
+#[derive(Debug, Format)]
 pub struct Debounce<'d> {
 	pub inner: Input<'d>,
 	debounce_time: Duration,

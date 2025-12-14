@@ -2,6 +2,7 @@
 #![feature(never_type)]
 #![feature(iter_array_chunks)]
 #![feature(generic_const_exprs)]
+#![feature(allocator_api)]
 #![no_std]
 #![no_main]
 #![deny(clippy::mem_forget, reason = "mem::forget is generally not safe to do with esp_hal types, especially those holding buffers for the duration of a data transfer.")]
@@ -27,11 +28,13 @@ mod calib;
 mod peripherials;
 mod tasks;
 mod utils;
+mod callbacks;
 
-use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, display};
+use peripherials::{Debounce, Display, Speaker, Analog, SpiBus, Touch, Controller, display};
 use tasks::display::FRAMEBUFFER_MANAGER;
 use calib::Calib;
-use utils::{PSRAM_ALLOCATOR, perf, PerfFutureExt};
+use utils::{PSRAM_ALLOCATOR, PerfFutureExt};
+use callbacks::IepassCallbacks;
 
 // static KUTASAN: &[u8] = include_bytes!("../../assets/kutasan.pcm");
 
@@ -101,44 +104,35 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let timg0 = timg::TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
     
-    // info!("Initializing second cpu.");
-    // 
-    // esp_rtos::start_second_core_with_stack_guard_offset(
-    //     peripherals.CPU_CTRL,
-    //     software_interrupt.software_interrupt1,
-    //     tasks::cpu1::STACK.take(),
-    //     None,
-    //     tasks::cpu1,
-    // );
-    
     info!("Initializing peripherals.");
     
     let up_pull = InputConfig::default().with_pull(Pull::Up);
+    let dbg_btn = Debounce::new(Input::new(peripherals.GPIO0, up_pull));
     
-    let mut dbg_btn = Debounce::new(Input::new(peripherals.GPIO0, up_pull));
-    let mut select_btn = Debounce::new(Input::new(peripherals.GPIO14, up_pull));
-    let mut start_btn = Debounce::new(Input::new(peripherals.GPIO4, up_pull));
-    let mut x_btn = Debounce::new(Input::new(peripherals.GPIO15, up_pull));
-    let mut y_btn = Debounce::new(Input::new(peripherals.GPIO16, up_pull));
-    let mut a_btn = Debounce::new(Input::new(peripherals.GPIO17, up_pull));
-    let mut b_btn = Debounce::new(Input::new(peripherals.GPIO18, up_pull));
-    
-    let mut analog = Analog::new(
-        peripherals.ADC1,
-        peripherals.GPIO8,
-        peripherals.GPIO9,
-        calib.analog_deadzone,
-        calib.analog,
+    let controller = Controller::new(
+        Debounce::new(Input::new(peripherals.GPIO14, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO4, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO15, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO16, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO17, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO18, up_pull)),
+        Debounce::new(Input::new(peripherals.GPIO3, up_pull)),
+        Analog::new(
+            peripherals.ADC1,
+            peripherals.GPIO8,
+            peripherals.GPIO9,
+            calib.analog_deadzone,
+            calib.analog,
+        ),
     );
-    let _analog_btn = Debounce::new(Input::new(peripherals.GPIO3, up_pull));
     
     let _sd_cs = Output::new(peripherals.GPIO38, Level::High, gpio::OutputConfig::default());
     
     let spi_bus = SpiBus::new(
         peripherals.SPI3,
-        peripherals.GPIO35,
-        peripherals.GPIO36,
-        peripherals.GPIO37,
+        peripherals.GPIO47,
+        peripherals.GPIO48,
+        peripherals.GPIO45,
         peripherals.DMA_CH2,
     )?;
     
@@ -149,13 +143,13 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         calib.touch,
     );
     
-    // let mut speaker = Speaker::new(
-    //     peripherals.I2S0,
-    //     peripherals.GPIO6,
-    //     peripherals.GPIO5,
-    //     peripherals.GPIO7,
-    //     peripherals.DMA_CH1,
-    // )?;
+    let _speaker = Speaker::new(
+        peripherals.I2S0,
+        peripherals.GPIO6,
+        peripherals.GPIO5,
+        peripherals.GPIO7,
+        peripherals.DMA_CH1,
+    )?;
     
     let display = Display::new(
         peripherals.SPI2,
@@ -168,6 +162,16 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         embassy_time::Delay,
     ).await?;
     
+    info!("Initializing second cpu.");
+    
+    esp_rtos::start_second_core_with_stack_guard_offset(
+        peripherals.CPU_CTRL,
+        software_interrupt.software_interrupt1,
+        tasks::cpu1::STACK.take(),
+        None,
+        || tasks::cpu1(dbg_btn),
+    );
+    
     info!("Spawning tasks.");
     
     spawner.spawn(tasks::display(display))?;
@@ -176,10 +180,11 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     info!("Creating Pico-8");
     
     let mut pico8 = P8rs::new_in(&PSRAM_ALLOCATOR)?;
+    pico8.set_callbacks(IepassCallbacks::new(controller));
     
-    info!("Loading mandelbrot.p8");
+    info!("Loading mener.p8");
     
-    pico8.load_cartridge(include_bytes!("../../lua/mandelbrot.p8"))?;
+    pico8.load_cartridge(include_bytes!("../../lua/mener.p8"))?;
     
     info!("Entering main loop.");
     
@@ -187,20 +192,6 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     
     loop {
         if let Some((x, y)) = touch.read(100, 100).await? { info!("Touch: {} {}", x, y); }
-        if dbg_btn.falling_edge() { perf::dump_perf()?; }
-        if x_btn.falling_edge() { info!("x_btn"); }
-        if y_btn.falling_edge() { info!("y_btn"); }
-        if a_btn.falling_edge() { info!("a_btn"); }
-        if b_btn.falling_edge() { info!("b_btn"); }
-        if select_btn.falling_edge() { info!("select_btn"); }
-        if start_btn.falling_edge() {
-            info!("start_btn");
-            
-            info!("{}", analog.read(100));
-            
-            // speaker.play(&*KUTASAN).await?;
-            // speaker.reset().await?;
-        }
         
         pico8.run()?; // TODO: result.requested_fps
         
@@ -212,6 +203,7 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         };
         
         let mut fb = fbs.get_empty().await;
+        fb.fill(Color::BLACK);
         let screen = runtime.memory.screen();
         let pixels = screen.iter()
                            .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
