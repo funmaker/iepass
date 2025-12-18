@@ -4,17 +4,19 @@ use bitflags::bitflags;
 use p8rs_macros::{p8, TransparentRef};
 use thiserror::Error;
 use p8rs_types::p8num::P8Num;
+
 use crate::utils::NonZeroNibble;
 use super::MemoryAccess;
 
 /// 0x5f00..=0x5f80
 pub struct MachineState<'m>(pub(super) &'m mut [u8; 0x80]);
 
-
 impl MachineState<'_> {
 	pub fn reset(&mut self) {
+		let rng_state = *self.rnd_state();
 		self.fill(0);
 		
+		*self.rnd_state() = rng_state;
 		*self.pen_color() = 6;
 		*self.clip_rect() = [0, 0, 128, 128];
 		self._set_cursor_y(6);
@@ -155,7 +157,7 @@ impl MachineState<'_> {
 		self.const_slice(0x40)
 	}
 	
-	pub fn rng_state(&mut self) -> &mut [u8; 8] {
+	pub fn rnd_state(&mut self) -> &mut [u8; 8] {
 		self.const_slice(0x44)
 	}
 	

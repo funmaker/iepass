@@ -11,6 +11,7 @@ pub fn install_pico8_math(ctx: Context) {
 	ctx.set_global("bxor", bxor::callback(ctx));
 	ctx.set_global("ceil", ceil::callback(ctx));
 	ctx.set_global("flr", flr::callback(ctx));
+	ctx.set_global("abs", abs::callback(ctx));
 	ctx.set_global("lshr", lshr::callback(ctx));
 	ctx.set_global("max", max::callback(ctx));
 	ctx.set_global("mid", mid::callback(ctx));
@@ -57,6 +58,11 @@ pub fn flr(a: P8Num) -> P8Num {
 }
 
 #[api_callback]
+pub fn abs(a: P8Num) -> P8Num {
+	a.abs()
+}
+
+#[api_callback]
 pub fn lshr(a: P8Num, b: P8Num) -> P8Num {
 	if b < P8Num::ZERO {
 		shl(a, -b)
@@ -75,7 +81,7 @@ pub fn max(a: P8Num, b: P8Num) -> P8Num {
 
 #[api_callback]
 pub fn mid(a: P8Num, b: P8Num, c: P8Num) -> P8Num {
-	if (a <= b) != (a <= c) { a } else if (b <= a) != (b <= c) { b } else { c }
+	a.min(b).max(a.max(b).min(c))
 }
 
 #[api_callback]

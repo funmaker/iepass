@@ -70,8 +70,8 @@ where PinAnalX: AdcChannel + AnalogPin + 'static,
 			analog: (analog_x, analog_y),
 			up: analog_y < -75,
 			down: analog_y > 75,
-			left: analog_x > 75,
-			right: analog_x < -75,
+			left: analog_x < -75,
+			right: analog_x > 75,
 		}
 	}
 }

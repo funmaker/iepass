@@ -1,4 +1,5 @@
 use core::fmt::Debug;
+use cfg_if::cfg_if;
 use p8rs_types::p8scii;
 
 #[allow(unused_variables)]
@@ -9,6 +10,16 @@ pub trait Callbacks: Debug {
 	
 	fn get_buttons(&mut self) -> [u8; 8] {
 		[0; 8]
+	}
+	
+	fn get_rnd_seed(&mut self) -> u32 {
+		cfg_if! {
+			if #[cfg(feature = "rand")] {
+				rand::random()
+			} else {
+				0
+			}
+		}
 	}
 }
 

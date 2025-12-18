@@ -1,6 +1,7 @@
 use core::fmt::{Debug, Formatter};
 use esp_hal::analog::adc::AdcChannel;
 use esp_hal::gpio::AnalogPin;
+use esp_hal::rng::Rng;
 use p8rs::vm::Callbacks;
 
 use crate::peripherials::controller::Controller;
@@ -8,14 +9,18 @@ use crate::peripherials::controller::Controller;
 pub struct IepassCallbacks<'d, PinAnalX, PinAnalY>
 where PinAnalX: AdcChannel,
       PinAnalY: AdcChannel {
-	controller: Controller<'d, PinAnalX, PinAnalY>
+	controller: Controller<'d, PinAnalX, PinAnalY>,
+	rng: Rng,
 }
 
 impl<'d, PinAnalX, PinAnalY> IepassCallbacks<'d, PinAnalX, PinAnalY>
 where PinAnalX: AdcChannel,
       PinAnalY: AdcChannel {
 	pub fn new(controller: Controller<'d, PinAnalX, PinAnalY>) -> Self {
-		Self { controller }
+		Self {
+			controller,
+			rng: Rng::new(),
+		}
 	}
 }
 
@@ -46,5 +51,9 @@ where PinAnalX: AdcChannel + AnalogPin + 'static,
 		if state.start_btn { ret |= 1 << 6; }
 		
 		[ret, 0, 0, 0, 0, 0, 0, 0]
+	}
+	
+	fn get_rnd_seed(&mut self) -> u32 {
+		self.rng.random()
 	}
 }

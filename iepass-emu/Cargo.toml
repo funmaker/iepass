@@ -13,7 +13,7 @@ default = ["log-04"]
 log-04 = ["p8rs/log-04", "p8rs-log/log-04"]
 
 [dependencies]
-p8rs = { workspace = true, features = ["std"] }
+p8rs = { workspace = true, features = ["std", "rand"] }
 p8rs-log = { workspace = true, features = ["std"] }
 p8rs-types.workspace = true
 env_logger.workspace = true

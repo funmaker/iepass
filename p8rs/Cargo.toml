@@ -13,9 +13,11 @@ default = ["std"]
 std = ["p8rs-log/std", "p8rs-piccolo/std", "embedded-io/std"]
 defmt = ["p8rs-log/defmt", "p8rs-piccolo/defmt", "dep:defmt"]
 log-04 = ["p8rs-log/log-04", "p8rs-piccolo/log-04"]
+rand = ["dep:rand"]
 
 [dependencies]
 defmt = { workspace = true, optional = true }
+rand = { workspace = true, optional = true, features = ["thread_rng"] }
 p8rs-log.workspace = true
 p8rs-piccolo.workspace = true
 p8rs-types = { workspace = true, features = ["bytemuck"] }
@@ -26,7 +28,7 @@ anyhow.workspace = true
 bitflags.workspace = true
 thiserror.workspace = true
 bytemuck.workspace = true
-log = "0.4.28"
+cfg-if.workspace = true
 
 [dev-dependencies]
 embedded-io.workspace = true

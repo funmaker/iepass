@@ -22,6 +22,7 @@ pub use callbacks::Callbacks;
 use api::install_pico8_apis;
 use cart::CartLoadError;
 use traceback::write_traceback_entries;
+use crate::vm::memory::Memory;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -44,7 +45,7 @@ impl P8rs<Global> {
 	}
 }
 
-impl<A: Allocator> P8rs<A> {
+impl<A: Allocator + 'static> P8rs<A> {
 	pub fn new_in(alloc: A) -> Result<P8rs<A>, InvalidTableKey> {
 		let mut lua = Lua::empty();
 		
@@ -55,15 +56,17 @@ impl<A: Allocator> P8rs<A> {
 		
 		Ok(Self {
 			lua,
-			runtime: Runtime::new_in(alloc),
+			runtime: Runtime::new(alloc),
 			executor: None,
 			fresh_globals
 		})
 	}
-}
-
-impl<A: Allocator + 'static> P8rs<A> {
-	pub fn load(&mut self, source: &[u8]) -> Result<(), ExternError> {
+	
+	pub fn load_cartridge(&mut self, cartridge: impl AsRef<[u8]>) -> Result<(), CartLoadError> {
+		cart::load_cartridge(self, cartridge.as_ref())
+	}
+	
+	pub fn load_lua(&mut self, source: &[u8]) -> Result<(), ExternError> {
 		let ex = self.lua.try_enter(|ctx| {
 			let env = shallow_copy_table(ctx.mutation(), ctx.fetch(&self.fresh_globals))?;
 			let kernel = Closure::load_with_env(ctx, None, include_bytes!("kernel.lua"), env)?;
@@ -76,10 +79,6 @@ impl<A: Allocator + 'static> P8rs<A> {
 		self.executor = Some(ex);
 		
 		Ok(())
-	}
-	
-	pub fn load_cartridge(&mut self, source: impl AsRef<[u8]>) -> Result<(), CartLoadError> {
-		cart::load_cartridge(self, source.as_ref())
 	}
 	
 	pub fn set_callbacks(&mut self, callbacks: impl Callbacks + 'static) {
@@ -179,6 +178,10 @@ impl<A: Allocator + 'static> P8rs<A> {
 	
 	pub fn runtime(&mut self) -> &mut Runtime {
 		&mut self.runtime
+	}
+	
+	pub fn memory(&mut self) -> &mut Memory {
+		&mut self.runtime.memory
 	}
 }
 

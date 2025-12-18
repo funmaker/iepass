@@ -33,7 +33,7 @@ pub fn rnd<'gc>(ctx: Context<'gc>, rt: &mut Runtime, limit: Option<Value<'gc>>) 
 }
 
 #[api_callback]
-pub fn srand<'gc>(ctx: Context<'gc>, rt: &mut Runtime, seed: Option<P8Num>) {
+pub fn srand(rt: &mut Runtime, seed: Option<P8Num>) {
 	let seed = seed.map(P8Num::to_raw).unwrap_or(0).cast_unsigned() & 0x7fff_ffff;
 	let (hi, lo) = match seed {
 		0 => (0x6000_9755, 0xdead_beef),
@@ -42,17 +42,17 @@ pub fn srand<'gc>(ctx: Context<'gc>, rt: &mut Runtime, seed: Option<P8Num>) {
 	
 	rt.memory
 	  .machine_state()
-	  .rng_state()
+	  .rnd_state()
 	  .copy_from_slice([hi.to_le_bytes(), lo.to_le_bytes()].as_flattened());
 	
 	for _ in 0..32 {
-		rnd(ctx, rt, None);
+		rnd_impl(rt);
 	}
 }
 
 fn rnd_impl(rt: &mut Runtime) -> u32 {
 	let mut ms = rt.memory.machine_state();
-	let rng_state = ms.rng_state();
+	let rng_state = ms.rnd_state();
 	let mut hi = u32::from_le_bytes(rng_state[0..4].try_into().unwrap());
 	let mut lo = u32::from_le_bytes(rng_state[4..8].try_into().unwrap());
 	

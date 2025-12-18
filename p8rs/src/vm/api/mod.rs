@@ -1,15 +1,15 @@
-mod base;
-mod math;
-mod table;
-mod memory;
-mod gfx;
-mod string;
-mod internal;
-mod print;
-mod drawing;
-mod input;
-mod sound;
-mod rnd;
+pub mod base;
+pub mod math;
+pub mod table;
+pub mod memory;
+pub mod gfx;
+pub mod string;
+pub mod internal;
+pub mod print;
+pub mod drawing;
+pub mod input;
+pub mod sound;
+pub mod rnd;
 
 use p8rs_piccolo::Context;
 

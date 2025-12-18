@@ -3764,14 +3764,15 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.4",
  "bytemuck",
+ "cfg-if 1.0.4",
  "defmt 1.0.1",
  "embedded-io 0.7.1",
  "gc-arena",
- "log",
  "p8rs-log",
  "p8rs-macros",
  "p8rs-piccolo",
  "p8rs-types",
+ "rand 0.9.2",
  "thiserror 2.0.17",
 ]
 

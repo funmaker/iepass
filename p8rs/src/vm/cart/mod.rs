@@ -15,7 +15,7 @@ pub fn load_cartridge<A: Allocator + 'static>(vm: &mut P8rs<A>, cartridge: &[u8]
 	}
 
 	if !load_ctx.lua_code.is_empty() {
-		load_ctx.vm.load(&load_ctx.lua_code)?;
+		load_ctx.vm.load_lua(&load_ctx.lua_code)?;
 	}
 
 	Ok(())

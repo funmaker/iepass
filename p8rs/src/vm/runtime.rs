@@ -1,11 +1,11 @@
 use core::alloc::Allocator;
 use core::any::Any;
 use alloc::boxed::Box;
-use alloc::alloc::Global;
 use bytemuck::Zeroable;
 use p8rs_types::p8num::P8Num;
 
 use crate::utils;
+use crate::vm::api;
 use crate::vm::callbacks::{Callbacks, DefaultCallbacks};
 use crate::vm::memory::{Memory, MemoryAccess};
 use crate::vm::memory::machine_state::{BtnpRepDelay, BtnpRepInterval};
@@ -25,14 +25,11 @@ pub struct Runtime {
 }
 
 impl Runtime {
-	pub fn new() -> Box<Runtime> {
-		Self::new_in(Global)
-	}
-	
-	pub fn new_in<A: Allocator>(alloc: A) -> Box<Runtime, A> {
+	pub(crate) fn new<A: Allocator>(alloc: A) -> Box<Runtime, A> {
 		let mut this: Box<Self, A> = utils::new_zeroed_box_in(alloc);
 		
 		this.memory.reset();
+		this.reseed_rnd();
 		this.target_fps = 30;
 		this.cursor = [0, 6];
 		
@@ -41,10 +38,16 @@ impl Runtime {
 	
 	pub fn set_callbacks(&mut self, callbacks: impl Callbacks + 'static) {
 		self.callbacks = Some(Box::new(callbacks));
+		self.reseed_rnd();
+	}
+	
+	pub fn reseed_rnd(&mut self) {
+		let seed = self.callbacks().get_rnd_seed();
+		api::rnd::srand(self, Some(P8Num::from_raw(seed as i32)));
 	}
 	
 	/// Should be called before every frame
-	pub fn start_frame(&mut self) {
+	pub(crate) fn start_frame(&mut self) {
 		let buttons = self.callbacks().get_buttons();
 		*self.memory.machine_state().btn_state() = buttons;
 		
