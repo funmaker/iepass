@@ -17,9 +17,10 @@ impl Log {
 		let mut lines = text.lines();
 		let mut mem_agg = None;
 		while let Some(line) = lines.next() {
+			let line = line.trim_prefix("INFO: ");
+			
 			let log =
-				line.strip_prefix("INFO: ")
-				    .and_then(|s| str_splitn_array(s, " | "))
+				str_splitn_array(line, " | ")
 				    .and_then(|[kind, name, content]| {
 					    match kind {
 						    "TEST" => Some(Log::TEST(name.into(), content.into())),
@@ -108,7 +109,7 @@ fn parse_ascii_hex_string(data: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn parse_scr_line(cur_name: &str, cur_row: usize, line: &str) -> Option<[u8; 128]> {
-	let line = line.strip_prefix("INFO: ")?;
+	let line = line.trim_prefix("INFO: ");
 	let [kind, name, row, data] = str_splitn_array(line, " | ")?;
 	let row: usize = row.trim().parse().ok()?;
 	

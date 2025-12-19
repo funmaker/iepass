@@ -9,10 +9,10 @@ pub struct RunResult {
 }
 
 impl RunResult {
-	pub fn new(output: String, runtime_error: Option<String>, timeout: bool) -> Self {
+	pub fn new(output: impl Into<String>, runtime_error: Option<impl Into<String>>, timeout: bool) -> Self {
 		RunResult {
-			output,
-			runtime_error,
+			output: output.into(),
+			runtime_error: runtime_error.map(Into::into),
 			timeout
 		}
 	}

@@ -6,6 +6,7 @@
 #![feature(array_try_map)]
 #![feature(slice_as_array)]
 #![feature(iter_array_chunks)]
+#![feature(substr_range)]
 
 pub const TMP_DIR: &str = "tmp";
 

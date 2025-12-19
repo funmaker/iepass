@@ -20,10 +20,6 @@ impl vm::Callbacks for RunnerCallback {
 		*buffer += "INFO: ";
 		buffer.extend(p8scii::to_iter(text));
 		*buffer += "\n";
-		
-		if !text.starts_with(b"SCR | ") && !text.starts_with(b"TEST | ") && !text.starts_with(b"MEM | ") {
-			println!("[printh] {}", Display(text));
-		}
 	}
 }
 

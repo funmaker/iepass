@@ -3,8 +3,6 @@ use std::fs::ReadDir;
 use std::io::Write;
 use std::path::PathBuf;
 
-const CARTS_DIR: &str = "carts";
-
 macro_rules! warn {
     ($($tokens: tt)*) => {
         println!("cargo::warning={}", format!($($tokens)*))
@@ -19,8 +17,9 @@ macro_rules! writeln_ident {
 }
 
 fn main() {
+	let carts_path = option_env!("CARTS_DIR").unwrap_or("carts");
 	let output_path = PathBuf::from(env::var("OUT_DIR").expect("Can't read OUT_DIR env var")).join("generated_tests.rs");
-	let carts_dir = fs::read_dir(CARTS_DIR).expect("Can't open carts dir");
+	let carts_dir = fs::read_dir(carts_path).expect("Can't open carts dir");
 	let mut output = fs::File::create(&output_path).expect("failed to create generated_tests.rs");
 	
 	println!("cargo:rerun-if-changed={}", output_path.display());
