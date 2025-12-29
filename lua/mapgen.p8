@@ -1,36 +1,38 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
-
 __lua__
-for i = 0x8000,0xffff,2 do
+
+cls()
+fillp(0b0101101001011010)
+for n=0,255 do
+	cx=(n%16)
+	cy=(n\16)
+	x=cx*8
+	y=cy*8
+	
+	c1=6
+	c2=7
+	if min(cx,cy)<=1 and (max(cx,cy) == 6 or max(cx,cy) == 7) then c1, c2 = 2,8
+	elseif cx==7 or cy==7 or cx==6 or cy==6 then c1,c2 = 0,1
+	end
+	
+	rectfill(x,y,x+8,y+8,n)
+	fset(n,n)
+	print(sub(tostr(n,true),5,5),x+1,y+1,c1)
+	print(sub(tostr(n,true),6,6),x+4,y+1,c2)
+end
+
+for y=0,127 do
+	for x=0,127 do
+		sset(x,y,pget(x,y))
+	end
+end
+
+for i = 0x2000,0x2fff,2 do
   poke(i, (i >>> 8) & 0xff, i & 0xff)
 end
 
-map(0, 0, 8, 8, 4, 4)
-map(0, 4, 8, 88, 4, 4)
-map(4, 4, 88, 88, 4, 4)
-map(4, 0, 88, 8, 4, 4)
-map(8, 8, 8, 44, 14, 5)
-p8rs.test_scr("basic");
-
-cls()
-map(-2, -2, 8, 8, 4, 4)
-map(-2, 62, 8, 88, 4, 4)
-map(126, 62, 88, 88, 4, 4)
-map(126, -2, 88, 8, 4, 4)
-map(0, 0, -16, -16, 4, 4)
-map(0, 4, -16, 112, 4, 4)
-map(4, 4, 112, 112, 4, 4)
-map(4, 0, 112, -16, 4, 4)
-p8rs.test_scr("clipping");
-
-local layers = { 0, 1, 2, 4, 8, 16, 32, 64, 128, 0b01010101, 0b10101010, 0b00110011, 0b00001111, 0b11111111 }
-for _, l in ipairs(layers) do
-  cls()
-  map(0, 0, 0, 0, 16, 16, l)
-  p8rs.test_scr("layer "..l);
-end
-
+cstore()
 __gfx__
 00000000101010102020202030303030404040405050505060606060707070708080808090909090a0a0a0a0b0b0b0b0c0c0c0c0d0d0d0d0e0e0e0e0f0f0f0f0
 066677700666770106667772066677730666747406667775022286060222888706667778066677790666777a0666777b0666077c0666770d0666777e0666777f

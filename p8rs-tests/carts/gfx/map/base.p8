@@ -6,29 +6,21 @@ for i = 0x8000,0xffff,2 do
   poke(i, (i >>> 8) & 0xff, i & 0xff)
 end
 
-map(0, 0, 8, 8, 4, 4)
-map(0, 4, 8, 88, 4, 4)
-map(4, 4, 88, 88, 4, 4)
-map(4, 0, 88, 8, 4, 4)
-map(8, 8, 8, 44, 14, 5)
-p8rs.test_scr("basic");
+for bank = 0x0,0xf do
+  for _, offset in ipairs({ 0, 1, 2, 14, 15, 16 }) do
+    local i = bank * 16 + offset
+    cls()
+    poke(0x5f56, i)
+    map(-2,  -2,  0,  0, 8, 8)
+    map(-2,  58,  0, 64, 8, 8)
+    map(122, 58, 64, 64, 8, 8)
+    map(122, -2, 64,  0, 8, 8)
+    p8rs.test_scr("base 0x" .. sub(tostr(i, true),5,6) .. "00");
 
-cls()
-map(-2, -2, 8, 8, 4, 4)
-map(-2, 62, 8, 88, 4, 4)
-map(126, 62, 88, 88, 4, 4)
-map(126, -2, 88, 8, 4, 4)
-map(0, 0, -16, -16, 4, 4)
-map(0, 4, -16, 112, 4, 4)
-map(4, 4, 112, 112, 4, 4)
-map(4, 0, 112, -16, 4, 4)
-p8rs.test_scr("clipping");
-
-local layers = { 0, 1, 2, 4, 8, 16, 32, 64, 128, 0b01010101, 0b10101010, 0b00110011, 0b00001111, 0b11111111 }
-for _, l in ipairs(layers) do
-  cls()
-  map(0, 0, 0, 0, 16, 16, l)
-  p8rs.test_scr("layer "..l);
+    if (i & 0xf) == 4 do
+      i += 8
+    end
+  end
 end
 
 __gfx__

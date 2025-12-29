@@ -182,9 +182,9 @@ async fn try_main(spawner: Spawner) -> Result<!> {
     let mut pico8 = P8rs::new_in(&PSRAM_ALLOCATOR)?;
     pico8.set_callbacks(IepassCallbacks::new(controller));
     
-    info!("Loading mener.p8");
+    info!("Loading breakout.p8");
     
-    pico8.load_cartridge(include_bytes!("../../lua/mener.p8"))?;
+    pico8.load_cartridge(include_bytes!("../../lua/breakout.p8"))?;
     
     info!("Entering main loop.");
     
