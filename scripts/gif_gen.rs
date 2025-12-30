@@ -62,7 +62,9 @@ fn main() {
 	                             .flat_map(|col| { let (r, g, b) = col.rgb(); [r, g, b] })
 	                             .collect();
 	
-	let results = load_results(tmp_path).expect("Failed to load results from tmp dir");
+	let mut results = load_results(tmp_path).expect("Failed to load results from tmp dir");
+	results.sort_by(|a, b| a.summary.orig_cart_path.cmp(&b.summary.orig_cart_path));
+	
 	let mut gif = fs::File::create(&output_path).expect("Could not create gif file");
 	let extra_cells = if summary { 1 } else { 0 };
 	let grid_height = (results.len() + extra_cells).isqrt();
@@ -76,7 +78,7 @@ fn main() {
 	
 	let mut last_step = vec![usize::MAX; results.len()];
 	let mut screen_cache = vec![ResultCache::new(); results.len()];
-	let mut framebuffer = vec![0_u8; fb_width as usize * fb_height as usize];
+	let mut framebuffer = vec![0_u8; fb_width * fb_height];
 	let frames = results.iter().map(|res| res.steps).max().unwrap_or(0);
 	
 	let mut frame = Frame::default();

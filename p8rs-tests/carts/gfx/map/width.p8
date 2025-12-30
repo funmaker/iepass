@@ -6,20 +6,28 @@ for i = 0x8000,0xffff,2 do
   poke(i, (i >>> 8) & 0xff, i & 0xff)
 end
 
-for i = 0x00,0xff do
-  if i >= 0x20 and i < 0x40 then e = 0x3D - i
-  elseif i >= 0x80          then e = 0xFD - i
-  else                           e = 0x0D - (i % 0x10)
-  end
+function test(width, base)
+  local height = (0x20 - base) \ (width / 0x100)
+  map(-2,  -2,  0,  0, 8, 8)
+  map(-2,  height - 6,  0, 64, 8, 8)
+  map(width - 6, height - 6, 64, 64, 8, 8)
+  map(width - 6, -2, 64,  0, 8, 8)
+  p8rs.test_scr(width .. "x" .. height)
+end
+
+for width = 0x01,0xff do
+  local base = width % 0x20
 
   cls()
-  poke(0x5f56, i)
-  map(-2,  -2,  0,  0, 8, 8)
-  map(-2,  e * 2,  0, 64, 8, 8)
-  map(122, e * 2, 64, 64, 8, 8)
-  map(122, -2, 64,  0, 8, 8)
-  p8rs.test_scr("base 0x" .. sub(tostr(i, true),5,6) .. "00")
+  poke(0x5f56, 0x20 + base)
+  poke(0x5f57, width)
+  test(width, base)
 end
+
+cls()
+poke(0x5f56, 0x20)
+poke(0x5f57, 0)
+test(256, 0)
 
 __gfx__
 00000000101010102020202030303030404040405050505060606060707070708080808090909090a0a0a0a0b0b0b0b0c0c0c0c0d0d0d0d0e0e0e0e0f0f0f0f0
