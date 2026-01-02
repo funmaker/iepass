@@ -12,7 +12,7 @@ function test(width, base)
   map(-2,  height - 6,  0, 64, 8, 8)
   map(width - 6, height - 6, 64, 64, 8, 8)
   map(width - 6, -2, 64,  0, 8, 8)
-  p8rs.test_scr(width .. "x" .. height)
+  p8rs.test_scr(width .. "X" .. height)
 end
 
 for width = 0x01,0xff do

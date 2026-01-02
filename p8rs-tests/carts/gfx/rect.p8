@@ -94,4 +94,4 @@ rect(0, 80, 64, 96, 80, 4)
 fillp(0b0011001111001100.111)
 rect(0, 64, 64, 80, 80, 4)
 fillp()
-p8rs.test_scr("Pattern flags");
+p8rs.test_scr("pattern flags");

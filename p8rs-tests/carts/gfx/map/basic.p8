@@ -24,6 +24,73 @@ map(4, 4, 112, 112, 4, 4)
 map(4, 0, 112, -16, 4, 4)
 p8rs.test_scr("clipping");
 
+cls()
+map()
+p8rs.test_scr("no args");
+
+cls()
+map(8)
+p8rs.test_scr("one arg");
+
+cls()
+map(4, 2)
+p8rs.test_scr("two arg");
+
+cls()
+map(4, 4, 16)
+map(0, 4, 30, 30)
+map(0, 0, 40, 40, 4)
+map(0, 0, 50, 50, 8, 8)
+p8rs.test_scr("less args");
+
+cls()
+camera(-63, -65)
+map(0, 0, -56, -56, 4, 4)
+map(0, 4, -56, 24, 4, 4)
+map(4, 4, 24, 24, 4, 4)
+map(4, 0, 24, -56, 4, 4)
+map(8, 8, -56, -20, 14, 5)
+camera()
+p8rs.test_scr("camera");
+
+cls()
+clip(26, 34, 68, 60)
+camera(-63, -65)
+map(0, 0, -56, -56, 4, 4)
+map(0, 4, -56, 24, 4, 4)
+map(4, 4, 24, 24, 4, 4)
+map(4, 0, 24, -56, 4, 4)
+map(8, 8, -56, -20, 14, 5)
+camera()
+clip()
+p8rs.test_scr("clip");
+
+cls()
+pal(4, 0x23)
+pal(2, 0x34)
+pal(4, 0x53, 2)
+pal(5, 0x48, 2)
+palt(4, false)
+fillp(0b0011001111001100.000)
+map(0, 0, 24, 48, 2, 2)
+fillp(0b0011001111001100.001)
+map(2, 0, 48, 48, 2, 2)
+fillp(0b0011001111001100.010)
+map(4, 0, 72, 48, 2, 2)
+fillp(0b0011001111001100.011)
+map(8, 0, 96, 48, 2, 2)
+fillp(0b0011001111001100.100)
+map(0, 2, 24, 72, 2, 2)
+fillp(0b0011001111001100.101)
+map(2, 2, 48, 72, 2, 2)
+fillp(0b0011001111001100.110)
+map(4, 2, 72, 72, 2, 2)
+fillp(0b0011001111001100.111)
+map(8, 2, 96, 72, 2, 2)
+fillp()
+p8rs.test_scr("pattern flags");
+
+
 local layers = { 0, 1, 2, 4, 8, 16, 32, 64, 128, 0b01010101, 0b10101010, 0b00110011, 0b00001111, 0b11111111 }
 for _, l in ipairs(layers) do
   cls()

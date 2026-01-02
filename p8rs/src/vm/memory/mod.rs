@@ -32,6 +32,7 @@ impl Memory {
 	
 	pub fn sprites(&mut self) -> Sprites<'_> {
 		// TODO: Handle map conflicts
+		// TODO: https://www.lexaloffle.com/bbs/?tid=50158 ?
 		let base_addr = match self.machine_state().sprite_addr_map().get() {
 			0x00 => 0x0000,
 			0x60 => 0x6000,
@@ -67,6 +68,25 @@ impl Memory {
 		}
 	}
 	
+	pub fn screen(&mut self) -> Screen<'_> {
+		// TODO: Handle map conflicts
+		let base_addr = match self.machine_state().screen_addr_map().get() {
+			0x00 => 0x0000,
+			0x60 => 0x6000,
+			0x80 => 0x8000,
+			0xa0 => 0xa000,
+			0xc0 => 0xc000,
+			0xe0 => 0xe000,
+			_    => 0x0000,
+		};
+		
+		Screen(self.const_slice(base_addr))
+	}
+	
+	pub fn painter(&mut self) -> Painter<'_> {
+		Painter::new(self)
+	}
+	
 	pub fn sprite_flags(&mut self) -> SpriteFlags<'_> {
 		SpriteFlags(self.const_slice(0x3000))
 	}
@@ -89,25 +109,6 @@ impl Memory {
 	
 	pub fn gpio(&mut self) -> &mut [u8; 128] {
 		self.const_slice(0x5f80)
-	}
-	
-	pub fn screen(&mut self) -> Screen<'_> {
-		// TODO: Handle map conflicts
-		let base_addr = match self.machine_state().screen_addr_map().get() {
-			0x00 => 0x0000,
-			0x60 => 0x6000,
-			0x80 => 0x8000,
-			0xa0 => 0xa000,
-			0xc0 => 0xc000,
-			0xe0 => 0xe000,
-			_    => 0x0000,
-		};
-		
-		Screen(self.const_slice(base_addr))
-	}
-	
-	pub fn painter(&mut self) -> Painter<'_> {
-		Painter::new(self)
 	}
 	
 	#[inline(always)]
