@@ -8,6 +8,9 @@ pub struct Screen {
 }
 
 impl Screen {
+	pub const WIDTH: u16 = 128;
+	pub const HEIGHT: u16 = 128;
+	
 	pub(super) fn new(offset: u16) -> Screen {
 		Screen { offset }
 	}

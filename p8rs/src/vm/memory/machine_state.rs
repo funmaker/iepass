@@ -51,7 +51,7 @@ impl MachineState<'_> {
 	
 	/// [x_begin, y_begin, x_end, y_end]
 	pub fn clip_rect(&mut self) -> &mut [u8; 4] {
-		self.const_slice(0x20)
+		self.const_slice_mut(0x20)
 	}
 	
 	/// Cursor must be controlled via methods in `Runtime` instead of changing memory directly!
@@ -106,7 +106,7 @@ impl MachineState<'_> {
 	}
 	
 	pub fn fill_pattern(&mut self) -> &mut FillPatternState {
-		FillPatternState::from_bits_mut(self.const_slice(0x31))
+		FillPatternState::from_bits_mut(self.const_slice_mut(0x31))
 	}
 	
 	pub fn color_flags(&mut self) -> &mut ColorFlags {
@@ -126,11 +126,11 @@ impl MachineState<'_> {
 	}
 	
 	pub fn tline_clip_size(&mut self) -> &mut [u8; 2] {
-		self.const_slice(0x38)
+		self.const_slice_mut(0x38)
 	}
 	
 	pub fn tline_clip_offset(&mut self) -> &mut [u8; 2] {
-		self.const_slice(0x3a)
+		self.const_slice_mut(0x3a)
 	}
 	
 	pub fn get_line_endpoint(&mut self) -> Option<[i16; 2]> {
@@ -154,15 +154,15 @@ impl MachineState<'_> {
 	}
 	
 	pub fn audio_effects_flags(&mut self) -> &mut [u8; 4] {
-		self.const_slice(0x40)
+		self.const_slice_mut(0x40)
 	}
 	
 	pub fn rnd_state(&mut self) -> &mut [u8; 8] {
-		self.const_slice(0x44)
+		self.const_slice_mut(0x44)
 	}
 	
 	pub fn btn_state(&mut self) -> &mut [u8; 8] {
-		self.const_slice(0x4c)
+		self.const_slice_mut(0x4c)
 	}
 	
 	pub fn sprite_addr_map(&mut self) -> &mut SpriteScreenMemoryMap {
@@ -182,7 +182,7 @@ impl MachineState<'_> {
 	}
 	
 	pub fn print_defaults(&mut self) -> &mut PrintDefaults {
-		PrintDefaults::from_bits_mut(self.const_slice(0x58))
+		PrintDefaults::from_bits_mut(self.const_slice_mut(0x58))
 	}
 	
 	pub fn btnp_rep_delay(&mut self) -> &mut BtnpRepDelay {
@@ -202,11 +202,11 @@ impl MachineState<'_> {
 	}
 	
 	pub fn high_color_bitfield(&mut self) -> &mut [u8; 16] {
-		self.const_slice(0x70)
+		self.const_slice_mut(0x70)
 	}
 	
 	#[inline(always)]
-	pub(crate) fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
+	pub(crate) fn const_slice_mut<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
 		(&mut self.0[base as usize..base as usize + S]).try_into().unwrap()
 	}
 	

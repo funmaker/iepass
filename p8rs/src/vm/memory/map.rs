@@ -1,4 +1,4 @@
-use super::Memory;
+use super::{Memory, MemoryAccess};
 
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -38,5 +38,38 @@ impl Map {
 		};
 		
 		Map { offset, width, height }
+	}
+	
+	pub fn set_sprite(&self, memory: &mut Memory, x: u16, y: u16, value: u8) {
+		if let Some(addr) = self.sprite_addr(x, y) {
+			memory.write(addr, value);
+		}
+	}
+	
+	pub fn get_sprite(&self, memory: &Memory, x: u16, y: u16) -> Option<u8> {
+		self.sprite_addr(x, y)
+		    .map(|addr| memory.read(addr))
+	}
+	
+	pub fn width(&self) -> u16 {
+		self.width
+	}
+	
+	pub fn height(&self) -> u16 {
+		self.height
+	}
+	
+	fn sprite_addr(&self, x: u16, y: u16) -> Option<u16> {
+		if x >= self.width || y >= self.height { return None; }
+		let pos = x + y * self.width;
+		
+		let addr = match self.offset {
+			MapOffset::Lower(offset) => 0x2000 + offset + pos,
+			MapOffset::Extended(offset) => 0x8000 + offset + pos,
+			MapOffset::Upper(offset) if pos < 0x1000 - offset => 0x3000 + offset + pos,
+			MapOffset::Upper(offset) => 0x1000 + offset + pos,
+		};
+		
+		Some(addr)
 	}
 }

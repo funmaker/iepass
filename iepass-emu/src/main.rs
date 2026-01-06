@@ -154,8 +154,9 @@ impl eframe::App for EmulatorApp {
 			
 			if run_result != RunResult::OutOfFuel {
 				let rt = self.pico8.runtime();
+				let memory = &mut rt.memory;
 				
-				let screen_palette = *rt.memory.machine_state().palette(Palette::Screen);
+				let screen_palette = *memory.machine_state().palette(Palette::Screen);
 				
 				let map_color = |color: u8| -> Color {
 					assert!(color < 16);
@@ -163,16 +164,15 @@ impl eframe::App for EmulatorApp {
 				};
 				
 				self.fb_tex.set(self.fb_pool.from_iter(
-					rt
-						.memory
-						.screen()
-						.iter()
-						.map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
-						.flatten()
-						.map(|color| {
-							let (r, g, b) = color.rgb();
-							Color32::from_rgb(r, g, b)
-						})
+					memory.screen()
+					      .as_slice_mut(memory)
+					      .iter()
+					      .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
+					      .flatten()
+					      .map(|color| {
+						      let (r, g, b) = color.rgb();
+						      Color32::from_rgb(r, g, b)
+					      })
 				), FRAMEBUFFER_OPTS);
 				
 				self.frame = self.frame + 1;

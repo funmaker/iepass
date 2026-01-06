@@ -8,6 +8,9 @@ pub struct Sprites {
 }
 
 impl Sprites {
+	pub const WIDTH: u16 = 128;
+	pub const HEIGHT: u16 = 128;
+	
 	pub(super) fn new(offset: u16) -> Sprites {
 		Sprites { offset }
 	}
@@ -20,7 +23,7 @@ impl Sprites {
 		memory.const_slice_mut::<0x2000>(self.offset)
 	}
 	
-	pub fn set_pixel(&mut self, memory: &mut Memory, x: u8, y: u8, value: u8) {
+	pub fn set_pixel(&self, memory: &mut Memory, x: u8, y: u8, value: u8) {
 		if x >= 128 || y >= 128 { return; }
 		
 		let slice = self.as_slice_mut(memory);

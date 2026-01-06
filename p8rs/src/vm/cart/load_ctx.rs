@@ -3,7 +3,7 @@ use core::alloc::Allocator;
 use thiserror::Error;
 use p8rs_piccolo::ExternError;
 use p8rs_types::p8scii;
-
+use crate::vm::memory::sprites::Sprites;
 use crate::vm::P8rs;
 
 pub struct CartLoadContext<'vm, 'c, A: Allocator + 'static> {
@@ -47,29 +47,27 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 	
 	fn load_gfx_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
 		let memory = self.vm.memory();
-		let sprites = memory.sprites().as_slice_mut(memory);
-		let mut max_offset = -1;
+		let sprites = memory.sprites();
 		
 		if self.gfx_loaded {
 			debug!("load_gfx_section: GFX section was already loaded, overwriting data.");
 		}
 		
-		for (offset, byte) in split_nonempty_lines(data, 128) // todo: figure out pico8 behaviour, if load_ctx.long_map_loaded { 64 } else { 128 }
-			.flat_map(|(line_idx, line)|
-				nibble_chunks(line).take(64).map(|(h, l)| (hex_char_to_nibble(l).unwrap_or(0) << 4) | hex_char_to_nibble(h).unwrap_or(0))
-				                   .enumerate().map(move |(col_idx, byte)| ((line_idx * 64 + col_idx) as i16, byte))
-			)
-		{
-			sprites[offset as usize] = byte;
-			if offset > max_offset { max_offset = offset; }
+		// todo: figure out pico8 behaviour, if load_ctx.long_map_loaded { 64 } else { 128 }
+		let mut written = 0;
+		for res in hex_iter::<1>(data) {
+			if res.col > Sprites::WIDTH as usize || res.row > Sprites::HEIGHT as usize { continue }
+			
+			sprites.set_pixel(memory, res.col as u8, res.row as u8, res.value);
+			written += 1;
 		}
 		
 		self.gfx_loaded = true;
 		
-		if max_offset == -1 {
+		if written <= 0 {
 			debug!("load_gfx_section: GFX section loaded: empty section!");
 		} else {
-			debug!("load_gfx_section: GFX section loaded: 0x{:X} bytes written to memory", max_offset + 1);
+			debug!("load_gfx_section: GFX section loaded: 0x{:X} bytes written to memory", written);
 		}
 		
 		Ok(())
@@ -78,73 +76,61 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 	fn load_map_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
 		let memory = self.vm.memory();
 		let map = memory.map();
-		let mut max_offset = -1;
 		
 		if self.map_loaded {
 			debug!("load_map_section: MAP section was already loaded, overwriting data.")
 		}
 		
-		for (offset, byte) in split_nonempty_lines(data, 33)
-			.flat_map(|(line_idx, line)|
-				nibble_chunks(line).take(128).map(|(h, l)| {
-					if let (Some(h), Some(l)) = (hex_char_to_nibble(h), hex_char_to_nibble(l)) {
-						(h << 4) | l
-					} else {
-						0
-					}
-				}).enumerate().map(move |(col_idx, byte)| ((line_idx * 128 + col_idx) as i16, byte))
-			)
-		{
-			// TODO: FIX
-			// if offset >= 0x1000 { max_offset = 0x1000; break; }
-			// let addr = offset as usize;
-			// memory[addr] = byte;
-			// if offset > max_offset { max_offset = offset; }
+		// todo: figure out pico8 behaviour, if load_ctx.long_map_loaded { 64 } else { 128 }
+		let mut written = 0;
+		for res in hex_iter::<2>(data) {
+			if res.col > map.width() as usize || res.row > map.height() as usize { continue }
+			
+			map.set_sprite(memory, res.col as u16, res.row as u16, res.value);
+			written += 1;
 		}
 		
-		// if gfx is loaded and the map section is longer than 0x1000, zero out the remaining shared memory area written by gfx (0x1000..0x2000, shared between MAP and GFX)
-		// (Pico8 behavior)
-		
-		// todo: figure out the behaviour
-		// load_ctx.map_loaded = true;
-		// if max_offset >= 0x1000 {
-		// 	load_ctx.long_map_loaded = true;
-		// 
-		// 	if load_ctx.gfx_loaded {
-		// 		debug!("Clearing extended GFX from 0x{:X}", max_offset);
-		// 		for offset in 0x1000..0x2000 {
-		// 			let addr = gfx_base_addr + offset;
-		// 			vm.runtime.memory[addr] = 0;
-		// 		}
-		// 	}
-		// }
-		
-		if max_offset == -1 {
+		if written == -1 {
 			debug!("load_map_section: MAP section loaded: empty section!");
 		} else {
-			debug!("load_map_section: MAP section loaded: 0x{:X} bytes written", max_offset);
+			debug!("load_map_section: MAP section loaded: 0x{:X} bytes written to memory", written);
 		}
 		
 		Ok(())
 	}
 }
 
-fn hex_char_to_nibble(hex_char: u8) -> Option<u8> {
-	match hex_char {
-		b'0'..=b'9' => Some(hex_char - b'0'),
-		b'a'..=b'f' => Some(hex_char - b'a' + 10),
-		b'A'..=b'F' => Some(hex_char - b'A' + 10),
+struct HexIterValue {
+	value: u8,
+	row: usize,
+	col: usize,
+}
+
+fn hex_iter<const Word: usize>(lines: &[u8]) -> impl Iterator<Item=HexIterValue> {
+	lines.split(|&b| b == b'\n' || b == b'\r')
+	     .filter(|line| !line.is_empty())
+	     .enumerate()
+	     .flat_map(|(row, line)|
+		     line.as_chunks::<Word>().0
+		         .iter()
+		         .enumerate()
+		         .map(move |(col, chunk)| HexIterValue {
+			         row,
+			         col,
+			         value: chunk.iter()
+			                     .copied()
+			                     .map(hex_value)
+			                     .fold(0, |acc, val| (acc << 4) + val.unwrap_or(0)),
+		         }))
+}
+
+fn hex_value(char: u8) -> Option<u8> {
+	match char {
+		b'0'..=b'9' => Some(char - b'0'),
+		b'a'..=b'f' => Some(char - b'a' + 10),
+		b'A'..=b'F' => Some(char - b'A' + 10),
 		_ => None,
 	}
-}
-
-fn split_nonempty_lines(data: &[u8], max_lines: usize) -> impl Iterator<Item=(usize, &[u8])> {
-	data.split(|&b| b == b'\n' || b == b'\r')
-	    .filter(|line| !line.is_empty()).take(max_lines).enumerate()
-}
-
-fn nibble_chunks(text: &[u8]) -> impl Iterator<Item=(u8, u8)> + '_ {
-	text.chunks(2).map(|chunk| (chunk[0], chunk.get(1).copied().unwrap_or(b'0')))
 }
 
 #[derive(Error, Debug)]

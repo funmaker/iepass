@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use p8rs::vm;
 use p8rs::piccolo::ExternError;
 use p8rs_types::p8scii;
-use p8rs_types::p8scii::Display;
 use crate::runner::TIMEOUT_MS;
 use crate::summary::RunResult;
 
