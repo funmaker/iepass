@@ -1,59 +1,57 @@
-use core::ops::{Deref, DerefMut};
+use super::Memory;
 
 /// Usually 0x6000..=0x7fff
-pub struct Screen<'m>(pub(super) &'m mut [u8; 0x2000]);
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Screen {
+	offset: u16,
+}
 
-impl Screen<'_> {
-	fn get_addr(x: u8, y: u8) -> Option<(usize, bool)> {
-		if x >= 128 || y >= 128 { return None }
-		Some((
-			(x as usize / 2) + y as usize * 64,
-			x & 1 == 0,
-		))
+impl Screen {
+	pub(super) fn new(offset: u16) -> Screen {
+		Screen { offset }
 	}
 	
-	pub fn get_pixel(&self, x: u8, y: u8) -> Option<u8> {
-		let (addr, high) = Self::get_addr(x, y)?;
-		if high {
-			Some(self.0[addr] & 0xF)
+	pub fn as_slice<'m>(&self, memory: &'m Memory) -> &'m [u8; 0x2000] {
+		memory.const_slice::<0x2000>(self.offset)
+	}
+	
+	pub fn as_slice_mut<'m>(&self, memory: &'m mut Memory) -> &'m mut [u8; 0x2000] {
+		memory.const_slice_mut::<0x2000>(self.offset)
+	}
+	
+	pub fn set_pixel(&mut self, memory: &mut Memory, x: u8, y: u8, value: u8) {
+		if x >= 128 || y >= 128 { return; }
+		
+		let slice = self.as_slice_mut(memory);
+		let tuple = &mut slice[y as usize * 64 + x as usize / 2];
+		if x % 2 == 0 {
+			*tuple = (*tuple & 0xF0) | (value & 0x0F);
 		} else {
-			Some(self.0[addr] >> 4)
+			*tuple = (*tuple & 0x0F) | ((value & 0x0F) << 4);
 		}
 	}
 	
-	pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
-		let Some((addr, high)) = Self::get_addr(x, y) else { return false };
+	pub fn get_pixel(&self, memory: &Memory, x: u8, y: u8) -> Option<u8> {
+		if x >= 128 || y >= 128 { return None; }
 		
-		let old = self.0[addr];
-		if high {
-			self.0[addr] = (old & 0xF0) | (value & 0xF);
+		let slice = self.as_slice(memory);
+		let tuple = slice[y as usize * 64 + x as usize / 2];
+		if x % 2 == 0 {
+			Some(tuple & 0x0F)
 		} else {
-			self.0[addr] = (value << 4) | (old & 0xF);
+			Some(tuple >> 4)
 		}
-		
-		true
 	}
 	
-	pub fn shift_up(&mut self, dy: u8, fill_color: u8) {
+	pub fn shift_up(&mut self, memory: &mut Memory, dy: u8, fill_color: u8) {
 		if dy == 0 { return }
 		
+		let slice = self.as_slice_mut(memory);
 		let start = dy.min(128) as usize * 64;
-		let end = self.len();
-		self.copy_within(start..end, 0);
-		self[end-start..].fill(fill_color);
+		let end = slice.len();
+		slice.copy_within(start..end, 0);
+		slice[end-start..].fill(fill_color);
 	}
 }
 
-impl Deref for Screen<'_> {
-	type Target = [u8; 0x2000];
-	
-	fn deref(&self) -> &Self::Target {
-		&*self.0
-	}
-}
-
-impl DerefMut for Screen<'_> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut *self.0
-	}
-}

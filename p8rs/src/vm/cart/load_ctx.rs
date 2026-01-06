@@ -46,7 +46,8 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 	}
 	
 	fn load_gfx_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
-		let mut sprites = self.vm.runtime.memory.sprites();
+		let memory = self.vm.memory();
+		let sprites = memory.sprites().as_slice_mut(memory);
 		let mut max_offset = -1;
 		
 		if self.gfx_loaded {
@@ -75,7 +76,8 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 	}
 	
 	fn load_map_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
-		let mut map = self.vm.runtime.memory.map();
+		let memory = self.vm.memory();
+		let map = memory.map();
 		let mut max_offset = -1;
 		
 		if self.map_loaded {
@@ -93,10 +95,11 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 				}).enumerate().map(move |(col_idx, byte)| ((line_idx * 128 + col_idx) as i16, byte))
 			)
 		{
-			if offset >= 0x1000 { max_offset = 0x1000; break; }
-			let addr = offset as usize;
-			map[addr] = byte;
-			if offset > max_offset { max_offset = offset; }
+			// TODO: FIX
+			// if offset >= 0x1000 { max_offset = 0x1000; break; }
+			// let addr = offset as usize;
+			// memory[addr] = byte;
+			// if offset > max_offset { max_offset = offset; }
 		}
 		
 		// if gfx is loaded and the map section is longer than 0x1000, zero out the remaining shared memory area written by gfx (0x1000..0x2000, shared between MAP and GFX)

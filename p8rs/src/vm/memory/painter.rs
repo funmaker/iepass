@@ -5,16 +5,15 @@ mod utils;
 use core::ops::Range;
 
 pub use callback::{PainterCallback, CallbackResult, Noop};
-pub use mode::{PainterMode, PenMode, SpriteMode};
+pub use mode::{PainterMode, PenMode, SpriteMode, TextMode};
 pub use utils::PaintRange;
-use super::Memory;
+use super::{Memory, Screen};
 use utils::Vector;
-use crate::vm::memory::painter::mode::TextMode;
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Painter<'a, Mode = PenMode, CB = Noop> {
-	memory: &'a mut Memory,
+pub struct Painter<Mode = PenMode, CB = Noop> {
+	screen: Screen,
 	clip_x: Range<u8>,
 	clip_y: Range<u8>,
 	camera: Vector<i16>,
@@ -23,30 +22,31 @@ pub struct Painter<'a, Mode = PenMode, CB = Noop> {
 	callback: CB,
 }
 
-impl<'m> Painter<'m, PenMode, Noop> {
-	pub fn new(memory: &'m mut Memory) -> Self {
-		let clip = *memory.machine_state().clip_rect();
-		let camera = memory.machine_state().get_camera_position();
-		let fill = memory.machine_state().fill_pattern().expand();
+impl<'m> Painter<PenMode, Noop> {
+	pub(super) fn new(screen: Screen, memory: &'m mut Memory) -> Self {
+		let mut ms = memory.machine_state();
+		let clip = *ms.clip_rect();
+		let camera = ms.get_camera_position();
+		let fill = ms.fill_pattern().expand();
 		
 		Painter {
+			screen,
 			clip_x: clip[0] .. clip[2].min(128),
 			clip_y: clip[1] .. clip[3].min(128),
 			camera: Vector::from(camera),
 			fill,
 			mode: PenMode::new(memory),
 			callback: Noop,
-			memory,
 		}
 	}
 }
 
-impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
-	pub fn with_callback<CB2>(self, callback: CB2) -> Painter<'m, Mode, CB2>
+impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<Mode, CB> {
+	pub fn with_callback<CB2>(self, callback: CB2) -> Painter<Mode, CB2>
 	where CB2: PainterCallback {
 		Painter {
 			callback,
-			memory: self.memory,
+			screen: self.screen,
 			clip_x: self.clip_x,
 			clip_y: self.clip_y,
 			camera: self.camera,
@@ -60,10 +60,10 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		self
 	}
 	
-	pub fn sprite_mode(self) -> Painter<'m, SpriteMode, CB> {
+	pub fn sprite_mode(self, memory: &mut Memory) -> Painter<SpriteMode, CB> {
 		Painter {
-			mode: SpriteMode::new(self.memory),
-			memory: self.memory,
+			mode: SpriteMode::new(memory),
+			screen: self.screen,
 			clip_x: self.clip_x,
 			clip_y: self.clip_y,
 			camera: self.camera,
@@ -72,16 +72,20 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		}
 	}
 	
-	pub fn text_mode(self, bg_color: Option<u8>) -> Painter<'m, TextMode, CB> {
+	pub fn text_mode(self, memory: &mut Memory, bg_color: Option<u8>) -> Painter<TextMode, CB> {
 		Painter {
-			mode: TextMode::new(self.memory, bg_color),
-			memory: self.memory,
+			mode: TextMode::new(memory, bg_color),
+			screen: self.screen,
 			clip_x: self.clip_x,
 			clip_y: self.clip_y,
 			camera: self.camera,
 			fill: self.fill,
 			callback: self.callback,
 		}
+	}
+	
+	pub fn screen(&self) -> Screen {
+		self.screen
 	}
 	
 	pub fn to_abs(&self, x: i16, y: i16) -> (i16, i16) {
@@ -91,34 +95,34 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		(x, y)
 	}
 	
-	pub fn paint(&mut self, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
+	pub fn paint(&mut self, memory: &mut Memory, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
 		let x = x.cam_range(self.clip_x.clone(), self.camera.x);
 		let y = y.cam_range(self.clip_y.clone(), self.camera.y);
 		
 		for y in y {
 			for x in x.clone() {
-				self.paint_abs_pixel(x, y);
+				self.paint_abs_pixel(memory, x, y);
 			}
 		}
 		
 		self
 	}
 	
-	pub fn paint_abs(&mut self, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
+	pub fn paint_abs(&mut self, memory: &mut Memory, x: impl PaintRange, y: impl PaintRange) -> &mut Self {
 		let x = x.abs_range(self.clip_x.clone());
 		let y = y.abs_range(self.clip_y.clone());
 		
 		for y in y {
 			for x in x.clone() {
-				self.paint_abs_pixel(x, y);
+				self.paint_abs_pixel(memory, x, y);
 			}
 		}
 		
 		self
 	}
 	
-	fn paint_abs_pixel(&mut self, x: u8, y: u8) {
-		let col = match self.callback.check(self.memory, x, y) {
+	fn paint_abs_pixel(&mut self, memory: &mut Memory, x: u8, y: u8) {
+		let col = match self.callback.check(memory, x, y) {
 			CallbackResult::Discard => return,
 			CallbackResult::Keep => None,
 			CallbackResult::Color(col) => Some(col),
@@ -131,7 +135,7 @@ impl<'m, Mode: PainterMode, CB: PainterCallback> Painter<'m, Mode, CB> {
 		};
 		
 		if let Some(col) = col {
-			self.memory.screen().set_pixel(x, y, col);
+			self.screen.set_pixel(memory, x, y, col);
 		}
 	}
 }

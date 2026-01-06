@@ -116,7 +116,7 @@ fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
 	}
 	
 	rt.set_cursor_y(rt.get_cursor_position()[1].overflowing_sub(shift as i16).0);
-	rt.memory.screen().shift_up(shift, 0);
+	rt.memory.screen().shift_up(&mut rt.memory, shift, 0);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -262,7 +262,7 @@ fn get_line_height(rt: &mut Runtime, state: &PrintState) -> (u8, u8) {
 
 fn get_font<'a>(rt: &'a mut Runtime, state: &PrintState) -> Font<'a> {
 	if state.custom_font {
-		Font::new(rt.memory.const_slice(0x5600))
+		Font::new(rt.memory.const_slice_mut(0x5600))
 	} else {
 		Font::SYSTEM
 	}
@@ -305,7 +305,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, state: &PrintState, letter: u8, 
 		
 		rt.memory
 		  .painter()
-		  .text_mode(bg)
+		  .text_mode(&mut rt.memory, bg)
 		  .with_callback(|_: &mut Memory, x: u8, y: u8| {
 			  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
 			  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
@@ -323,6 +323,7 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, state: &PrintState, letter: u8, 
 			  }
 		  })
 		  .paint(
+			  &mut rt.memory,
 			  cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
 			  cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
 		  );

@@ -27,7 +27,7 @@ pub fn cls(rt: &mut Runtime, col: Option<i16>) {
 	let col = col.unwrap_or(0) as u8 & 0xF;
 	let col = (col << 4) | col;
 	
-	rt.memory.screen().fill(col);
+	rt.memory.screen().as_slice_mut(&mut rt.memory).fill(col);
 	rt.set_cursor_home(0);
 	rt.set_cursor_position([0, 0]);
 	*rt.memory.machine_state().clip_rect() = [0, 0, 128, 128];
@@ -225,7 +225,7 @@ pub fn pset(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, col: Option<P8Num>
 		_ => return,
 	};
 	
-	rt.memory.painter().paint(x, y);
+	rt.memory.painter().paint(&mut rt.memory, x, y);
 }
 
 #[api_callback]
@@ -241,7 +241,7 @@ pub fn pget(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> u8 {
 		return 0;
 	}
 	
-	rt.memory.screen().get_pixel(x as u8, y as u8).unwrap_or(0)
+	rt.memory.screen().get_pixel(&mut rt.memory, x as u8, y as u8).unwrap_or(0)
 }
 
 #[api_callback]
@@ -255,7 +255,7 @@ pub fn sset(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, col: Option<u8>) {
 		return;
 	}
 	
-	rt.memory.sprites().set_pixel(x as u8, y as u8, col);
+	rt.memory.sprites().set_pixel(&mut rt.memory, x as u8, y as u8, col);
 }
 
 #[api_callback]
@@ -267,5 +267,5 @@ pub fn sget(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> u8 {
 		return 0;
 	}
 	
-	rt.memory.sprites().get_pixel(x as u8, y as u8).unwrap_or(0)
+	rt.memory.sprites().get_pixel(&mut rt.memory, x as u8, y as u8).unwrap_or(0)
 }

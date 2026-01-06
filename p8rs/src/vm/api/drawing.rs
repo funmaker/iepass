@@ -32,7 +32,7 @@ pub fn rectfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i
 	
 	rt.memory
 	  .painter()
-	  .paint(x0..=x1, y0..=y1);
+	  .paint(&mut rt.memory, x0..=x1, y0..=y1);
 }
 
 #[api_callback]
@@ -47,10 +47,10 @@ pub fn rect(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>,
 	
 	rt.memory
 	  .painter()
-	  .paint(x0..=x1, y0)
-	  .paint(x0..=x1, y1)
-	  .paint(x0, y0..=y1)
-	  .paint(x1, y0..=y1);
+	  .paint(&mut rt.memory, x0..=x1, y0)
+	  .paint(&mut rt.memory, x0..=x1, y1)
+	  .paint(&mut rt.memory, x0, y0..=y1)
+	  .paint(&mut rt.memory, x1, y0..=y1);
 }
 
 #[api_callback]
@@ -75,16 +75,16 @@ pub fn circfill(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Nu
 	let mut y = 0;
 	let mut e = 1 - x;
 	while x >= y {
-		painter.paint_abs(x0.wrapping_sub(x)..=x1.wrapping_add(x), y0.wrapping_sub(y));
-		painter.paint_abs(x0.wrapping_sub(x)..=x1.wrapping_add(x), y1.wrapping_add(y));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(x)..=x1.wrapping_add(x), y0.wrapping_sub(y));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(x)..=x1.wrapping_add(x), y1.wrapping_add(y));
 		
 		if e < 0 {
 			y += 1;
 			e += 2 * y + 1;
 		} else {
 			if x != y {
-				painter.paint_abs(x0.wrapping_sub(y)..=x1.wrapping_add(y), y0.wrapping_sub(x));
-				painter.paint_abs(x0.wrapping_sub(y)..=x1.wrapping_add(y), y1.wrapping_add(x));
+				painter.paint_abs(&mut rt.memory, x0.wrapping_sub(y)..=x1.wrapping_add(y), y0.wrapping_sub(x));
+				painter.paint_abs(&mut rt.memory, x0.wrapping_sub(y)..=x1.wrapping_add(y), y1.wrapping_add(x));
 			}
 			
 			y += 1;
@@ -117,14 +117,14 @@ pub fn circ(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, 
 	let mut y = 0;
 	let mut e = 1 - x;
 	while x >= y {
-		painter.paint_abs(x1.wrapping_add(x), y1.wrapping_add(y));
-		painter.paint_abs(x1.wrapping_add(y), y1.wrapping_add(x));
-		painter.paint_abs(x1.wrapping_add(x), y0.wrapping_sub(y));
-		painter.paint_abs(x1.wrapping_add(y), y0.wrapping_sub(x));
-		painter.paint_abs(x0.wrapping_sub(x), y1.wrapping_add(y));
-		painter.paint_abs(x0.wrapping_sub(y), y1.wrapping_add(x));
-		painter.paint_abs(x0.wrapping_sub(x), y0.wrapping_sub(y));
-		painter.paint_abs(x0.wrapping_sub(y), y0.wrapping_sub(x));
+		painter.paint_abs(&mut rt.memory, x1.wrapping_add(x), y1.wrapping_add(y));
+		painter.paint_abs(&mut rt.memory, x1.wrapping_add(y), y1.wrapping_add(x));
+		painter.paint_abs(&mut rt.memory, x1.wrapping_add(x), y0.wrapping_sub(y));
+		painter.paint_abs(&mut rt.memory, x1.wrapping_add(y), y0.wrapping_sub(x));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(x), y1.wrapping_add(y));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(y), y1.wrapping_add(x));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(x), y0.wrapping_sub(y));
+		painter.paint_abs(&mut rt.memory, x0.wrapping_sub(y), y0.wrapping_sub(x));
 		
 		y += 1;
 		if e < 0 {
@@ -154,15 +154,15 @@ pub fn ovalfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i
 	let (ox1, oy1) = painter.to_abs(x1 - width as i16, y1 - height as i16);
 	
 	if height == 0 {
-		painter.paint_abs(ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy0);
+		painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy0);
 		if oy0 != oy1 {
-			painter.paint_abs(ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy1);
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy1);
 		}
 		return;
 	} else if width == 0 {
-		painter.paint_abs(ox0, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
+		painter.paint_abs(&mut rt.memory, ox0, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
 		if ox0 != ox1 {
-			painter.paint_abs(ox1, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
+			painter.paint_abs(&mut rt.memory, ox1, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
 		}
 		return;
 	}
@@ -184,12 +184,12 @@ pub fn ovalfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i
 		if t + b2 * x <= crit1 || t + a2 * y <= crit3 {
 			x += 1; dxt += d2xt; t += dxt;
 		} else if t - a2 * y > crit2 {
-			painter.paint_abs(ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
-			painter.paint_abs(ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
 			y -= 1; dyt += d2yt; t += dyt;
 		} else {
-			painter.paint_abs(ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
-			painter.paint_abs(ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16)..=ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
 			x += 1; dxt += d2xt; t += dxt;
 			y -= 1; dyt += d2yt; t += dyt;
 		}
@@ -214,15 +214,15 @@ pub fn oval(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>,
 	let (ox1, oy1) = painter.to_abs(x1 - width as i16, y1 - height as i16);
 	
 	if height == 0 {
-		painter.paint_abs(ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy0);
+		painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy0);
 		if oy0 != oy1 {
-			painter.paint_abs(ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy1);
+			painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(width as i16)..=ox1.wrapping_add(width as i16), oy1);
 		}
 		return;
 	} else if width == 0 {
-		painter.paint_abs(ox0, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
+		painter.paint_abs(&mut rt.memory, ox0, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
 		if ox0 != ox1 {
-			painter.paint_abs(ox1, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
+			painter.paint_abs(&mut rt.memory, ox1, oy0.wrapping_sub(height as i16)..=oy1.wrapping_add(height as i16));
 		}
 		return;
 	}
@@ -241,10 +241,10 @@ pub fn oval(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>,
 	let d2yt = 2 * a2;
 	
 	while y >= 0 && x <= width {
-		painter.paint_abs(ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
-		painter.paint_abs(ox0.wrapping_sub(x as i16), oy0.wrapping_sub(y as i16));
-		painter.paint_abs(ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
-		painter.paint_abs(ox0.wrapping_sub(x as i16), oy1.wrapping_add(y as i16));
+		painter.paint_abs(&mut rt.memory, ox1.wrapping_add(x as i16), oy1.wrapping_add(y as i16));
+		painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16), oy0.wrapping_sub(y as i16));
+		painter.paint_abs(&mut rt.memory, ox1.wrapping_add(x as i16), oy0.wrapping_sub(y as i16));
+		painter.paint_abs(&mut rt.memory, ox0.wrapping_sub(x as i16), oy1.wrapping_add(y as i16));
 		
 		if t + b2 * x <= crit1 || t + a2 * y <= crit3 {
 			x += 1; dxt += d2xt; t += dxt;
@@ -291,10 +291,10 @@ pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P
 	let mut painter = rt.memory.painter();
 	
 	if y0 == y1 {
-		painter.paint(x0..=x1, y0);
+		painter.paint(&mut rt.memory, x0..=x1, y0);
 		return;
 	} else if x0 == x1 {
-		painter.paint(x0, y0..=y1);
+		painter.paint(&mut rt.memory, x0, y0..=y1);
 		return;
 	}
 	
@@ -317,9 +317,9 @@ pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P
 	
 	for x in x0..=x1 {
 		if steep {
-			painter.paint(y, x);
+			painter.paint(&mut rt.memory, y, x);
 		} else {
-			painter.paint(x, y);
+			painter.paint(&mut rt.memory, x, y);
 		}
 		
 		err += derr;
@@ -333,6 +333,7 @@ pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P
 
 #[api_callback]
 pub fn spr(rt: &mut Runtime, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: Option<P8Num>, h: Option<P8Num>, flip_x: Option<bool>, flip_y: Option<bool>) {
+	let memory = &mut rt.memory;
 	let n = n.unwrap_or(0);
 	let sx = (n % 16) * 8;
 	let sy = (n / 16) * 8;
@@ -344,16 +345,16 @@ pub fn spr(rt: &mut Runtime, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: 
 	let flip_y = flip_y.unwrap_or(false);
 	if n < 0 || n > 255 || w <= 0 || h <= 0 { return; }
 	
-	let painter = rt.memory.painter().sprite_mode();
+	let painter = memory.painter().sprite_mode(memory);
 	let (x0, y0) = painter.to_abs(x, y);
 	let x1 = x0 + w - 1;
 	let y1 = y0 + h - 1;
 	
 	match (flip_x, flip_y) {
-		(false, false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x as i16 - x0) as u8, (sy + y as i16 - y0) as u8)).paint_abs(x0..=x1, y0..=y1); },
-		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)).paint_abs(x0..=x1, y0..=y1); },
-		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
-		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel((sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)).paint_abs(x0..=x1, y0..=y1); },
+		(false, false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y as i16 - y0) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
+		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
+		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
+		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| memory.sprites().get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
 	}
 }
 
@@ -377,7 +378,7 @@ pub fn sspr(rt: &mut Runtime, sx: i16, sy: i16, sw: i16, sh: i16, mut dx: i16, m
 		flip_y = !flip_y;
 	}
 	
-	let painter = rt.memory.painter().sprite_mode();
+	let painter = rt.memory.painter().sprite_mode(&mut rt.memory);
 	let (dx0, dy0) = painter.to_abs(dx, dy);
 	let sx0 = sx;
 	let sy0 = sy;
@@ -406,9 +407,9 @@ pub fn sspr(rt: &mut Runtime, sx: i16, sy: i16, sw: i16, sh: i16, mut dx: i16, m
 			let sx = u8::try_from(sx).ok()?;
 			let sy = u8::try_from(sy).ok()?;
 			
-			memory.sprites().get_pixel(sx, sy)
+			memory.sprites().get_pixel(memory, sx, sy)
 		})
-		.paint_abs(dx0..dx0+dw, dy0..dy0+dh);
+		.paint_abs(&mut rt.memory, dx0..dx0+dw, dy0..dy0+dh);
 }
 
 fn sample(x: i16, dw: i16, sw: i16, factor: Option<i16>) -> i16 {

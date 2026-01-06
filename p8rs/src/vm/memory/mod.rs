@@ -11,6 +11,7 @@ pub mod sound_effects;
 pub mod machine_state;
 pub mod screen;
 pub mod painter;
+pub mod graphics;
 
 use sprites::Sprites;
 use map::Map;
@@ -20,6 +21,7 @@ use sound_effects::SoundEffects;
 use machine_state::MachineState;
 use screen::Screen;
 use painter::Painter;
+use graphics::Graphics;
 
 #[derive(Clone, Zeroable)]
 #[repr(transparent)]
@@ -30,89 +32,57 @@ impl Memory {
 		self.machine_state().reset();
 	}
 	
-	pub fn sprites(&mut self) -> Sprites<'_> {
-		// TODO: Handle map conflicts
-		// TODO: https://www.lexaloffle.com/bbs/?tid=50158 ?
-		let base_addr = match self.machine_state().sprite_addr_map().get() {
-			0x00 => 0x0000,
-			0x60 => 0x6000,
-			0x80 => 0x8000,
-			0xa0 => 0xa000,
-			0xc0 => 0xc000,
-			0xe0 => 0xe000,
-			_    => 0x0000,
-		};
-		
-		Sprites(self.const_slice(base_addr))
+	pub fn graphics(&mut self) -> Graphics {
+		Graphics::new(self)
 	}
 	
-	pub fn map(&mut self) -> Map<'_> {
-		// TODO: Validate
-		let base_addr = match *self.machine_state().map_addr_map() {
-			0x10..=0x1f => 0x3000,
-			0x20..=0x2f => 0x2000,
-			0x30..=0x3f => 0x3000,
-			0x80..=0xff => 0x8000,
-			_           => 0x0000,
-		};
-		
-		let width = match *self.machine_state().map_width() {
-			0 => 256,
-			n => n as usize,
-		};
-		
-		Map {
-			memory: self.const_slice(base_addr),
-			width,
-			height: 64,
-		}
+	pub fn sprites(&mut self) -> Sprites {
+		self.graphics().sprites()
 	}
 	
-	pub fn screen(&mut self) -> Screen<'_> {
-		// TODO: Handle map conflicts
-		let base_addr = match self.machine_state().screen_addr_map().get() {
-			0x00 => 0x0000,
-			0x60 => 0x6000,
-			0x80 => 0x8000,
-			0xa0 => 0xa000,
-			0xc0 => 0xc000,
-			0xe0 => 0xe000,
-			_    => 0x0000,
-		};
-		
-		Screen(self.const_slice(base_addr))
+	pub fn screen(&mut self) -> Screen {
+		self.graphics().screen()
 	}
 	
-	pub fn painter(&mut self) -> Painter<'_> {
-		Painter::new(self)
+	pub fn map(&mut self) -> Map {
+		self.graphics().map(self)
+	}
+	
+	pub fn painter(&mut self) -> Painter {
+		self.graphics().painter(self)
 	}
 	
 	pub fn sprite_flags(&mut self) -> SpriteFlags<'_> {
-		SpriteFlags(self.const_slice(0x3000))
+		SpriteFlags(self.const_slice_mut(0x3000))
 	}
 	
 	pub fn music(&mut self) -> Music<'_> {
-		Music(self.const_slice(0x3100))
+		Music(self.const_slice_mut(0x3100))
 	}
 	
 	pub fn sound_effects(&mut self) -> SoundEffects<'_> {
-		SoundEffects(self.const_slice(0x3200))
+		SoundEffects(self.const_slice_mut(0x3200))
 	}
 	
 	pub fn persistent_data(&mut self) -> &mut [u8; 256] {
-		self.const_slice(0x5e00)
+		self.const_slice_mut(0x5e00)
 	}
 	
 	pub fn machine_state(&mut self) -> MachineState<'_> {
-		MachineState(self.const_slice(0x5f00))
+		MachineState(self.const_slice_mut(0x5f00))
 	}
 	
 	pub fn gpio(&mut self) -> &mut [u8; 128] {
-		self.const_slice(0x5f80)
+		self.const_slice_mut(0x5f80)
 	}
 	
 	#[inline(always)]
-	pub(crate) fn const_slice<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
+	pub(crate) fn const_slice<const S: usize>(&self, base: u16) -> &[u8; S] {
+		(&self.0[base as usize..base as usize + S]).try_into().unwrap()
+	}
+	
+	#[inline(always)]
+	pub(crate) fn const_slice_mut<const S: usize>(&mut self, base: u16) -> &mut [u8; S] {
 		(&mut self.0[base as usize..base as usize + S]).try_into().unwrap()
 	}
 }
