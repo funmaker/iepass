@@ -7,9 +7,10 @@ for i = 0x8000,0xffff,2 do
 end
 
 for i = 0x00,0xff do
-  if i >= 0x20 and i < 0x40 then e = 0x3D - i
-  elseif i >= 0x80          then e = 0xFD - i
-  else                           e = 0x0D - (i % 0x10)
+  if     i >= 0x10 and i < 0x20 then e = 0x1D - i
+  elseif i >= 0x20 and i < 0x40 then e = 0x3D - i
+  elseif i >= 0x80              then e = 0xFD - i
+  else                               e = 0x1D
   end
 
   cls()

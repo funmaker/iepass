@@ -46,4 +46,11 @@ impl Sprites {
 			Some(tuple >> 4)
 		}
 	}
+	
+	pub fn sprite_pos(&self, idx: u8) -> [u8; 2] {
+		[
+			(idx % 16) * 8,
+			(idx / 16) * 8,
+		]
+	}
 }

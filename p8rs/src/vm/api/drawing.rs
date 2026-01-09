@@ -18,6 +18,7 @@ pub fn install_pico8_drawing(ctx: Context) {
 	ctx.set_global("line", line::callback(ctx));
 	ctx.set_global("spr", spr::callback(ctx));
 	ctx.set_global("sspr", sspr::callback(ctx));
+	ctx.set_global("map", map::callback(ctx));
 }
 
 #[api_callback]
@@ -62,7 +63,7 @@ pub fn circfill(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Nu
 	if r < p8!(0) { return }
 	
 	let even_flag = rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::EVEN_RADIUS_CIRC);
-	let mut painter = rt.memory.painter();
+	let painter = rt.memory.painter();
 	
 	let (x0, y0) = painter.to_abs(x, y);
 	let (x1, y1) = if r.fract() >= p8!(0.5) && even_flag {
@@ -104,7 +105,7 @@ pub fn circ(rt: &mut Runtime, x: Option<i16>, y: Option<i16>, r: Option<P8Num>, 
 	if r < p8!(0) { return }
 	
 	let even_flag = rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::EVEN_RADIUS_CIRC);
-	let mut painter = rt.memory.painter();
+	let painter = rt.memory.painter();
 	
 	let (x0, y0) = painter.to_abs(x, y);
 	let (x1, y1) = if r.fract() >= p8!(0.5) && even_flag {
@@ -146,7 +147,7 @@ pub fn ovalfill(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i
 	let (x0, x1) = (x0.min(x1), x0.max(x1));
 	let (y0, y1) = (y0.min(y1), y0.max(y1));
 	
-	let mut painter = rt.memory.painter();
+	let painter = rt.memory.painter();
 	
 	let width = (x1 as i32 - x0 as i32) / 2;
 	let height = (y1 as i32 - y0 as i32) / 2;
@@ -206,7 +207,7 @@ pub fn oval(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>,
 	let (x0, x1) = (x0.min(x1), x0.max(x1));
 	let (y0, y1) = (y0.min(y1), y0.max(y1));
 	
-	let mut painter = rt.memory.painter();
+	let painter = rt.memory.painter();
 	
 	let width = (x1 as i32 - x0 as i32) / 2;
 	let height = (y1 as i32 - y0 as i32) / 2;
@@ -288,7 +289,7 @@ pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P
 		_ => unreachable!(),
 	};
 	
-	let mut painter = rt.memory.painter();
+	let painter = rt.memory.painter();
 	
 	if y0 == y1 {
 		painter.paint(&mut rt.memory, x0..=x1, y0);
@@ -346,17 +347,17 @@ pub fn spr(rt: &mut Runtime, n: Option<i16>, x: Option<i16>, y: Option<i16>, w: 
 	
 	let memory = &mut rt.memory;
 	let graphics = memory.graphics();
-	let painter = graphics.painter(memory).sprite_mode(memory);
 	let sprites = graphics.sprites();
+	let painter = graphics.painter(memory).sprite_mode(memory);
 	let (x0, y0) = painter.to_abs(x, y);
 	let x1 = x0 + w - 1;
 	let y1 = y0 + h - 1;
 	
 	match (flip_x, flip_y) {
-		(false, false) => { painter.with_callback(|memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y as i16 - y0) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
-		(true,  false) => { painter.with_callback(|memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
-		(false, true ) => { painter.with_callback(|memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
-		(true,  true ) => { painter.with_callback(|memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)).paint_abs(memory, x0..=x1, y0..=y1); },
+		(false, false) => { painter.paint_abs_tex(memory, x0..=x1, y0..=y1, |memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y as i16 - y0) as u8)); },
+		(true,  false) => { painter.paint_abs_tex(memory, x0..=x1, y0..=y1, |memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y as i16 - y0) as u8)); },
+		(false, true ) => { painter.paint_abs_tex(memory, x0..=x1, y0..=y1, |memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x as i16 - x0) as u8, (sy + y1 - y as i16) as u8)); },
+		(true,  true ) => { painter.paint_abs_tex(memory, x0..=x1, y0..=y1, |memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x1 - x as i16) as u8, (sy + y1 - y as i16) as u8)); },
 	}
 }
 
@@ -392,29 +393,27 @@ pub fn sspr(rt: &mut Runtime, sx: i16, sy: i16, sw: i16, sh: i16, mut dx: i16, m
 	let dxf = (sw > dw && sw % dw == 0).then_some(sw / dw);
 	let dyf = (sh > dh && sh % dh == 0).then_some(sh / dh);
 	
-	painter
-		.with_callback(|memory: &mut Memory, x, y| {
-			let mut sx = sx0 + sample(x as i16 - dx0, dw, sw, dxf);
-			let mut sy = sy0 + sample(y as i16 - dy0, dh, sh, dyf);
-			
-			if flip_x {
-				sx = sx1.min(127) - (sx - sx0.max(0))
-			}
-			
-			if flip_y {
-				sy = sy1.min(127) - (sy - sy0.max(0))
-			}
-			
-			if sx < sx0.max(0) || sy < sy0.max(0) || sx > sx1.min(127) || sy > sy1.min(127) {
-				return None
-			}
-			
-			let sx = u8::try_from(sx).ok()?;
-			let sy = u8::try_from(sy).ok()?;
-			
-			sprites.get_pixel(memory, sx, sy)
-		})
-		.paint_abs(&mut rt.memory, dx0..dx0+dw, dy0..dy0+dh);
+	painter.paint_abs_tex(&mut rt.memory, dx0..dx0+dw, dy0..dy0+dh, |memory: &mut Memory, x, y| {
+		let mut sx = sx0 + sample(x as i16 - dx0, dw, sw, dxf);
+		let mut sy = sy0 + sample(y as i16 - dy0, dh, sh, dyf);
+		
+		if flip_x {
+			sx = sx1.min(127) - (sx - sx0.max(0))
+		}
+		
+		if flip_y {
+			sy = sy1.min(127) - (sy - sy0.max(0))
+		}
+		
+		if sx < sx0.max(0) || sy < sy0.max(0) || sx > sx1.min(127) || sy > sy1.min(127) {
+			return None
+		}
+		
+		let sx = u8::try_from(sx).ok()?;
+		let sy = u8::try_from(sy).ok()?;
+		
+		sprites.get_pixel(memory, sx, sy)
+	});
 }
 
 fn sample(x: i16, dw: i16, sw: i16, factor: Option<i16>) -> i16 {
@@ -425,4 +424,89 @@ fn sample(x: i16, dw: i16, sw: i16, factor: Option<i16>) -> i16 {
 	};
 	
 	ret
+}
+
+#[api_callback]
+pub fn map(rt: &mut Runtime, mx: Option<i16>, my: Option<i16>, dx: Option<i16>, dy: Option<i16>, mw: Option<i16>, mh: Option<i16>, layer: Option<i16>) {
+	let memory = &mut rt.memory;
+	let graphics = memory.graphics();
+	let sprites = graphics.sprites();
+	let map = graphics.map(memory);
+	let painter = graphics.painter(memory).sprite_mode(memory);
+	
+	let mx = mx.unwrap_or(0);
+	let my = my.unwrap_or(0);
+	let dx = dx.unwrap_or(0);
+	let dy = dy.unwrap_or(0);
+	let mut mw = mw.map(|sw| sw.max(0) as u16).unwrap_or(map.width());
+	let mut mh = mh.map(|sh| sh.max(0) as u16).unwrap_or(map.height().min(0x7FFF));
+	
+	let layer = match layer {
+		None | Some(0) => 0xFF,
+		Some(val) => val as u8,
+	};
+	
+	let (mut x0, mut y0) = painter.to_abs(dx, dy);
+	
+	let mut mx = if mx < 0 {
+		x0 = x0.saturating_add(mx.saturating_neg().saturating_mul(8));
+		mw = mw.saturating_sub(mx.saturating_neg() as u16);
+		0
+	} else {
+		mx as u16
+	};
+	
+	let mut my = if my < 0 {
+		y0 = y0.saturating_add(my.saturating_neg().saturating_mul(8));
+		mh = mh.saturating_sub(my.saturating_neg() as u16);
+		0
+	} else {
+		my as u16
+	};
+	
+	if x0 <= -8 {
+		let cells = (x0 / -8) as u16;
+		mx = mx.saturating_add(cells);
+		mw = mw.saturating_sub(cells);
+		x0 %= 8;
+	}
+	
+	if y0 <= -8 {
+		let cells = (y0 / -8) as u16;
+		my = my.saturating_add(cells);
+		mh = mh.saturating_sub(cells);
+		y0 %= 8;
+	}
+	
+	if mx + mw > map.width() {
+		mw = map.width().saturating_sub(mx);
+	}
+	
+	if my + mh > map.height() {
+		mh = map.height().saturating_sub(my);
+	}
+	
+	if mw <= 0 || mh <= 0 || x0 >= 128 || y0 >= 128 || mx >= map.width() || my >= map.height() || layer == 0 { return; }
+	
+	let mw = mw.min(17);
+	let mh = mh.min(17);
+	
+	for cy in 0..mh {
+		for cx in 0..mw {
+			let sprite = map.get_sprite(memory, mx + cx, my + cy).unwrap();
+			
+			let [sx, sy] = sprites.sprite_pos(sprite).map(i16::from);
+			let sx0 = x0 + cx as i16 * 8;
+			let sy0 = y0 + cy as i16 * 8;
+			
+			if sprite == 0 || layer & memory.sprite_flags()[sprite] == 0 { continue }
+			
+			painter.paint_abs_tex(
+				memory,
+				sx0..sx0+8,
+				sy0..sy0+8,
+				|memory: &mut Memory, x, y| sprites.get_pixel(memory, (sx + x as i16 - sx0) as u8, (sy + y as i16 - sy0) as u8),
+			);
+		}
+	}
 }

@@ -2,8 +2,8 @@ use crate::vm::memory::machine_state::{FillPatternFlags, Palette};
 use crate::vm::memory::Memory;
 
 pub trait PainterMode {
-	fn fg(&mut self, color: Option<u8>) -> Option<u8>;
-	fn bg(&mut self, color: Option<u8>) -> Option<u8>;
+	fn fg(&self, color: Option<u8>) -> Option<u8>;
+	fn bg(&self, color: Option<u8>) -> Option<u8>;
 }
 
 pub struct TextMode {
@@ -26,14 +26,14 @@ impl TextMode {
 }
 
 impl PainterMode for TextMode {
-	fn fg(&mut self, color: Option<u8>) -> Option<u8> {
+	fn fg(&self, color: Option<u8>) -> Option<u8> {
 		match color {
 			None => Some(self.text_color),
 			Some(_) => self.bg_color,
 		}
 	}
 	
-	fn bg(&mut self, color: Option<u8>) -> Option<u8> {
+	fn bg(&self, color: Option<u8>) -> Option<u8> {
 		match color {
 			None => Some(self.text_color),
 			Some(_) => self.bg_opaque.then_some(0),
@@ -73,11 +73,11 @@ impl PenMode {
 }
 
 impl PainterMode for PenMode {
-	fn fg(&mut self, _color: Option<u8>) -> Option<u8> {
+	fn fg(&self, _color: Option<u8>) -> Option<u8> {
 		Some(self.fg)
 	}
 	
-	fn bg(&mut self, _color: Option<u8>) -> Option<u8> {
+	fn bg(&self, _color: Option<u8>) -> Option<u8> {
 		self.bg
 	}
 }
@@ -112,11 +112,11 @@ impl SpriteMode {
 }
 
 impl PainterMode for SpriteMode {
-	fn fg(&mut self, color: Option<u8>) -> Option<u8> {
+	fn fg(&self, color: Option<u8>) -> Option<u8> {
 		color.and_then(|col| self.fg[(col & 0x0F) as usize])
 	}
 	
-	fn bg(&mut self, color: Option<u8>) -> Option<u8> {
+	fn bg(&self, color: Option<u8>) -> Option<u8> {
 		color.and_then(|col| self.bg[(col & 0x0F) as usize])
 	}
 }

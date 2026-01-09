@@ -306,26 +306,26 @@ fn draw_letter(_ctx: Context, rt: &mut Runtime, state: &PrintState, letter: u8, 
 		rt.memory
 		  .painter()
 		  .text_mode(&mut rt.memory, bg)
-		  .with_callback(|_: &mut Memory, x: u8, y: u8| {
-			  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
-			  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
-			  let font_x = if is_wide { local_x / 2 } else { local_x };
-			  let font_y = if is_tall { local_y / 2 } else { local_y };
-			  let font_line = char_font[font_y as usize];
-			  let font_bit = (font_line >> font_x) & 1 != 0;
-			  
-			  if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
-				  CallbackResult::Keep
-			  }else if bg.is_some() {
-				  CallbackResult::Color(0)
-			  } else {
-				  CallbackResult::Discard
-			  }
-		  })
-		  .paint(
+		  .paint_tex(
 			  &mut rt.memory,
 			  cursor_x..cursor_x.saturating_add((font_width*x_stride) as i16),
-			  cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16)
+			  cursor_y..cursor_y.saturating_add((font_height*y_stride) as i16),
+			  |_: &mut Memory, x: u8, y: u8| {
+				  let local_x = x.overflowing_sub(abs_cursor_x as u8).0;
+				  let local_y = y.overflowing_sub(abs_cursor_y as u8).0;
+				  let font_x = if is_wide { local_x / 2 } else { local_x };
+				  let font_y = if is_tall { local_y / 2 } else { local_y };
+				  let font_line = char_font[font_y as usize];
+				  let font_bit = (font_line >> font_x) & 1 != 0;
+				  
+				  if (font_bit && !(is_dotty_x && local_x % 2 == 0) && !(is_dotty_y && local_y % 2 == 1)) != is_inverted {
+					  CallbackResult::Keep
+				  }else if bg.is_some() {
+					  CallbackResult::Color(0)
+				  } else {
+					  CallbackResult::Discard
+				  }
+			  }
 		  );
 	}
 	

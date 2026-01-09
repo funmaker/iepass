@@ -23,7 +23,7 @@ impl Screen {
 		memory.const_slice_mut::<0x2000>(self.offset)
 	}
 	
-	pub fn set_pixel(&mut self, memory: &mut Memory, x: u8, y: u8, value: u8) {
+	pub fn set_pixel(&self, memory: &mut Memory, x: u8, y: u8, value: u8) {
 		if x >= 128 || y >= 128 { return; }
 		
 		let slice = self.as_slice_mut(memory);
@@ -47,7 +47,7 @@ impl Screen {
 		}
 	}
 	
-	pub fn shift_up(&mut self, memory: &mut Memory, dy: u8, fill_color: u8) {
+	pub fn shift_up(&self, memory: &mut Memory, dy: u8, fill_color: u8) {
 		if dy == 0 { return }
 		
 		let slice = self.as_slice_mut(memory);

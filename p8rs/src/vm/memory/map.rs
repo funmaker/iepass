@@ -18,12 +18,12 @@ pub struct Map {
 }
 
 impl Map {
-	pub(super) fn new(offset: u16, memory: &mut Memory) -> Map {
-		let offset = match offset {
-			0x2000..0x3000 => MapOffset::Lower(offset - 0x2000),
-			0x3000..0x4000 => MapOffset::Upper(offset - 0x3000),
-			0x8000.. => MapOffset::Extended(offset - 0x8000),
-			_ => panic!("Invalid map offset {offset}. Should be 0x2000..0x4000 or 0x8000.."),
+	pub(super) fn new(base: u16, memory: &mut Memory) -> Map {
+		let offset = match base {
+			0x1000..0x2000 => MapOffset::Lower(base - 0x1000),
+			0x2000..0x3000 => MapOffset::Upper(base - 0x2000),
+			0x8000.. => MapOffset::Extended(base - 0x8000),
+			_ => panic!("Invalid map base offset 0x{base:04X}. Should be 0x1000..=0x2FFF or 0x8000..=0xFFFF"),
 		};
 		
 		let width = match *memory.machine_state().map_width() {
@@ -64,10 +64,10 @@ impl Map {
 		let pos = x + y * self.width;
 		
 		let addr = match self.offset {
-			MapOffset::Lower(offset) => 0x2000 + offset + pos,
+			MapOffset::Lower(offset) => 0x1000 + offset + pos,
 			MapOffset::Extended(offset) => 0x8000 + offset + pos,
-			MapOffset::Upper(offset) if pos < 0x1000 - offset => 0x3000 + offset + pos,
-			MapOffset::Upper(offset) => 0x1000 + offset + pos,
+			MapOffset::Upper(offset) if pos < 0x1000 - offset => 0x2000 + offset + pos,
+			MapOffset::Upper(offset) => offset + pos,
 		};
 		
 		Some(addr)

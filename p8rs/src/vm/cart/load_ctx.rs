@@ -10,6 +10,7 @@ pub struct CartLoadContext<'vm, 'c, A: Allocator + 'static> {
 	pub vm: &'vm mut P8rs<A>,
 	pub lua_code: Cow<'c, [u8]>,
 	pub gfx_loaded: bool,
+	pub gff_loaded: bool,
 	pub map_loaded: bool,
 }
 
@@ -19,6 +20,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 			vm,
 			lua_code: Cow::Borrowed(b""),
 			gfx_loaded: false,
+			gff_loaded: false,
 			map_loaded: false,
 		}
 	}
@@ -29,6 +31,7 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 		match name {
 			b"__lua__" => self.load_lua_section(body)?,
 			b"__gfx__" => self.load_gfx_section(body)?,
+			b"__gff__" => self.load_gff_section(body)?,
 			b"__map__" => self.load_map_section(body)?,
 			_ => { warn!("load_section: Unknown section name {}", p8scii::Display(name)); }
 		}
@@ -73,6 +76,30 @@ impl<'vm, 'c, A: Allocator + 'static> CartLoadContext<'vm, 'c, A> {
 		Ok(())
 	}
 	
+	fn load_gff_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
+		let mut flags = self.vm.memory().sprite_flags();
+		
+		if self.gff_loaded {
+			debug!("load_gff_section: GFF section was already loaded, overwriting data.")
+		}
+		
+		let mut written = 0;
+		for res in hex_iter::<2>(data) {
+			if res.col > 128 || res.row > 2 { continue }
+			
+			flags[(res.col + res.row * 128) as u8] = res.value;
+			written += 1;
+		}
+		
+		if written == -1 {
+			debug!("load_gff_section: GFF section loaded: empty section!");
+		} else {
+			debug!("load_gff_section: GFF section loaded: 0x{:X} bytes written to memory", written);
+		}
+		
+		Ok(())
+	}
+	
 	fn load_map_section(&mut self, data: &[u8]) -> Result<(), CartLoadError> {
 		let memory = self.vm.memory();
 		let map = memory.map();
@@ -106,12 +133,12 @@ struct HexIterValue {
 	col: usize,
 }
 
-fn hex_iter<const Word: usize>(lines: &[u8]) -> impl Iterator<Item=HexIterValue> {
+fn hex_iter<const WORD: usize>(lines: &[u8]) -> impl Iterator<Item=HexIterValue> {
 	lines.split(|&b| b == b'\n' || b == b'\r')
 	     .filter(|line| !line.is_empty())
 	     .enumerate()
 	     .flat_map(|(row, line)|
-		     line.as_chunks::<Word>().0
+		     line.as_chunks::<WORD>().0
 		         .iter()
 		         .enumerate()
 		         .map(move |(col, chunk)| HexIterValue {

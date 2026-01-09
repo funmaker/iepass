@@ -1,22 +1,23 @@
 use crate::vm::memory::Memory;
 
-pub trait PainterCallback {
-	fn check(&mut self, memory: &mut Memory, x: u8, y: u8) -> CallbackResult;
+pub trait PainterCallback: Copy {
+	fn check(&self, memory: &mut Memory, x: u8, y: u8) -> CallbackResult;
 }
 
+#[derive(Copy, Clone)]
 pub struct Noop;
 impl PainterCallback for Noop {
 	#[inline(always)]
-	fn check(&mut self, _: &mut Memory, _: u8, _: u8) -> CallbackResult {
+	fn check(&self, _: &mut Memory, _: u8, _: u8) -> CallbackResult {
 		CallbackResult::Keep
 	}
 }
 
 impl<T, R> PainterCallback for T
-where T: Fn(&mut Memory, u8, u8) -> R,
+where T: Fn(&mut Memory, u8, u8) -> R + Copy,
       R: Into<CallbackResult> {
 	#[inline(always)]
-	fn check(&mut self, memory: &mut Memory, x: u8, y: u8) -> CallbackResult {
+	fn check(&self, memory: &mut Memory, x: u8, y: u8) -> CallbackResult {
 		self(memory, x, y).into()
 	}
 }
