@@ -19,6 +19,7 @@ pub fn install_pico8_drawing(ctx: Context) {
 	ctx.set_global("spr", spr::callback(ctx));
 	ctx.set_global("sspr", sspr::callback(ctx));
 	ctx.set_global("map", map::callback(ctx));
+	ctx.set_global("mapdraw", map::callback(ctx));
 }
 
 #[api_callback]

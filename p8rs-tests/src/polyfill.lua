@@ -89,7 +89,8 @@ do
 		local out = ""
 		local first = true
 		
-		for _, v in ipairs(t) do
+		for k=1,#t do
+      local v = t[k]
 			if first then first = false
 			else out = out .. ", "
 			end
