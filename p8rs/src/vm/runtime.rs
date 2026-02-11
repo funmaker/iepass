@@ -17,7 +17,7 @@ pub struct Runtime {
 	pub cart_memory: [u8; 0x8000],
 	pub buttons: Buttons,
 	pub target_fps: u16,
-	pub time: P8Num,
+	pub frame_no: u32,
 	#[cfg_attr(feature = "defmt", defmt(Debug2Format))]
 	callbacks: Option<Box<dyn Callbacks>>,
 	cursor: [i16; 2],
@@ -66,7 +66,7 @@ impl Runtime {
 		
 		self.buttons.update(buttons, delay, interval);
 		
-		self.time += P8Num::from(self.target_fps as i16).recip();
+		self.frame_no += if self.target_fps == 30 { 2 } else { 1 };
 	}
 	
 	/// Returns actual cursor position (memory only contains lower u8 of each coordinate)

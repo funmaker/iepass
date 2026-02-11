@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use anyhow::anyhow;
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Execution, IntoValue, RuntimeError, String, Value};
+use p8rs_piccolo::{Context, Error, Execution, IntoValue, RuntimeError, Stack, String, Table, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
 use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
@@ -15,14 +15,76 @@ pub fn install_pico8_base(ctx: Context) {
 	p8rs_piccolo::stdlib::load_base(ctx);
 	p8rs_piccolo::stdlib::load_table(ctx);
 	
+	ctx.set_global("assert", assert::callback(ctx));
+	ctx.set_global("select", select::callback(ctx));
+	ctx.set_global("rawget", rawget::callback(ctx));
+	ctx.set_global("rawlen", rawlen::callback(ctx));
+	ctx.set_global("rawset", rawset::callback(ctx));
+	ctx.set_global("getmetatable", getmetatable::callback(ctx));
+	ctx.set_global("setmetatable", setmetatable::callback(ctx));
+	ctx.set_global("trace", trace::callback(ctx));
+	ctx.set_global("stat", stat::callback(ctx));
+	ctx.set_global("type", type_of::callback(ctx));
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
-	ctx.set_global("type", get_type::callback(ctx));
-	ctx.set_global("stat", stat::callback(ctx));
-	ctx.set_global("trace", trace::callback(ctx));
 	ctx.set_global("time", time::callback(ctx));
 	ctx.set_global("t", time::callback(ctx));
+}
+
+#[api_callback]
+pub fn assert<'gc>(ctx: Context<'gc>, check: Value<'gc>, error: Option<Value<'gc>>) -> Result<Value<'gc>, Value<'gc>> {
+	match check {
+		Value::Nil | Value::Boolean(false) => Err(error.unwrap_or(ctx.intern_static(b"assertion failed!").into())),
+		value => Ok(value)
+	}
+}
+
+#[api_callback]
+pub fn select<'gc>(ctx: Context<'gc>, stack: Stack<'gc, '_>) -> Result<Value<'gc>, Value<'gc>> {
+	let len = stack.len() - 1;
+	let count = stack.get(0);
+	
+	if let Value::String(count) = count && count == "#" {
+		Ok((len as i16).into())
+	} else if let Some(count) = count.to_number() {
+		let int = count.to_integer() as usize;
+		if int < 0 || int >= len { Ok(Value::Nil) }
+		else { Ok(stack.get(int + 1)) }
+	} else {
+		Err(ctx.intern_static(b"bad argument #0 to 'select'").into())
+	}
+}
+
+#[api_callback]
+pub fn rawget<'gc>(ctx: Context<'gc>, table: Table<'gc>, key: Value<'gc>) -> Value<'gc> {
+	table.get_value(ctx, key)
+}
+
+#[api_callback]
+pub fn rawlen<'gc>(ctx: Context<'gc>, value: Value<'gc>) -> Result<i16, Value<'gc>> {
+	match value {
+		Value::Table(value) => Ok(value.length().cast_signed()),
+		Value::String(value) => Ok(value.len() as i16),
+		_ => Err(ctx.intern_static(b"bad argument #0 to 'rawlen'").into()),
+	}
+}
+
+#[api_callback]
+pub fn rawset<'gc>(ctx: Context<'gc>, table: Table<'gc>, key: Value<'gc>, value: Value<'gc>) -> Result<Value<'gc>, Error<'gc>> {
+	table.set(ctx, key, value)?;
+	Ok(table.into())
+}
+
+#[api_callback]
+pub fn getmetatable<'gc>(table: Table<'gc>) -> Option<Table<'gc>> {
+	table.metatable()
+}
+
+#[api_callback]
+pub fn setmetatable<'gc>(ctx: Context<'gc>, table: Table<'gc>, metatable: Option<Table<'gc>>) -> Table<'gc> {
+	table.set_metatable(&ctx, metatable);
+	table
 }
 
 #[api_callback]
@@ -67,7 +129,6 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 	Ok(String::from_buffer(ctx.mutation(), buf.into_bytes().into_boxed_slice()))
 }
 
-
 #[api_callback]
 pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	Ok(match stat_cmd {
@@ -77,7 +138,7 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, 
 }
 
 #[api_callback]
-pub fn get_type<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
+pub fn type_of<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
 	Ok(Some(match val {
 		Value::Nil => "nil".into_value(ctx),
 		Value::Boolean(_) => "boolean".into_value(ctx),
@@ -125,7 +186,7 @@ pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrit
 
 #[api_callback]
 pub fn time(rt: &mut Runtime) -> P8Num {
-	rt.time
+	P8Num::from_raw(((rt.frame_no as i32 / 60) << 16) | ((rt.frame_no as i32 % 60 << 16) / 60))
 }
 
 

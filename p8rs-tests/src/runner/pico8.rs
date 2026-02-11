@@ -72,10 +72,10 @@ pub fn run(path: impl AsRef<Path>) -> RunResult {
 	}
 	
 	let stdout = if stdout.starts_with("RUNNING: ") {
-		let eol = stdout.find('\n').unwrap_or(stdout.len());
-		stdout[eol ..].trim()
+		let eol = stdout.find('\n').unwrap_or(stdout.len()) + 1;
+		&stdout[eol ..]
 	} else {
-		stdout.trim()
+		&stdout[..]
 	};
 	
 	if stderr.is_empty() { // Linux (everything goes to stdout)

@@ -88,7 +88,7 @@ do
 	stringifyTable = function(t)
 		local out = ""
 		local first = true
-		
+
 		for k=1,#t do
       local v = t[k]
 			if first then first = false
@@ -96,21 +96,21 @@ do
 			end
 			out = out .. stringify(v)
 		end
-		
+
 		local entries = {}
 		for k, v in pairs(t) do
 			if not (type(k) == "number" and k == flr(k) and k > 0 and k <= #t) then
 				add(entries, {k, v})
 			end
 		end
-		
+
 		qsort(entries, function(a, b) return compareAny(a[1], b[1]) end)
-		
+
 		for _, entry in ipairs(entries) do
 			if first then first = false
 			else out = out .. ", "
 			end
-			
+
 			out = out .. "[" .. stringify(entry[1]) .. "] = " .. stringify(entry[2])
 		end
 		
@@ -128,8 +128,14 @@ do
 		end
 	end
 	
-	p8rs.test = function(name, value)
-		printh("TEST | " .. name .. " | " .. stringify(value))
+	p8rs.test = function(name, ...)
+    local args = {...}
+    local tail = ""
+    for i = 1,#args do
+      if i > 1 then tail ..= " | " end
+      tail ..= stringify(args[i])
+    end
+		printh("TEST | " .. name .. " | " .. tail)
 	end
 	
 	p8rs.test_mem = function(name, addr, count)

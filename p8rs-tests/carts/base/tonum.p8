@@ -1,0 +1,36 @@
+pico-8 cartridge // http://www.pico-8.com
+version 43
+__lua__
+
+for flags = 0b00,0b111 do
+  p8rs.test("nil " .. flags, tonum(nil, flags))
+  p8rs.test("number " .. flags, tonum(1.5, flags))
+  p8rs.test("string " .. flags, tonum("Hello World!", flags))
+  p8rs.test("str dec " .. flags, tonum("1234", flags))
+  p8rs.test("str dec neg " .. flags, tonum("-1234", flags))
+  p8rs.test("str dec frc " .. flags, tonum("1234.5678", flags))
+  p8rs.test("str dec frc neg " .. flags, tonum("-1234.5678", flags))
+  p8rs.test("str dec overflow " .. flags, tonum("-12345678.987654321", flags))
+  p8rs.test("str hex " .. flags, tonum("0x1234", flags))
+  p8rs.test("str hex neg " .. flags, tonum("-0x1234", flags))
+  p8rs.test("str hex frc " .. flags, tonum("0x1234.5678", flags))
+  p8rs.test("str hex frc neg " .. flags, tonum("-0x1234.5678", flags))
+  p8rs.test("str hex overflow " .. flags, tonum("-0x12345678.987654321", flags))
+  p8rs.test("str bin " .. flags, tonum("0b11110000101101", flags))
+  p8rs.test("str bin neg " .. flags, tonum("-0b11110000101101", flags))
+  p8rs.test("str bin frc " .. flags, tonum("0b11110000101101.10110000111101", flags))
+  p8rs.test("str bin frc neg " .. flags, tonum("-0b11110000101101.10110000111101", flags))
+  p8rs.test("str bin overflow " .. flags, tonum("-0b111100001011011010101110.101100001111010111011101", flags))
+  p8rs.test("str sci " .. flags, tonum("2.55e2", flags))
+  p8rs.test("str sci neg " .. flags, tonum("-2.55e2", flags))
+  p8rs.test("str sci frc " .. flags, tonum("2.5539e2", flags))
+  p8rs.test("str sci frc neg " .. flags, tonum("-2.5539e2", flags))
+  p8rs.test("str sci overflow " .. flags, tonum("-12345678e2", flags))
+  p8rs.test("str sci overflow 2 " .. flags, tonum("-12345678e10", flags))
+  p8rs.test("boolean " .. flags, tonum(true, flags))
+  p8rs.test("list " .. flags, tonum({1, 2, 3}, flags))
+  p8rs.test("table " .. flags, tonum({ foo = 42, bar = "baz" }, flags))
+  p8rs.test("function " .. flags, tonum(function() end, flags))
+  p8rs.test("thread " .. flags, tonum(cocreate(function() end), flags))
+  p8rs.test("empty", tonum())
+end
