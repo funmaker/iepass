@@ -1,7 +1,7 @@
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{String, Context, RuntimeError, Stack, Value};
 
-pub fn install_pico8_string(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("sub", sub::callback(ctx));
 	ctx.set_global("ord", ord::callback(ctx));
 }

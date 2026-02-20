@@ -8,7 +8,7 @@ use crate::vm::memory::machine_state::MiscChipsetFeatureFlags;
 use crate::vm::memory::Memory;
 use crate::vm::Runtime;
 
-pub fn install_pico8_drawing(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("rectfill", rectfill::callback(ctx));
 	ctx.set_global("rect", rect::callback(ctx));
 	ctx.set_global("circfill", circfill::callback(ctx));

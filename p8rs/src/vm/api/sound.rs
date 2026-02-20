@@ -1,7 +1,7 @@
 use p8rs_macros::api_callback;
 use p8rs_piccolo::Context;
 
-pub fn install_pico8_sound(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("music", music::callback(ctx));
 	ctx.set_global("sfx", sfx::callback(ctx));
 }

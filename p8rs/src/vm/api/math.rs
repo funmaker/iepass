@@ -4,7 +4,7 @@ use p8rs_macros::api_callback;
 
 use crate::vm::P8Num;
 
-pub fn install_pico8_math(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("band", band::callback(ctx));
 	ctx.set_global("bnot", bnot::callback(ctx));
 	ctx.set_global("bor", bor::callback(ctx));

@@ -1,29 +1,31 @@
 pub mod base;
-pub mod math;
-pub mod table;
-pub mod memory;
-pub mod gfx;
-pub mod string;
 pub mod internal;
-pub mod print;
-pub mod drawing;
-pub mod input;
-pub mod sound;
+pub mod math;
 pub mod rnd;
+pub mod string;
+pub mod table;
+pub mod coroutine;
+pub mod memory;
+pub mod input;
+pub mod gfx;
+pub mod drawing;
+pub mod print;
+pub mod sound;
 
 use p8rs_piccolo::Context;
 
-pub fn install_pico8_apis(ctx: Context) {
-	base::install_pico8_base(ctx);
-	input::install_pico8_input(ctx);
-	math::install_pico8_math(ctx);
-	gfx::install_pico8_gfx(ctx);
-	drawing::install_pico8_drawing(ctx);
-	print::install_pico8_print(ctx);
-	memory::install_pico8_memory(ctx);
-	string::install_pico8_string(ctx);
-	table::install_pico8_table(ctx);
-	sound::install_pico8_sound(ctx);
-	rnd::install_pico8_rnd(ctx);
-	internal::install_pico8_internal(ctx);
+pub fn load_all(ctx: Context) {
+	base::load(ctx);
+	internal::load(ctx);
+	math::load(ctx);
+	rnd::load(ctx);
+	string::load(ctx);
+	table::load(ctx);
+	coroutine::load(ctx);
+	memory::load(ctx);
+	input::load(ctx);
+	gfx::load(ctx);
+	drawing::load(ctx);
+	print::load(ctx);
+	sound::load(ctx);
 }

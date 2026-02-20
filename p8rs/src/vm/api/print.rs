@@ -10,10 +10,10 @@ use crate::vm::memory::Memory;
 use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
-pub fn install_pico8_print(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
 		let rt = rt.downcast::<Runtime>();
-		let (text, mut x, y, mut col): (Value, Option<P8Num>, Option<P8Num>, Option<P8Num>) = stack.consume(ctx).unwrap();
+		let (text, mut x, y, mut col): (Option<Value>, Option<P8Num>, Option<P8Num>, Option<P8Num>) = stack.consume(ctx).unwrap();
 		if y.is_none() {
 			col = x;
 			x = None;
@@ -25,16 +25,7 @@ pub fn install_pico8_print(ctx: Context) {
 		}
 		if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
 		
-		let text = if let Value::String(text) = text {
-			text
-		} else {
-			if let Some(Value::String(str)) = super::base::tostr(ctx, text, None)? {
-				str
-			} else {
-				debug!("[print] Could not convert value to string when printing!");
-				String::from_static(ctx.mutation(), "")
-			}
-		};
+		let text = super::base::tostr(ctx, text, None);
 		
 		trace!("[print] {}", text);
 		

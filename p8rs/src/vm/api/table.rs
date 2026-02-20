@@ -1,7 +1,7 @@
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Table, Stack, Value};
 
-pub fn install_pico8_table(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("pack", pack::callback(ctx));
 	ctx.set_global("unpack", unpack::callback(ctx));
 	ctx.set_global("count", count::callback(ctx));

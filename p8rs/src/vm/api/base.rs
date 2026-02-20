@@ -7,7 +7,7 @@ use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
-pub fn install_pico8_base(ctx: Context) {
+pub fn load(ctx: Context) {
 	// implements: assert, type, select, rawget, rawset,
 	//             getmetatable, setmetatable, next, pairs, ipairs
 	// extra functions: tostring, error, pcall, collectgarbage
@@ -24,7 +24,7 @@ pub fn install_pico8_base(ctx: Context) {
 	ctx.set_global("setmetatable", setmetatable::callback(ctx));
 	ctx.set_global("trace", trace::callback(ctx));
 	ctx.set_global("stat", stat::callback(ctx));
-	ctx.set_global("type", type_of::callback(ctx));
+	ctx.set_global("type", r#type::callback(ctx));
 	ctx.set_global("tostr", tostr::callback(ctx));
 	ctx.set_global("tonum", tonum::callback(ctx));
 	ctx.set_global("printh", printh::callback(ctx));
@@ -138,8 +138,8 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, 
 }
 
 #[api_callback]
-pub fn type_of<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
-	Ok(Some(match val {
+pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<Value<'gc>> {
+	val.map(|val| match val {
 		Value::Nil => "nil".into_value(ctx),
 		Value::Boolean(_) => "boolean".into_value(ctx),
 		Value::Number(_) => "number".into_value(ctx),
@@ -148,39 +148,44 @@ pub fn type_of<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Result<Option<Value<'
 		Value::Function(_) => "function".into_value(ctx),
 		Value::Thread(_) => "thread".into_value(ctx),
 		Value::UserData(_) => "userdata".into_value(ctx),
-	}))
+	})
 }
 
 #[api_callback]
-pub fn tostr<'gc>(ctx: Context<'gc>, val: Value<'gc>, opts: Option<Value<'gc>>) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
+pub fn tostr<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>, opts: Option<Value<'gc>>) -> String<'gc> {
 	let flags = P8NumStringConversionFlags::from_bits_truncate(match opts {
 		Some(Value::Boolean(true)) => 1,
 		Some(Value::Number(num)) => num.to_integer() as u8,
 		_ => 0,
 	});
 	
-	let result = match val {
-		Value::Nil => "[nil]".into_value(ctx),
-		Value::Boolean(x) => if x { "true" } else { "false" }.into_value(ctx),
-		Value::Number(num) => String::from_slice(ctx.mutation(), num.to_str_fmt(flags).as_ref().as_bytes()).into_value(ctx),
-		Value::String(s) => s.into_value(ctx),
-		Value::Table(_) => "[table]".into_value(ctx),
-		Value::Function(_) => "[function]".into_value(ctx),
-		Value::Thread(_) => "[thread]".into_value(ctx),
-		Value::UserData(_) => "[userdata]".into_value(ctx),
-	};
+	match val {
+		None => String::from_static(&ctx, b""),
+		Some(Value::Nil) => String::from_static(&ctx, b"[nil]"),
+		Some(Value::Boolean(true)) => String::from_static(&ctx, b"true"),
+		Some(Value::Boolean(false)) => String::from_static(&ctx, b"false"),
+		Some(Value::Number(num)) => String::from_slice(&ctx, num.to_str_fmt(flags).as_ref().as_bytes()),
+		Some(Value::String(str)) => str,
+		Some(Value::Table(_)) => String::from_static(&ctx, b"[table]"),
+		Some(Value::Function(_)) => String::from_static(&ctx, b"[function]"),
+		Some(Value::Thread(_)) => String::from_static(&ctx, b"[thread]"),
+		Some(Value::UserData(_)) => String::from_static(&ctx, b"[userdata]"),
+	}
+}
+
+#[api_callback]
+pub fn tonum<'gc>(val: Value<'gc>, opts: Option<u8>) -> Option<P8Num> {
+	let Value::String(text) = val else { return None };
+	let flags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
 	
-	Ok(Some(result))
+	number_from_ascii(&text, flags).ok()
 }
 
 #[api_callback]
-pub fn tonum<'gc>(val: String, opts: Option<u8>) -> Option<Value<'gc>> {
-	let flags: NumberConversionFlags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
-	number_from_ascii(&val, flags).map(|x| Value::Number(x)).ok()
-}
-
-#[api_callback]
-pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
+pub fn printh<'gc>(ctx: Context<'gc>, rt: &mut Runtime, value: Option<Value<'gc>>, filename: Option<String<'gc>>, overwrite: Option<bool>, save_to_desktop: Option<bool>) {
+	if value.is_none() { return; }
+	
+	let text = tostr(ctx, value, None);
 	rt.callbacks().printh(&text, filename.as_deref(), overwrite, save_to_desktop);
 }
 
@@ -188,7 +193,3 @@ pub fn printh(rt: &mut Runtime, text: String, filename: Option<String>, overwrit
 pub fn time(rt: &mut Runtime) -> P8Num {
 	P8Num::from_raw(((rt.frame_no as i32 / 60) << 16) | ((rt.frame_no as i32 % 60 << 16) / 60))
 }
-
-
-
-

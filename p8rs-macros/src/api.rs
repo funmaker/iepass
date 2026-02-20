@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{Result, FnArg, Error, Type, PatType, Index, ReturnType, GenericParam, Ident};
+use syn::{Result, FnArg, Error, Type, PatType, Index, ReturnType, GenericParam, Ident, PathArguments, GenericArgument};
 use syn::spanned::Spanned;
 
 pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
@@ -30,23 +30,41 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 	
 	let mut args = None;
 	if free_count > 0 {
-		args = Some(quote!(
+		args = Some(quote! {
 			let args: (#free_ty) = stack.consume(ctx).map_err(|err| format!("[{}]: {}", stringify!(#name), err).into_value(ctx))?;
-		));
+		});
 	}
 	
 	let mut ret_try = None;
 	let mut write_stack = None;
+	let mut ret_value = quote! {
+		Ok(CallbackReturn::Return)
+	};
+	
 	if let ReturnType::Type(_, ty) = &func.sig.output {
 		write_stack = Some(quote! {
 			stack.replace(ctx, ret);
 		});
 		
-		if let Type::Path(path) = &**ty {
-			if path.path.segments.last().is_some_and(|segment| segment.ident == "Result") {
+		if let Type::Path(path) = &**ty
+		&& let Some(mut seg) = path.path.segments.last() {
+			if seg.ident == "Result" {
 				ret_try = Some(quote! {
 					let ret = ret?;
-				})
+				});
+				
+				if let PathArguments::AngleBracketed(args) = &seg.arguments
+				&& let Some(GenericArgument::Type(Type::Path(path))) = args.args.first()
+				&& let Some(inner) = path.path.segments.last() {
+					seg = inner;
+				}
+			}
+			
+			if seg.ident == "CallbackReturn" {
+				write_stack = None;
+				ret_value = quote! {
+					Ok(ret)
+				};
 			}
 		}
 	}
@@ -77,7 +95,7 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 					let ret = #name::<#generics_args>(#fn_args);
 					#ret_try
 					#write_stack
-					Ok(CallbackReturn::Return)
+					#ret_value
 				})
 			}
 		}

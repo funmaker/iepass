@@ -7,7 +7,7 @@ use crate::vm::memory::MemoryAccess;
 use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
 
-pub fn install_pico8_memory(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("peek", peek::callback(ctx));
 	ctx.set_global("peek2", peek2::callback(ctx));
 	ctx.set_global("peek4", peek4::callback(ctx));

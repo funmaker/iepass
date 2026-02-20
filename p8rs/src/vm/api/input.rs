@@ -3,7 +3,7 @@ use p8rs_piccolo::{Context, Value};
 
 use crate::vm::Runtime;
 
-pub fn install_pico8_input(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("btn", btn::callback(ctx));
 	ctx.set_global("btnp", btnp::callback(ctx));
 }

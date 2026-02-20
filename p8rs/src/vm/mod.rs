@@ -19,7 +19,7 @@ mod traceback;
 
 pub use runtime::Runtime;
 pub use callbacks::Callbacks;
-use api::install_pico8_apis;
+use api::load_all;
 use cart::CartLoadError;
 use traceback::write_traceback_entries;
 use crate::vm::memory::Memory;
@@ -50,7 +50,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 		let mut lua = Lua::empty();
 		
 		let fresh_globals = lua.enter(|ctx| {
-			install_pico8_apis(ctx);
+			load_all(ctx);
 			Ok(ctx.stash(shallow_copy_table(ctx.mutation(), ctx.globals())?))
 		})?;
 		

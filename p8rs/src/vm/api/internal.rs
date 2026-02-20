@@ -4,7 +4,7 @@ use p8rs_piccolo::{Callback, CallbackReturn, Context, Execution, IntoValue, Stri
 
 use crate::vm::Runtime;
 
-pub fn install_pico8_internal(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("_set_fps", _set_fps::callback(ctx));
 	
 	ctx.set_global("flip", Callback::from_fn(&ctx, |_, _, _, _| Ok(CallbackReturn::Yield { to_thread: None, then: None })));

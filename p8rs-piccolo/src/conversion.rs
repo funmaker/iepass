@@ -157,21 +157,38 @@ where
 }
 
 pub trait FromValue<'gc>: Sized {
+    const NILLABLE: bool = false;
+    
     fn from_value(ctx: Context<'gc>, value: Value<'gc>) -> Result<Self, TypeError>;
+    
+    fn from_value_option(ctx: Context<'gc>, value: Option<Value<'gc>>) -> Result<Self, TypeError> {
+        Self::from_value(ctx, value.unwrap_or(Value::Nil))
+    }
 }
 
 impl<'gc> FromValue<'gc> for Value<'gc> {
+    const NILLABLE: bool = true;
+    
     fn from_value(_: Context<'gc>, value: Value<'gc>) -> Result<Self, TypeError> {
         Ok(value)
     }
 }
 
 impl<'gc, T: FromValue<'gc>> FromValue<'gc> for Option<T> {
+    const NILLABLE: bool = T::NILLABLE;
+    
     fn from_value(ctx: Context<'gc>, value: Value<'gc>) -> Result<Self, TypeError> {
-        Ok(if value.is_nil() {
-            None
-        } else {
-            Some(T::from_value(ctx, value)?)
+        Ok(match value {
+            Value::Nil if !T::NILLABLE => None,
+            value => Some(T::from_value(ctx, value)?),
+        })
+    }
+    
+    fn from_value_option(ctx: Context<'gc>, value: Option<Value<'gc>>) -> Result<Self, TypeError> {
+        Ok(match value {
+            None => None,
+            Some(Value::Nil) if !T::NILLABLE => None,
+            value => Some(T::from_value_option(ctx, value)?),
         })
     }
 }
@@ -357,7 +374,7 @@ impl<'gc, T: FromValue<'gc>> FromMultiValue<'gc> for T {
         ctx: Context<'gc>,
         mut values: impl Iterator<Item = Value<'gc>>,
     ) -> Result<Self, TypeError> {
-        T::from_value(ctx, values.next().unwrap_or(Value::Nil))
+        T::from_value_option(ctx, values.next())
     }
 }
 
@@ -479,7 +496,7 @@ impl<'gc, I: FromValue<'gc>, const N: usize> FromMultiValue<'gc> for Variadic<[I
     ) -> Result<Self, TypeError> {
         let mut res: [Option<I>; N] = array::from_fn(|_| None);
         for i in 0..N {
-            res[i] = Some(I::from_value(ctx, values.next().unwrap_or(Value::Nil))?);
+            res[i] = Some(I::from_value_option(ctx, values.next())?);
         }
 
         Ok(Self(res.map(|v| v.unwrap())))

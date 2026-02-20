@@ -5,7 +5,7 @@ use p8rs_piccolo::{Context, Value};
 use p8rs_types::p8num::P8Num;
 use crate::vm::Runtime;
 
-pub fn install_pico8_rnd(ctx: Context) {
+pub fn load(ctx: Context) {
 	ctx.set_global("rnd", rnd::callback(ctx));
 	ctx.set_global("srand", srand::callback(ctx));
 }
