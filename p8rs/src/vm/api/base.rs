@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use anyhow::anyhow;
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Error, Execution, IntoValue, RuntimeError, Stack, String, Table, Value};
+use p8rs_piccolo::{Context, Error, Execution, Function, IntoValue, RuntimeError, Stack, String, Table, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
 use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
@@ -49,7 +49,7 @@ pub fn select<'gc>(ctx: Context<'gc>, stack: Stack<'gc, '_>) -> Result<Value<'gc
 		Ok((len as i16).into())
 	} else if let Some(count) = count.to_number() {
 		let int = count.to_integer() as usize;
-		if int < 0 || int >= len { Ok(Value::Nil) }
+		if int >= len { Ok(Value::Nil) }
 		else { Ok(stack.get(int + 1)) }
 	} else {
 		Err(ctx.intern_static(b"bad argument #0 to 'select'").into())
@@ -153,23 +153,41 @@ pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<Value<'
 
 #[api_callback]
 pub fn tostr<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>, opts: Option<Value<'gc>>) -> String<'gc> {
-	let flags = P8NumStringConversionFlags::from_bits_truncate(match opts {
-		Some(Value::Boolean(true)) => 1,
-		Some(Value::Number(num)) => num.to_integer() as u8,
-		_ => 0,
-	});
+	let pointers = !matches!(opts, None | Some(Value::Nil) | Some(Value::Boolean(false)));
+	let flags = match opts {
+		Some(Value::Boolean(true)) => P8NumStringConversionFlags::HEX,
+		Some(Value::Number(num)) => P8NumStringConversionFlags::from_bits_truncate(num.to_integer() as u8),
+		_ => P8NumStringConversionFlags::empty(),
+	};
+	
+	let Some(val) = val else {
+		return String::from_static(&ctx, b"")
+	};
+	
+	if pointers {
+		let with_pointer = match val {
+			Value::Function(Function::Closure(cls)) => Some(format!("function: {:p}", cls.into_inner())),
+			Value::Function(Function::Callback(clb)) => Some(format!("function: {:p}", clb.into_inner())),
+			Value::Table(tab) => Some(format!("table: {:p}", tab.into_inner())),
+			Value::UserData(ud) => Some(format!("userdata: {:p}", ud.into_inner())),
+			_ => None,
+		};
+		
+		if let Some(val) = with_pointer {
+			return String::from_buffer(&ctx, val.into_boxed_str().into_boxed_bytes());
+		}
+	}
 	
 	match val {
-		None => String::from_static(&ctx, b""),
-		Some(Value::Nil) => String::from_static(&ctx, b"[nil]"),
-		Some(Value::Boolean(true)) => String::from_static(&ctx, b"true"),
-		Some(Value::Boolean(false)) => String::from_static(&ctx, b"false"),
-		Some(Value::Number(num)) => String::from_slice(&ctx, num.to_str_fmt(flags).as_ref().as_bytes()),
-		Some(Value::String(str)) => str,
-		Some(Value::Table(_)) => String::from_static(&ctx, b"[table]"),
-		Some(Value::Function(_)) => String::from_static(&ctx, b"[function]"),
-		Some(Value::Thread(_)) => String::from_static(&ctx, b"[thread]"),
-		Some(Value::UserData(_)) => String::from_static(&ctx, b"[userdata]"),
+		Value::Nil => String::from_static(&ctx, b"[nil]"),
+		Value::Boolean(true) => String::from_static(&ctx, b"true"),
+		Value::Boolean(false) => String::from_static(&ctx, b"false"),
+		Value::Number(num) => String::from_slice(&ctx, num.to_str_fmt(flags).as_ref().as_bytes()),
+		Value::String(str) => str,
+		Value::Table(_) => String::from_static(&ctx, b"[table]"),
+		Value::Function(_) => String::from_static(&ctx, b"[function]"),
+		Value::Thread(_) => String::from_static(&ctx, b"[thread]"),
+		Value::UserData(_) => String::from_static(&ctx, b"[userdata]"),
 	}
 }
 

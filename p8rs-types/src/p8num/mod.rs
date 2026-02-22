@@ -244,38 +244,35 @@ impl P8Num {
 		use core::ascii::Char;
 		use core::fmt::Write;
 		
+		let mut value = *self;
+		if format_flags.is_empty() {
+			let fract = value.fract().to_raw() as u16;
+			
+			if fract <= 0x0006 || fract >= 0xFFFA {
+				value = value.round();
+			}
+			
+			if fract & 0x1FFF == 0x0800 {
+				value += P8Num::EPSILON * value.signum();
+			}
+		}
+		
+		let mut string = ArrayString::<23>::new_const();
+		
 		let is_hex = format_flags.contains(P8NumStringConversionFlags::HEX);
 		let is_i32 = format_flags.contains(P8NumStringConversionFlags::I32);
-		
-		let mut value = *self;
-		if !is_hex && !is_i32 && !(P8Num::from_raw(0x0000_0007) ..= P8Num::from_raw(0x0000_FFF9)).contains(&value.fract()) {
-			value = value.round();
+		match (is_hex, is_i32) {
+			(true, true) => write!(&mut string, "0x{:08x}", value.to_raw()).unwrap(),
+			(true, false) => write!(&mut string, "0x{:04x}.{:04x}", value.to_integer(), value.to_raw() & 0x0000_FFFF).unwrap(),
+			(false, true) => write!(&mut string, "{}", value.to_raw()).unwrap(),
+			(false, false) if self.is_negative() => write!(&mut string, "-{:.4}", f64::from(value).abs()).unwrap(),
+			(false, false) => write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap(),
 		}
 		
-		let mut string = ArrayString::<16>::new_const();
-		if self.is_negative() && !is_hex {
-			write!(&mut string, "-").unwrap();
-		}
-		if is_i32 {
-			if is_hex {
-				write!(&mut string, "0x{:08x}", value.to_raw()).unwrap();
-			} else {
-				write!(&mut string, "{}", value.to_raw()).unwrap();
-			}
-		} else {
-			if is_hex {
-				// write!(&mut string, "0x{:04x}.{:04x}", value.to_integer(), value.to_raw() & 0xFFFF).unwrap();
-				write!(&mut string, "0x{:04x}", value.to_integer()).unwrap();
-				write!(&mut string, ".{:04x}", value.to_raw() & 0xFFFF).unwrap();
-			} else {
-				write!(&mut string, "{:.4}", f64::from(value).abs()).unwrap();
-			}
-		}
+		let mut buffer = ArrayVec::<_, 11>::new_const();
+		buffer.extend(string.as_ascii().unwrap().iter().copied().take(buffer.capacity()));
 		
-		let mut buffer = ArrayVec::<_, 16>::new_const();
-		buffer.extend(string.as_ascii().unwrap().iter().copied());
-		
-		if !is_hex && !is_i32 {
+		if buffer.contains(&Char::FullStop) && !is_hex {
 			while let Some(Char::Digit0) = buffer.last() {
 				buffer.pop();
 			}

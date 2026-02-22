@@ -14,7 +14,7 @@ fn main() {
 	let error = matches.free.len() != 2;
 	
 	if help || error {
-		let brief = format!("Usage: rle-decode <input file> <output file> [Options...]");
+		let brief = "Usage: rle-decode <input file> <output file> [Options...]";
 		if error {
 			eprint!("{}", opts.usage(&brief));
 			process::exit(-1);

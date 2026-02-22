@@ -26,7 +26,7 @@ fn main() {
 	let error = matches.free.len() != 2;
 	
 	if help || error {
-		let brief = format!("Usage: font-gen assets/font.png p8rs/src/vm/font/generated.rs [Options...]");
+		let brief = "Usage: font-gen assets/font.png p8rs/src/vm/font/generated.rs [Options...]";
 		if error {
 			eprint!("{}", opts.usage(&brief));
 			process::exit(-1);

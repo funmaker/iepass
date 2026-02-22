@@ -46,7 +46,7 @@ fn main() {
 	let error = matches.free.len() != 2;
 	
 	if help || error {
-		let brief = format!("Usage: gif-gen p8rs-tests/tmp p8rs-tests/tmp/tests.gif [Options...]");
+		let brief = "Usage: gif-gen p8rs-tests/tmp p8rs-tests/tmp/tests.gif [Options...]";
 		if error {
 			eprint!("{}", opts.usage(&brief));
 			process::exit(-1);

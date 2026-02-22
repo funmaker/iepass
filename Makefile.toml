@@ -21,6 +21,14 @@ env.SCRIPT = "font-gen"
 extend = "script-rs"
 env.SCRIPT = "gif-gen"
 
+[tasks.numbers]
+extend = "script-rs"
+env.SCRIPT = "numbers"
+
+[tasks.plots]
+extend = "script-py"
+env.SCRIPT = "plots"
+
 [tasks.perf-probe-rs]
 extend = "script-rs"
 env.SCRIPT = "perf-probe-rs"
@@ -103,3 +111,7 @@ args = ["make", "clean", "${@}"]
 [tasks.script-rs]
 command = "cargo"
 args = ["run", "--package", "scripts", "--bin", "${SCRIPT}", "--", "${@}"]
+
+[tasks.script-py]
+command = "python"
+args = ["scripts/${SCRIPT}.py", "${@}"]

@@ -1,8 +1,13 @@
+import os
 import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
+
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
 
 y_columns = [
     'Sin', 'Cos',
@@ -37,8 +42,8 @@ def load_csv(path):
     
     return df
 
-pico8 = load_csv('../lua/pico8.csv')
-p8rs = load_csv('../lua/p8rs.csv')
+pico8 = load_csv('./data/pico8.csv')
+p8rs = load_csv('./data/p8rs.csv')
 
 fig, axes = plt.subplots(math.ceil(len(y_columns) / 2), 2, figsize=(15, 12))
 axes = axes.flatten()
