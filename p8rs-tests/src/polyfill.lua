@@ -129,12 +129,13 @@ do
 	end
 	
 	p8rs.test = function(name, ...)
-    local args = {...}
-    local tail = ""
-    for i = 1,#args do
-      if i > 1 then tail ..= " | " end
-      tail ..= stringify(args[i])
-    end
+		local argc = select("#", ...)
+		local args = {...}
+		local tail = ""
+		for i = 1,argc do
+			if i > 1 then tail ..= " | " end
+			tail ..= stringify(args[i])
+		end
 		printh("TEST | " .. name .. " | " .. tail)
 	end
 	

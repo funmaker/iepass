@@ -5,8 +5,12 @@ use crate::{
     Callback, Closure, Context, Function, String, Table, Thread, TypeError, UserData, Value,
 };
 
-pub trait IntoValue<'gc> {
+pub trait IntoValue<'gc>: Sized {
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc>;
+    
+    fn into_value_option(self, ctx: Context<'gc>) -> Option<Value<'gc>> {
+        Some(self.into_value(ctx))
+    }
 }
 
 macro_rules! impl_into {
@@ -106,6 +110,10 @@ impl<'gc, T: IntoValue<'gc>> IntoValue<'gc> for Option<T> {
             None => Value::Nil,
         }
     }
+    
+    fn into_value_option(self, ctx: Context<'gc>) -> Option<Value<'gc>> {
+        self.map(|val| val.into_value(ctx))
+    }
 }
 
 impl<'a, 'gc, T> IntoValue<'gc> for &'a Option<T>
@@ -180,7 +188,7 @@ impl<'gc, T: FromValue<'gc>> FromValue<'gc> for Option<T> {
     fn from_value(ctx: Context<'gc>, value: Value<'gc>) -> Result<Self, TypeError> {
         Ok(match value {
             Value::Nil if !T::NILLABLE => None,
-            value => Some(T::from_value(ctx, value)?),
+            value => T::from_value(ctx, value).ok(),
         })
     }
     
@@ -188,7 +196,7 @@ impl<'gc, T: FromValue<'gc>> FromValue<'gc> for Option<T> {
         Ok(match value {
             None => None,
             Some(Value::Nil) if !T::NILLABLE => None,
-            value => Some(T::from_value_option(ctx, value)?),
+            value => T::from_value_option(ctx, value).ok(),
         })
     }
 }
@@ -358,7 +366,7 @@ pub trait IntoMultiValue<'gc> {
 
 impl<'gc, T: IntoValue<'gc>> IntoMultiValue<'gc> for T {
     fn into_multi_value(self, ctx: Context<'gc>) -> impl Iterator<Item = Value<'gc>> {
-        iter::once(self.into_value(ctx))
+        self.into_value_option(ctx).into_iter()
     }
 }
 

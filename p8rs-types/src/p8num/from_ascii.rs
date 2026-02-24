@@ -1,14 +1,23 @@
 use super::{FromAsciiError, P8Num};
 
 pub fn from_ascii_dec(src: &[u8]) -> Result<P8Num, FromAsciiError> {
+	if src.is_empty() {
+		return Err(FromAsciiError::Empty);
+	}
+	
 	for char in src {
-		if !matches!(char, b'0'..=b'9' | b'-' | b'+' | b'.') {
+		if !matches!(char, b'0'..=b'9' | b'-' | b'+' | b'.' | b'e' | b'E') {
 			return Err(FromAsciiError::UnexpectedChar(*char));
 		}
 	}
 	
-	let float = src.as_ascii().unwrap().as_str().parse::<f64>().unwrap();
-	Ok(P8Num::new_f64(float))
+	let float = src.as_ascii().unwrap().as_str().parse::<f64>().map_err(|_| FromAsciiError::InvalidLiteral)?;
+	
+	if float >= 140737488355328.0 {
+		Ok(P8Num::ZERO)
+	} else {
+		Ok(P8Num::new_f64(float))
+	}
 }
 
 pub fn from_ascii_bin(src: &[u8]) -> Result<P8Num, FromAsciiError> {

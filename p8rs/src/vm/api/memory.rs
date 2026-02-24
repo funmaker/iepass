@@ -4,7 +4,6 @@ use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, IntoValue};
 use p8rs_types::p8num::P8Num;
 use crate::vm::memory::MemoryAccess;
-use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
@@ -65,11 +64,7 @@ pub fn poke<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc, 
 	} else {
 		for i in 0..count {
 			let addr = base.wrapping_add(i as u16);
-			let val = match stack.get(i) {
-				Value::Number(v) => v.to_integer() as u8,
-				Value::String(v) => number_from_ascii(v.as_bytes(), NumberConversionFlags::ZERO_ON_FAIL).unwrap().to_integer() as u8,
-				_ => 0,
-			};
+			let val = stack.get(i).to_number().unwrap_or(P8Num::ZERO).to_integer() as u8;
 			rt.memory.write(addr, val);
 		}
 	}
@@ -87,11 +82,7 @@ pub fn poke2<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc,
 	} else {
 		for i in 0..count {
 			let addr = base.wrapping_add((i*2) as u16);
-			let val = match stack.get(i) {
-				Value::Number(v) => v.to_integer(),
-				Value::String(v) => number_from_ascii(v.as_bytes(), NumberConversionFlags::ZERO_ON_FAIL).unwrap().to_integer(),
-				_ => 0,
-			};
+			let val = stack.get(i).to_number().unwrap_or(P8Num::ZERO).to_integer();
 			rt.memory.write(addr, val);
 		}
 	}
@@ -109,11 +100,7 @@ pub fn poke4<'gc, 'a>(rt: &mut Runtime, ctx: Context<'gc>, mut stack: Stack<'gc,
 	} else {
 		for i in 0..count {
 			let addr = base.wrapping_add((i*4) as u16);
-			let val = match stack.get(i) {
-				Value::Number(v) => v.to_raw(),
-				Value::String(v) => number_from_ascii(v.as_bytes(), NumberConversionFlags::ZERO_ON_FAIL).unwrap().to_raw(),
-				_ => 0,
-			};
+			let val = stack.get(i).to_number().unwrap_or(P8Num::ZERO).to_raw();
 			rt.memory.write(addr, val);
 		}
 	}

@@ -196,7 +196,7 @@ impl P8Num {
 			2 => from_ascii::from_ascii_bin(src),
 			10 => from_ascii::from_ascii_dec(src),
 			16 => from_ascii::from_ascii_hex(src),
-			_ => unreachable!(),
+			_ => unimplemented!(),
 		}
 	}
 	
@@ -2397,6 +2397,10 @@ pub enum TryFromError {
 pub enum FromAsciiError {
 	/// The string contains an unexpected character
 	UnexpectedChar(u8),
+	/// The string is empty
+	Empty,
+	/// The string is not a valid literal
+	InvalidLiteral,
 }
 
 bitflags! {

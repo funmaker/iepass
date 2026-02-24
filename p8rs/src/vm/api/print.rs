@@ -77,7 +77,7 @@ pub fn load(ctx: Context) {
 			y_provided: y.is_some(),
 			clipping: false,
 			drawn: false,
-			max_x: None,
+			max_pos: None,
 		})))
 	}));
 }
@@ -363,8 +363,8 @@ struct PrintSeq<'gc> {
 	drawn: bool,
 	/// was y-coord provided when calling print()
 	y_provided: bool,
-	/// maximum cursor x during printing - for return
-	max_x: Option<i16>,
+	/// maximum cursor pos during printing - for return
+	max_pos: Option<(i16, i16)>,
 }
 
 impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
@@ -396,13 +396,19 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 					self.drawn = true;
 				}
 				
-				let (w, _, x_wrapped) = draw_letter(ctx, rt, &self.state, char, self.y_provided, self.clipping);
+				let (w, h, x_wrapped) = draw_letter(ctx, rt, &self.state, char, self.y_provided, self.clipping);
 				
 				self.x_wrapped = x_wrapped;
 				
-				let x = rt.get_cursor_position()[0].overflowing_add(w).0;
+				let [x, y] = rt.get_cursor_position();
+				let x = x.wrapping_add(w);
+				let y = y.wrapping_add(h);
 				rt.set_cursor_x(x);
-				self.max_x = self.max_x.max(Some(x));
+				if let Some((old_x, old_y)) = self.max_pos {
+					self.max_pos = Some((old_x.max(x), old_y.max(y)));
+				} else {
+					self.max_pos = Some((x, y));
+				}
 			}
 			
 			let Some(part) = self.text.next() else { break };
@@ -439,7 +445,10 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			handle_newline(rt, NewlineRequest::PrintEndNewline, &self.state, self.y_provided);
 		}
 		
-		stack.replace(ctx, P8Num::from(self.max_x.unwrap_or(0)));
+		
+		let [_, cursor_y] = rt.get_cursor_position();
+		stack.replace(ctx, self.max_pos.unwrap_or((0, 0)));
+		
 		Ok(SequencePoll::Return)
 	}
 }

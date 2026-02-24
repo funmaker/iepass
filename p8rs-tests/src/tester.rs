@@ -89,8 +89,9 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 	}
 	
 	match (pico8.runtime_error, p8rs.runtime_error) {
-		(Some(pico8_err), None) => panic!("pico8 raised a runtime error, but p8rs did not.\n\tpico8 runtime error:\n\t\t{}\n\tp8rs runtime error:\n\t\tNone", pico8_err),
-		(None, Some(p8rs_err)) => panic!("p8rs raised a runtime error, but pico8 did not.\n\tpico8 runtime error:\n\t\tNone\n\tp8rs runtime error:\n\t\t{}", p8rs_err),
+		(Some(pico8_err), Some(p8rs_err)) => panic!("p8rs and pico8 raised a runtime error.\n\tpico8 runtime error:\n\t\t{pico8_err}\n\tp8rs runtime error:\n\t\t{p8rs_err}"),
+		(Some(pico8_err), None) => panic!("pico8 raised a runtime error, but p8rs did not.\n\tpico8 runtime error:\n\t\t{pico8_err}\n\tp8rs runtime error:\n\t\tNone"),
+		(None, Some(p8rs_err)) => panic!("p8rs raised a runtime error, but pico8 did not.\n\tpico8 runtime error:\n\t\tNone\n\tp8rs runtime error:\n\t\t{p8rs_err}"),
 		_ => {}
 	}
 	

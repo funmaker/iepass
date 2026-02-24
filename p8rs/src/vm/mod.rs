@@ -13,7 +13,6 @@ pub mod font;
 pub mod cart;
 pub mod runtime;
 pub mod callbacks;
-mod numeric;
 mod api;
 mod traceback;
 

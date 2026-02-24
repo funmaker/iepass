@@ -1,9 +1,8 @@
 use core::fmt::Write;
-use anyhow::anyhow;
+use bitflags::bitflags;
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Error, Execution, Function, IntoValue, RuntimeError, Stack, String, Table, Value};
+use p8rs_piccolo::{Context, Error, Execution, Function, RuntimeError, Stack, String, Table, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
-use crate::vm::numeric::{number_from_ascii, NumberConversionFlags};
 use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
@@ -35,7 +34,7 @@ pub fn load(ctx: Context) {
 #[api_callback]
 pub fn assert<'gc>(ctx: Context<'gc>, check: Value<'gc>, error: Option<Value<'gc>>) -> Result<Value<'gc>, Value<'gc>> {
 	match check {
-		Value::Nil | Value::Boolean(false) => Err(error.unwrap_or(ctx.intern_static(b"assertion failed!").into())),
+		Value::Nil | Value::Boolean(false) => Err(error.unwrap_or(String::from_static(&ctx, b"assertion failed!").into())),
 		value => Ok(value)
 	}
 }
@@ -43,16 +42,16 @@ pub fn assert<'gc>(ctx: Context<'gc>, check: Value<'gc>, error: Option<Value<'gc
 #[api_callback]
 pub fn select<'gc>(ctx: Context<'gc>, stack: Stack<'gc, '_>) -> Result<Value<'gc>, Value<'gc>> {
 	let len = stack.len() - 1;
-	let count = stack.get(0);
+	let pos = stack.get(0);
 	
-	if let Value::String(count) = count && count == "#" {
+	if let Value::String(pos) = pos && pos == "#" {
 		Ok((len as i16).into())
-	} else if let Some(count) = count.to_number() {
-		let int = count.to_integer() as usize;
+	} else if let Some(pos) = pos.to_number() {
+		let int = pos.to_integer() as usize;
 		if int >= len { Ok(Value::Nil) }
 		else { Ok(stack.get(int + 1)) }
 	} else {
-		Err(ctx.intern_static(b"bad argument #0 to 'select'").into())
+		Err(String::from_static(&ctx, b"bad argument #0 to 'select'").into())
 	}
 }
 
@@ -90,12 +89,11 @@ pub fn setmetatable<'gc>(ctx: Context<'gc>, table: Table<'gc>, metatable: Option
 #[api_callback]
 pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Value<'gc>, mut message: Value<'gc>, mut skip: Value<'gc>) -> Result<String<'gc>, RuntimeError<'gc>> {
 	if skip.is_nil() { // if up to 2 args passed, skip coroutine arg
-		skip = message;
-		message = coroutine;
-		coroutine = Value::Nil;
+		(coroutine, message, skip) = (Value::Nil, coroutine, message);
 	}
 	
-	let mut buf: alloc::string::String = alloc::string::String::new();
+	let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
+	let mut buf = alloc::string::String::new();
 	
 	if let Value::String(first_line) = message {
 		write!(&mut buf, "{}\n", first_line)?;
@@ -112,8 +110,6 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 		// always skip the last entry (p8_prelog.lua)
 		let entries = &entries[0..entries.len().saturating_sub(1)];
 		
-		let skip = if let Value::Number(skip) = skip { skip.to_integer() } else { 1 };
-		
 		if skip == 0 {
 			write!(&mut buf, "\t[C]: in function 'trace'\n")?;
 		}
@@ -121,7 +117,6 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 		if skip >= 0 {
 			write_traceback_entries(&mut buf, entries.iter().skip((skip as usize).saturating_sub(1)))?;
 		}
-		
 	}
 	
 	buf.pop(); // remove last newline
@@ -130,24 +125,27 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 }
 
 #[api_callback]
-pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> Result<Option<Value<'gc>>, RuntimeError<'gc>> {
-	Ok(match stat_cmd {
-		7 => { Some(Value::Number(P8Num::from(rt.target_fps.cast_signed()))) }
-		other => { return Err(anyhow!("stat({}) not implemented!", other).into())}
-	})
+pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> P8Num {
+	match stat_cmd {
+		7 => P8Num::from(rt.target_fps.cast_signed()),
+		other => {
+			rt.callbacks().printh(format!("[stat] {other} cmd not implemented.").as_bytes(), None, None, None);
+			P8Num::ZERO
+		}
+	}
 }
 
 #[api_callback]
-pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<Value<'gc>> {
+pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<String<'gc>> {
 	val.map(|val| match val {
-		Value::Nil => "nil".into_value(ctx),
-		Value::Boolean(_) => "boolean".into_value(ctx),
-		Value::Number(_) => "number".into_value(ctx),
-		Value::String(_) => "string".into_value(ctx),
-		Value::Table(_) => "table".into_value(ctx),
-		Value::Function(_) => "function".into_value(ctx),
-		Value::Thread(_) => "thread".into_value(ctx),
-		Value::UserData(_) => "userdata".into_value(ctx),
+		Value::Nil => String::from_static(&ctx, b"nil"),
+		Value::Boolean(_) => String::from_static(&ctx, b"boolean"),
+		Value::Number(_) => String::from_static(&ctx, b"number"),
+		Value::String(_) => String::from_static(&ctx, b"string"),
+		Value::Table(_) => String::from_static(&ctx, b"table"),
+		Value::Function(_) => String::from_static(&ctx, b"function"),
+		Value::Thread(_) => String::from_static(&ctx, b"thread"),
+		Value::UserData(_) => String::from_static(&ctx, b"userdata"),
 	})
 }
 
@@ -193,10 +191,77 @@ pub fn tostr<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>, opts: Option<Value
 
 #[api_callback]
 pub fn tonum<'gc>(val: Value<'gc>, opts: Option<u8>) -> Option<P8Num> {
-	let Value::String(text) = val else { return None };
+	let text = match val {
+		Value::Boolean(false) => b"0",
+		Value::Boolean(true) => b"1",
+		Value::String(str) => str.as_bytes(),
+		Value::Number(num) => return Some(num),
+		_ => return None,
+	};
+	
 	let flags = NumberConversionFlags::from_bits_truncate(opts.unwrap_or(0));
 	
-	number_from_ascii(&text, flags).ok()
+	if flags.contains(NumberConversionFlags::FORCE_HEX) {
+		let mut num = 0_u32;
+		
+		for char in text {
+			num = num.wrapping_shl(4);
+			
+			match char {
+				b'0'..=b'9' => num = num.wrapping_add((char - b'0') as _),
+				b'a'..=b'f' => num = num.wrapping_add((char - b'a' + 10) as _),
+				b'A'..=b'F' => num = num.wrapping_add((char - b'A' + 10) as _),
+				_ => continue,
+			}
+		}
+		
+		if !flags.contains(NumberConversionFlags::SHIFT_16) {
+			num = num.wrapping_shl(16);
+		}
+		
+		Some(P8Num::from_raw(num.cast_signed()))
+	} else if flags.contains(NumberConversionFlags::SHIFT_16) {
+		let mut num = 0_u32;
+		
+		let (text, negative) = match text {
+			[b'-', rest @ ..] => (rest, true),
+			[b'+', rest @ ..] => (rest, false),
+			[rest @ ..] => (rest, false),
+		};
+		
+		for char in text {
+			match char {
+				b'0'..=b'9' => {
+					num = num.wrapping_mul(10);
+					num = num.wrapping_add((char - b'0') as _);
+				}, 
+				_ => break,
+			}
+		}
+		
+		let num = P8Num::from_raw(num.cast_signed());
+		
+		Some(if negative { -num } else { num })
+	} else {
+		let (text, negative) = match text {
+			[b'-', rest @ ..] => (rest, true),
+			[b'+', rest @ ..] => (rest, false),
+			[rest @ ..] => (rest, false),
+		};
+		
+		let res = match text {
+			[b'0', b'x' | b'X', text @ ..] => P8Num::from_ascii_radix(text, 16),
+			[b'0', b'b' | b'B', text @ ..] => P8Num::from_ascii_radix(text, 2),
+			text => P8Num::from_ascii_radix(text, 10),
+		};
+		
+		if res.is_err() && flags.contains(NumberConversionFlags::ZERO_ON_FAIL) {
+			Some(P8Num::ZERO)
+		} else {
+			res.ok()
+			   .map(|num| if negative { -num } else { num })
+		}
+	}
 }
 
 #[api_callback]
@@ -211,3 +276,19 @@ pub fn printh<'gc>(ctx: Context<'gc>, rt: &mut Runtime, value: Option<Value<'gc>
 pub fn time(rt: &mut Runtime) -> P8Num {
 	P8Num::from_raw(((rt.frame_no as i32 / 60) << 16) | ((rt.frame_no as i32 % 60 << 16) / 60))
 }
+
+bitflags! {
+    pub struct NumberConversionFlags: u8 {
+		/// Read using hexadecimal notation, without requiring the "0x" prefix.
+		/// Note: Non-hexadecimal characters, including '.' and '-', are taken to be '0'.
+        const FORCE_HEX    = 1 << 0;
+		
+		/// Shift the value right 16 bits to create a 16.16 fixed-point number.
+		/// This works with all formats, even booleans: true becomes 0x.0001.
+        const SHIFT_16     = 1 << 1;
+		
+		/// When value cannot be converted to a number, return 0 instead of nothing.
+        const ZERO_ON_FAIL = 1 << 2;
+    }
+}
+

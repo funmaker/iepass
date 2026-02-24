@@ -281,7 +281,8 @@ fn draw_step(framebuffer: &mut [u8], cell_x: usize, cell_y: usize, stride: usize
 		Some(Log::SCR(_, scr_pal, pixels)) => {
 			cache.print_scr(*scr_pal, pixels.as_flattened().try_into().unwrap());
 		},
-		Some(Log::TEST(_, text)) => {
+		Some(Log::TEST(_, text)) |
+		Some(Log::OTHER(text)) => {
 			cache.print_str(7, 0, text);
 		},
 		Some(Log::MEM(_, offset, memory)) => {
