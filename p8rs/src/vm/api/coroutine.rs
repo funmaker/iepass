@@ -1,4 +1,4 @@
-use std::pin::Pin;
+use core::pin::Pin;
 use gc_arena::Collect;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{meta_ops, BoxSequence, CallbackReturn, Context, Error, Execution, RuntimeRef, Sequence, SequencePoll, Stack, Thread, ThreadMode, Value};

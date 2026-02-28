@@ -99,7 +99,7 @@ args = ["build", "${@}"]
 [tasks.clean]
 dependencies = ["clean-assets"]
 command = "git"
-args = ["clean", "-Xdff", "--exclude=.idea", "${@}"]
+args = ["clean", "-Xdff", "--exclude=!.idea", "${@}"]
 
 [tasks.clean-assets]
 cwd = "./assets"

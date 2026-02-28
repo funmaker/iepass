@@ -44,8 +44,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(spawner: Spawner) {
     let channels = rtt_target::rtt_init! {
         up: {
-            0: { size: 4096, mode: ChannelMode::BlockIfFull, name: "defmt" }
-            // 1: { size: 4096, name: "perf" }
+            0: { size: 4096, name: "defmt" }
+            1: { size: 4096, mode: ChannelMode::BlockIfFull, name: "perf" }
         }
         down: {
             0: { size: 1024, name: "stdin" }
@@ -53,7 +53,7 @@ async fn main(spawner: Spawner) {
     };
     
     rtt_target::set_defmt_channel(channels.up.0);
-    // perf::set_channel(channels.up.1);
+    utils::perf::set_channel(channels.up.1);
     
     try_main(spawner).perf_trace("Main Task")
                      .await
@@ -204,11 +204,13 @@ async fn try_main(spawner: Spawner) -> Result<!> {
         
         let mut fb = fbs.get_empty().await;
         fb.fill(Color::BLACK);
-        let screen = runtime.memory.screen();
-        let pixels = screen.iter()
-                           .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
-                           .flatten()
-                           .enumerate();
+        let pixels = runtime.memory
+                            .screen()
+                            .as_slice(&runtime.memory)
+                            .iter()
+                            .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
+                            .flatten()
+                            .enumerate();
         for (id, pixel) in pixels {
             let x = id % 128;
             let y = id / 128;

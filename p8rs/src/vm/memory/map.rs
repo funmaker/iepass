@@ -23,7 +23,7 @@ impl Map {
 			0x1000..0x2000 => MapOffset::Lower(base - 0x1000),
 			0x2000..0x3000 => MapOffset::Upper(base - 0x2000),
 			0x8000.. => MapOffset::Extended(base - 0x8000),
-			_ => panic!("Invalid map base offset 0x{base:04X}. Should be 0x1000..=0x2FFF or 0x8000..=0xFFFF"),
+			_ => panic!("Invalid map base offset 0x{:04X}. Should be 0x1000..=0x2FFF or 0x8000..=0xFFFF", base),
 		};
 		
 		let width = match *memory.machine_state().map_width() {

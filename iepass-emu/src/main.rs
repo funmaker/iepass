@@ -165,7 +165,7 @@ impl eframe::App for EmulatorApp {
 				
 				self.fb_tex.set(self.fb_pool.from_iter(
 					memory.screen()
-					      .as_slice_mut(memory)
+					      .as_slice(memory)
 					      .iter()
 					      .map(|byte| [map_color(*byte & 0x0F), map_color(*byte >> 4)])
 					      .flatten()

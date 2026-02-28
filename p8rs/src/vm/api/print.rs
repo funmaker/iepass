@@ -445,8 +445,6 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 			handle_newline(rt, NewlineRequest::PrintEndNewline, &self.state, self.y_provided);
 		}
 		
-		
-		let [_, cursor_y] = rt.get_cursor_position();
 		stack.replace(ctx, self.max_pos.unwrap_or((0, 0)));
 		
 		Ok(SequencePoll::Return)

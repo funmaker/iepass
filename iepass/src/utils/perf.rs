@@ -38,7 +38,7 @@ pub fn dump_perf() -> Result<(), core::fmt::Error> {
 			None => {
 				let mut output = String::with_capacity(PERF_SIZE * 30);
 				PerfInner::write_entries(entries, &mut output)?;
-				defmt::println!("[PERF ] {}", output);
+				defmt::println!("[perf ] {}", output);
 			},
 		};
 		

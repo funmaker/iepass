@@ -1,4 +1,5 @@
 #![feature(mpmc_channel)]
+#![feature(trim_prefix_suffix)]
 
 use std::process::{Child, exit};
 use std::sync::mpsc;

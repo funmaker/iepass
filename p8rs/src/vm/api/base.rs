@@ -1,4 +1,5 @@
 use core::fmt::Write;
+use alloc::format;
 use bitflags::bitflags;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Error, Execution, Function, RuntimeError, Stack, String, Table, Value};
