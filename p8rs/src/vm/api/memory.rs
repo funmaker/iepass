@@ -7,12 +7,12 @@ use crate::vm::memory::MemoryAccess;
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("peek", peek::callback(ctx));
-	ctx.set_global("peek2", peek2::callback(ctx));
-	ctx.set_global("peek4", peek4::callback(ctx));
-	ctx.set_global("poke", poke::callback(ctx));
-	ctx.set_global("poke2", poke2::callback(ctx));
-	ctx.set_global("poke4", poke4::callback(ctx));
+	ctx.set_global(b"peek", peek::callback(ctx));
+	ctx.set_global(b"peek2", peek2::callback(ctx));
+	ctx.set_global(b"peek4", peek4::callback(ctx));
+	ctx.set_global(b"poke", poke::callback(ctx));
+	ctx.set_global(b"poke2", poke2::callback(ctx));
+	ctx.set_global(b"poke4", poke4::callback(ctx));
 }
 
 /// Inclusive range, end >= start.

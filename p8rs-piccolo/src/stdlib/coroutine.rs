@@ -7,7 +7,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "create",
+        b"create",
         Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             let thread = Thread::new(ctx);
             thread
@@ -20,7 +20,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "resume",
+        b"resume",
         Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             let thread: Thread = stack.from_front(ctx)?;
             Ok(CallbackReturn::Resume {
@@ -32,7 +32,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "continue",
+        b"continue",
         Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             let thread: Thread = stack.from_front(ctx)?;
             Ok(CallbackReturn::Resume { thread, then: None })
@@ -41,7 +41,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "status",
+        b"status",
         Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             let thread: Thread = stack.consume(ctx)?;
             stack.replace(
@@ -59,7 +59,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "yield",
+        b"yield",
         Callback::from_fn(&ctx, |_, _, _, _| {
             Ok(CallbackReturn::Yield {
                 to_thread: None,
@@ -70,7 +70,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "yieldto",
+        b"yieldto",
         Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             let thread: Thread = stack.from_front(ctx)?;
             Ok(CallbackReturn::Yield {
@@ -82,7 +82,7 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
 
     coroutine.set_field(
         ctx,
-        "running",
+        b"running",
         Callback::from_fn(&ctx, |ctx, exec, mut stack, _| {
             let current_thread = exec.current_thread();
             stack.replace(ctx, (current_thread.thread, current_thread.is_main));
@@ -90,5 +90,5 @@ pub fn load_coroutine<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    ctx.set_global("coroutine", coroutine);
+    ctx.set_global(b"coroutine", coroutine);
 }

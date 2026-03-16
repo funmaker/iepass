@@ -8,28 +8,23 @@ use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
 pub fn load(ctx: Context) {
-	// implements: assert, type, select, rawget, rawset,
-	//             getmetatable, setmetatable, next, pairs, ipairs
-	// extra functions: tostring, error, pcall, collectgarbage
-	// TODO: Remove
-	p8rs_piccolo::stdlib::load_base(ctx);
-	p8rs_piccolo::stdlib::load_table(ctx);
-	
-	ctx.set_global("assert", assert::callback(ctx));
-	ctx.set_global("select", select::callback(ctx));
-	ctx.set_global("rawget", rawget::callback(ctx));
-	ctx.set_global("rawlen", rawlen::callback(ctx));
-	ctx.set_global("rawset", rawset::callback(ctx));
-	ctx.set_global("getmetatable", getmetatable::callback(ctx));
-	ctx.set_global("setmetatable", setmetatable::callback(ctx));
-	ctx.set_global("trace", trace::callback(ctx));
-	ctx.set_global("stat", stat::callback(ctx));
-	ctx.set_global("type", r#type::callback(ctx));
-	ctx.set_global("tostr", tostr::callback(ctx));
-	ctx.set_global("tonum", tonum::callback(ctx));
-	ctx.set_global("printh", printh::callback(ctx));
-	ctx.set_global("time", time::callback(ctx));
-	ctx.set_global("t", time::callback(ctx));
+	ctx.set_global(b"assert", assert::callback(ctx));
+	ctx.set_global(b"select", select::callback(ctx));
+	ctx.set_global(b"rawget", rawget::callback(ctx));
+	ctx.set_global(b"rawlen", rawlen::callback(ctx));
+	ctx.set_global(b"rawset", rawset::callback(ctx));
+	ctx.set_global(b"rawequal", rawequal::callback(ctx));
+	ctx.set_global(b"getmetatable", getmetatable::callback(ctx));
+	ctx.set_global(b"setmetatable", setmetatable::callback(ctx));
+	ctx.set_global(b"trace", trace::callback(ctx));
+	ctx.set_global(b"stat", stat::callback(ctx));
+	ctx.set_global(b"type", r#type::callback(ctx));
+	ctx.set_global(b"tostring", tostring::callback(ctx));
+	ctx.set_global(b"tostr", tostr::callback(ctx));
+	ctx.set_global(b"tonum", tonum::callback(ctx));
+	ctx.set_global(b"printh", printh::callback(ctx));
+	ctx.set_global(b"time", time::callback(ctx));
+	ctx.set_global(b"t", time::callback(ctx));
 }
 
 #[api_callback]
@@ -74,6 +69,21 @@ pub fn rawlen<'gc>(ctx: Context<'gc>, value: Value<'gc>) -> Result<i16, Value<'g
 pub fn rawset<'gc>(ctx: Context<'gc>, table: Table<'gc>, key: Value<'gc>, value: Value<'gc>) -> Result<Value<'gc>, Error<'gc>> {
 	table.set(ctx, key, value)?;
 	Ok(table.into())
+}
+
+#[api_callback]
+pub fn rawequal<'gc>(lhs: Value<'gc>, rhs: Value<'gc>) -> bool {
+	match (lhs, rhs) {
+		(Value::Nil, Value::Nil) => true,
+		(Value::Boolean(a), Value::Boolean(b)) => a == b,
+		(Value::Number(a), Value::Number(b)) => a == b,
+		(Value::String(a), Value::String(b)) => a == b,
+		(Value::Function(a), Value::Function(b)) => a == b,
+		(Value::Thread(a), Value::Thread(b)) => a == b,
+		(Value::Table(a), Value::Table(b)) => a == b,
+		(Value::UserData(a), Value::UserData(b)) => a == b,
+		_ => false
+	}
 }
 
 #[api_callback]
@@ -129,6 +139,7 @@ pub fn trace<'gc>(ex: Execution<'gc, '_>, ctx: Context<'gc>, mut coroutine: Valu
 pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> P8Num {
 	match stat_cmd {
 		7 => P8Num::from(rt.target_fps.cast_signed()),
+		11 => P8Num::ONE,
 		other => {
 			rt.callbacks().printh(format!("[stat] {other} cmd not implemented.").as_bytes(), None, None, None);
 			P8Num::ZERO
@@ -147,6 +158,24 @@ pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<String<
 		Value::Function(_) => String::from_static(&ctx, b"function"),
 		Value::Thread(_) => String::from_static(&ctx, b"thread"),
 		Value::UserData(_) => String::from_static(&ctx, b"userdata"),
+	})
+}
+
+#[api_callback]
+pub fn tostring<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Result<String<'gc>, Value<'gc>> {
+	let val = val.ok_or_else(|| String::from_static(&ctx, "bad argument #0 to 'tostring' (value expected)"))?;
+	
+	Ok(match val {
+		Value::Nil => String::from_static(&ctx, b"nil"),
+		Value::Boolean(true) => String::from_static(&ctx, b"true"),
+		Value::Boolean(false) => String::from_static(&ctx, b"false"),
+		Value::Number(num) => String::from_slice(&ctx, num.to_str_fmt(P8NumStringConversionFlags::empty()).as_ref().as_bytes()),
+		Value::String(str) => str,
+		Value::Function(Function::Closure(cls)) => String::from_buffer(&ctx, format!("function: {:p}", cls.into_inner()).into_boxed_str().into_boxed_bytes()),
+		Value::Function(Function::Callback(clb)) => String::from_buffer(&ctx, format!("function: {:p}", clb.into_inner()).into_boxed_str().into_boxed_bytes()),
+		Value::Thread(thread) => String::from_buffer(&ctx, format!("thread: {:p}", thread.into_inner()).into_boxed_str().into_boxed_bytes()),
+		Value::Table(tab) => String::from_buffer(&ctx, format!("table: {:p}", tab.into_inner()).into_boxed_str().into_boxed_bytes()),
+		Value::UserData(ud) => String::from_buffer(&ctx, format!("userdata: {:p}", ud.into_inner()).into_boxed_str().into_boxed_bytes()),
 	})
 }
 

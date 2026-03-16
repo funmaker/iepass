@@ -38,7 +38,7 @@ pub fn load_math<'gc>(ctx: Context<'gc>) {
         load_float(ctx, math);
     }
 
-    ctx.set_global("math", math);
+    ctx.set_global(b"math", math);
 }
 
 pub fn load_baseline<'gc>(ctx: Context<'gc>, math: Table<'gc>) {

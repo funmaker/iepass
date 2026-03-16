@@ -2,8 +2,8 @@ use p8rs_macros::api_callback;
 use p8rs_piccolo::{String, Context, RuntimeError, Stack, Value};
 
 pub fn load(ctx: Context) {
-	ctx.set_global("sub", sub::callback(ctx));
-	ctx.set_global("ord", ord::callback(ctx));
+	ctx.set_global(b"sub", sub::callback(ctx));
+	ctx.set_global(b"ord", ord::callback(ctx));
 }
 
 #[api_callback]

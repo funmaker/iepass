@@ -1,5 +1,6 @@
 pub mod base;
 pub mod internal;
+pub mod consts;
 pub mod math;
 pub mod rnd;
 pub mod string;
@@ -17,6 +18,7 @@ use p8rs_piccolo::Context;
 pub fn load_all(ctx: Context) {
 	base::load(ctx);
 	internal::load(ctx);
+	consts::load(ctx);
 	math::load(ctx);
 	rnd::load(ctx);
 	string::load(ctx);

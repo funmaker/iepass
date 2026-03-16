@@ -15,7 +15,7 @@ fn userdata() -> Result<(), Box<dyn Error>> {
             &ctx,
             MyUserData(Gc::new(&ctx, Lock::new(17))),
         );
-        ctx.set_global("userdata", userdata);
+        ctx.set_global(b"userdata", userdata);
         let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
             match stack[0] {
                 Value::UserData(ud) => {
@@ -28,7 +28,7 @@ fn userdata() -> Result<(), Box<dyn Error>> {
             stack.clear();
             Ok(CallbackReturn::Return)
         });
-        ctx.set_global("callback", callback);
+        ctx.set_global(b"callback", callback);
         Ok(())
     })?;
 

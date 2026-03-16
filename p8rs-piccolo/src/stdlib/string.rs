@@ -99,7 +99,7 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    ctx.set_global("string", string);
+    ctx.set_global(b"string", string);
 }
 
 fn sub(string: &[u8], i: i64, j: Option<i64>) -> Result<&[u8], core::num::TryFromIntError> {

@@ -6,8 +6,8 @@ use p8rs_types::p8num::P8Num;
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("rnd", rnd::callback(ctx));
-	ctx.set_global("srand", srand::callback(ctx));
+	ctx.set_global(b"rnd", rnd::callback(ctx));
+	ctx.set_global(b"srand", srand::callback(ctx));
 }
 
 #[api_callback]

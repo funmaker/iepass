@@ -9,14 +9,18 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 	let mut free_count = 0;
 	let mut free_ty = TokenStream::new();
 	let mut fn_args = TokenStream::new();
+	let mut uses_stack = false;
 	
 	for arg in func.sig.inputs.iter() {
 		match ArgKind::classify(arg)? {
 			ArgKind::Context => fn_args.extend(quote!( ctx, )),
 			ArgKind::Execution => fn_args.extend(quote!( exec.reborrow(), )),
-			ArgKind::Stack => fn_args.extend(quote!( stack.reborrow(), )),
 			ArgKind::RuntimeRef => fn_args.extend(quote!( rt.reborrow(), )),
 			ArgKind::RuntimeDowncast => fn_args.extend(quote!( rt.downcast(), )),
+			ArgKind::Stack => {
+				uses_stack = true;
+				fn_args.extend(quote!( stack.reborrow(), ))
+			},
 			ArgKind::Free(arg) => {
 				let ty = arg.ty;
 				let idx = Index::from(free_count);
@@ -31,7 +35,11 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 	let mut args = None;
 	if free_count > 0 {
 		args = Some(quote! {
-			let args: (#free_ty) = stack.consume(ctx).map_err(|err| format!("[{}]: {}", stringify!(#name), err).into_value(ctx))?;
+			let Ok(args) = stack.consume::<(#free_ty)>(ctx) else { return Ok(CallbackReturn::Return) };
+		});
+	} else if !uses_stack {
+		args = Some(quote! {
+			stack.clear();
 		});
 	}
 	

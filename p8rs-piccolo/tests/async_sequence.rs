@@ -31,7 +31,7 @@ fn async_sequence_works() -> Result<(), ExternError> {
             });
             Ok(CallbackReturn::Sequence(seq))
         });
-        ctx.set_global("callback", callback);
+        ctx.set_global(b"callback", callback);
         Ok(())
     })?;
 

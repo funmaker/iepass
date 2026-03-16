@@ -1384,6 +1384,7 @@ fn get_binary_operator<S>(token: &Token<S>) -> Option<BinaryOperator> {
         Token::BitAnd => Some(BinaryOperator::BitAnd),
         Token::BitOr => Some(BinaryOperator::BitOr),
         Token::BitNotXor => Some(BinaryOperator::BitXor),
+        Token::BitXor => Some(BinaryOperator::BitXor),
         Token::ShiftRightArithmetic => Some(BinaryOperator::ShiftRightArithmetic),
         Token::ShiftRightLogical => Some(BinaryOperator::ShiftRightLogical),
         Token::ShiftLeft => Some(BinaryOperator::ShiftLeft),

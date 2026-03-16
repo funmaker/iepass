@@ -5,10 +5,10 @@ use p8rs_piccolo::{meta_ops, BoxSequence, CallbackReturn, Context, Error, Execut
 use p8rs_piccolo::meta_ops::MetaCallError;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("cocreate", cocreate::callback(ctx));
-	ctx.set_global("coresume", coresume::callback(ctx));
-	ctx.set_global("costatus", costatus::callback(ctx));
-	ctx.set_global("yield", r#yield::callback(ctx));
+	ctx.set_global(b"cocreate", cocreate::callback(ctx));
+	ctx.set_global(b"coresume", coresume::callback(ctx));
+	ctx.set_global(b"costatus", costatus::callback(ctx));
+	ctx.set_global(b"yield", r#yield::callback(ctx));
 }
 
 #[api_callback]

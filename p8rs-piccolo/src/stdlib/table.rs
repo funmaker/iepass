@@ -10,7 +10,7 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
 
     table.set_field(
         ctx,
-        "pack",
+        b"pack",
         Callback::from_fn(&ctx, |ctx, _, stack, _| {
             Ok(CallbackReturn::Sequence(BoxSequence::new(
                 &ctx,
@@ -50,11 +50,11 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
     })
     .into();
 
-    table.set_field(ctx, "unpack", unpack.clone());
+    table.set_field(ctx, b"unpack", unpack.clone());
 
     table.set_field(
         ctx,
-        "concat",
+        b"concat",
         Callback::from_fn_with(&ctx, unpack, move |unpack, ctx, _exec, mut stack, _| {
             let sep = stack.remove(1).unwrap_or_default();
 
@@ -96,20 +96,20 @@ pub fn load_table<'gc>(ctx: Context<'gc>) {
         }),
     );
 
-    table.set_field(ctx, "remove", Callback::from_fn(&ctx, table_remove_impl));
+    table.set_field(ctx, b"remove", Callback::from_fn(&ctx, table_remove_impl));
 
-    table.set_field(ctx, "insert", Callback::from_fn(&ctx, table_insert_impl));
-    ctx.set_global("add", Callback::from_fn(&ctx, table_insert_impl)); // TODO: Move to p8rs
+    table.set_field(ctx, b"insert", Callback::from_fn(&ctx, table_insert_impl));
+    ctx.set_global(b"add", Callback::from_fn(&ctx, table_insert_impl)); // TODO: Move to p8rs
 
     let data = include_str!("table/sort.lua");
     let func = Closure::load(ctx, Some("table/sort.lua"), data.as_bytes()).unwrap();
-    table.set_field(ctx, "sort", func);
+    table.set_field(ctx, b"sort", func);
 
     let data = include_str!("table/move.lua");
     let func = Closure::load(ctx, Some("table/move.lua"), data.as_bytes()).unwrap();
-    table.set_field(ctx, "move", func);
+    table.set_field(ctx, b"move", func);
 
-    ctx.set_global("table", table);
+    ctx.set_global(b"table", table);
 }
 
 fn prep_metaop_call<'gc, const N: usize>(

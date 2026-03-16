@@ -1,6 +1,8 @@
 use alloc::{string::String as StdString, vec::Vec};
 use core::{array, iter, ops};
 use p8rs_types::p8num::P8Num;
+use p8rs_types::p8scii;
+use p8rs_types::p8scii::LossyIteratorEx;
 use crate::{
     Callback, Closure, Context, Function, String, Table, Thread, TypeError, UserData, Value,
 };
@@ -93,13 +95,19 @@ impl_copy_into!(
 
 impl<'gc> IntoValue<'gc> for &'static str {
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc> {
-        Value::String(ctx.intern_static(self.as_bytes()))
+        if self.bytes().all(|b| b >= b' ' && b <= b'~') {
+            Value::String(String::from_static(&ctx, self.as_bytes()))
+        } else {
+            let str = p8scii::from_str(self).lossy().collect();
+            Value::String(String::from_buffer(&ctx, str))
+        }
     }
 }
 
 impl<'gc> IntoValue<'gc> for StdString {
     fn into_value(self, ctx: Context<'gc>) -> Value<'gc> {
-        Value::String(ctx.intern(self.as_bytes()))
+        let str = p8scii::from_str(&self).lossy().collect();
+        Value::String(String::from_buffer(&ctx, str))
     }
 }
 

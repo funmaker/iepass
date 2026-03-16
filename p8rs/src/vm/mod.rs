@@ -86,53 +86,47 @@ impl<A: Allocator + 'static> P8rs<A> {
 	
 	pub fn run(&mut self) -> Result<RunResult, ExternError> {
 		loop {
-			match self.run_fuel(1024*1024)? {
+			match self.run_fuel(i32::MAX)? {
 				RunResult::OutOfFuel => continue,
 				result => return Ok(result),
 			}
 		}
 	}
 	
-	pub fn run_fuel(&mut self, mut max_fuel: i32) -> Result<RunResult, ExternError> {
-		if max_fuel < 1 {
-			warn!("run_fuel called with {} fuel, using 1 fuel", max_fuel);
-			max_fuel = 1;
-		}
+	pub fn run_fuel(&mut self, fuel: i32) -> Result<RunResult, ExternError> {
+		const FUEL_PER_GC: i32 = 4096;
 		
-		let mut fuel = Fuel::with(max_fuel);
-		let result = if let Some(executor) = self.executor.as_mut() {
-			self.lua.enter(|ctx| {
+		let Some(executor) = self.executor.as_mut() else {
+			return Err(RuntimeError::new(anyhow!("No cartridge loaded")).into())
+		};
+		
+		let mut remaining_fuel = fuel.max(1);
+		loop {
+			let mut fuel = Fuel::with(remaining_fuel.min(FUEL_PER_GC));
+			remaining_fuel -= fuel.remaining();
+			
+			let result = self.lua.try_enter(|ctx| {
 				let executor = ctx.fetch(executor);
+				if executor.mode() == ExecutorMode::Suspended {
+					executor.resume(ctx, ())?;
+				}
 				
-				loop {
-					if executor.mode() == ExecutorMode::Suspended {
-						executor.resume(ctx, ()).unwrap();
-					}
-					
-					self.runtime.start_frame();
-					
-					if !executor.step(ctx, &mut fuel, &mut *self.runtime).unwrap() {
-						if fuel.is_interrupted() {
-							trace!("[run_fuel] Execution interrupted, fuel: {:?}, executor: {:?}", fuel, executor.mode());
-							return Ok(RunResult::Stop)
-						} else {
-							trace!("[run_fuel] Out of fuel: {:?}", fuel);
-							return Ok(RunResult::OutOfFuel)
-						}
-					}
-					
+				let done = executor.step(ctx, &mut fuel, &mut *self.runtime)?;
+				
+				if self.runtime.stopped {
+					executor.stop(&ctx);
+					Ok(RunResult::Stop)
+				} else if fuel.is_interrupted() {
+					Ok(RunResult::Flip)
+				} else if !done {
+					Ok(RunResult::OutOfFuel)
+				} else {
 					match executor.mode() {
-						ExecutorMode::Normal => {
-							trace!("[run_fuel] mode Normal {:?}", fuel);
-							continue
-						},
-						ExecutorMode::Stopped => {
-							trace!("[run_fuel] mode Stopped, {:?}", fuel);
-							return Ok(RunResult::Stop)
-						},
+						ExecutorMode::Stopped => Ok(RunResult::Stop),
+						ExecutorMode::Suspended => Ok(RunResult::Flip),
 						ExecutorMode::Result => {
-							match executor.take_result::<Value>(ctx).unwrap() {
-								Ok(value) => trace!("[run_fuel] mode Result - Value: {:?}, fuel {:?}", value, fuel),
+							match executor.take_result::<Value>(ctx)? {
+								Ok(value) => warn!("Executor returned Value: {:?}", value),
 								Err(err) => {
 									match &err {
 										Error::Lua(e) => error!("[run_fuel] Uncaught lua error ({}): {}", e.0.type_name(), e.0.display()),
@@ -151,28 +145,24 @@ impl<A: Allocator + 'static> P8rs<A> {
 							}
 							
 							match executor.mode() {
-								ExecutorMode::Suspended => {
-									trace!("[run_fuel] Result -> Flip, {:?}", fuel);
-									return Ok(RunResult::Flip)
-								},
-								ExecutorMode::Stopped => {
-									trace!("[run_fuel] Result -> Stopped.");
-									return Ok(RunResult::Stop)
-								},
+								ExecutorMode::Suspended => Ok(RunResult::Flip),
+								ExecutorMode::Stopped => Ok(RunResult::Stop),
 								mode => panic!("Unexpected executor mode: Result -> {:?}", mode),
 							}
 						},
 						mode => panic!("Unexpected executor mode: {:?}", mode),
 					}
 				}
-			})
-		} else {
-			Err(RuntimeError::new(anyhow!("No cartridge loaded")).into())
-		};
-		
-		trace!("[run_fuel] Step finished {:?}", result);
-		
-		result
+			})?;
+			
+			remaining_fuel += fuel.remaining();
+			
+			if result == RunResult::OutOfFuel && remaining_fuel >= 0 {
+				continue
+			} else {
+				return Ok(result);
+			}
+		}
 	}
 	
 	pub fn runtime(&mut self) -> &mut Runtime {

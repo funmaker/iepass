@@ -40,7 +40,7 @@ fn error_tostring() -> Result<(), ExternError> {
 
     let executor = lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, _, _, _| Err(TestError.into()));
-        ctx.set_global("callback", callback);
+        ctx.set_global(b"callback", callback);
 
         let closure = Closure::load(
             ctx,

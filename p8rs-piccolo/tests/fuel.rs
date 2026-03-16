@@ -9,7 +9,7 @@ fn test_interrupt() -> Result<(), ExternError> {
             exec.fuel().interrupt();
             Ok(CallbackReturn::Return)
         });
-        ctx.set_global("callback", callback);
+        ctx.set_global(b"callback", callback);
         Ok(())
     })?;
 

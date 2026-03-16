@@ -1,9 +1,10 @@
 use core::pin::Pin;
 use core::ops::Not;
 use gc_arena::Collect;
-use p8rs_piccolo::{BoxSequence, Callback, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
+use p8rs_macros::api_callback;
+use p8rs_piccolo::{BoxSequence, CallbackReturn, Context, Error, Execution, RuntimeError, RuntimeRef, Sequence, SequencePoll, Stack, String, Value};
 use p8rs_types::p8num::P8Num;
-
+use crate::vm::api::base::tostr;
 use crate::vm::font::Font;
 use crate::vm::memory::machine_state::{MiscChipsetFeatureFlags, PrintDefaultsFlags};
 use crate::vm::memory::Memory;
@@ -11,75 +12,76 @@ use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("print", Callback::from_fn(&ctx, |ctx, _exec, mut stack, rt| {
-		let rt = rt.downcast::<Runtime>();
-		let (text, mut x, y, mut col): (Option<Value>, Option<P8Num>, Option<P8Num>, Option<P8Num>) = stack.consume(ctx).unwrap();
-		if y.is_none() {
-			col = x;
-			x = None;
+	ctx.set_global(b"print", print::callback(ctx));
+}
+
+#[api_callback]
+pub fn print<'gc>(ctx: Context<'gc>, rt: &mut Runtime, text: Option<Value<'gc>>, mut x: Option<P8Num>, y: Option<P8Num>, mut col: Option<P8Num>) -> CallbackReturn<'gc> {
+	if y.is_none() {
+		col = x;
+		x = None;
+	}
+	
+	if let Some((x, y)) = x.zip(y) {
+		rt.set_cursor_home(x.to_integer());
+		rt.set_cursor_position([x.to_integer(), y.to_integer()]);
+	}
+	if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
+	
+	let text = tostr(ctx, text, None);
+	
+	trace!("[print] {}", text);
+	
+	match TextEscapeIterator::new(text).last() {
+		None => { // empty string
+			// todo: return val
+			return CallbackReturn::Return;
 		}
-		
-		if let Some((x, y)) = x.zip(y) {
-			rt.set_cursor_home(x.to_integer());
-			rt.set_cursor_position([x.to_integer(), y.to_integer()]);
-		}
-		if let Some(col) = col { rt.memory.machine_state().set_pen_color(col); }
-		
-		let text = super::base::tostr(ctx, text, None);
-		
-		trace!("[print] {}", text);
-		
-		match TextEscapeIterator::new(text).last() {
-			None => { // empty string
+		Some(last_part) => {
+			if matches!(last_part, TextPart::UnterminatedEscapeSequence(_)) {
+				debug!("[print()] String contained unterminated escape sequence, discarding.");
 				// todo: return val
-				return Ok(CallbackReturn::Return);
+				return CallbackReturn::Return;
 			}
-			Some(last_part) => {
-				if matches!(last_part, TextPart::UnterminatedEscapeSequence(_)) {
-					debug!("[print()] String contained unterminated escape sequence, discarding.");
-					// todo: return val
-					return Ok(CallbackReturn::Return);
-				}
-			}
-		};
-		
-		let flags = *rt.memory.machine_state().print_defaults().flags();
-		
-		let flags_enabled = flags.contains(PrintDefaultsFlags::ENABLE);
-		let state = PrintState {
-			advance_x: 0,
-			advance_x_wide: 0,
-			advance_y: 0,
-			background_color: None,
-			padding:     flags_enabled && flags.contains(PrintDefaultsFlags::PADDING),
-			wide:        flags_enabled && flags.contains(PrintDefaultsFlags::WIDE),
-			tall:        flags_enabled && flags.contains(PrintDefaultsFlags::TALL),
-			solid_bg:    flags_enabled && flags.contains(PrintDefaultsFlags::SOLID_BG),
-			invert:      flags_enabled && flags.contains(PrintDefaultsFlags::INVERT),
-			dotty:       flags_enabled && flags.contains(PrintDefaultsFlags::DOTTY),
-			custom_font: flags_enabled && flags.contains(PrintDefaultsFlags::CUSTOM_FONT),
-			pinball: false,
-			wrap: rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP),
-		};
-		
-		if y.is_none() {
-			handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, &state, y.is_some());
 		}
-		
-		Ok(CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
-			skip_frames: 0,
-			letter_frame_skip: 0,
-			text: TextEscapeIterator::new(text),
-			next_char: None,
-			stopped: false,
-			state,
-			x_wrapped: false,
-			y_provided: y.is_some(),
-			clipping: false,
-			drawn: false,
-			max_pos: None,
-		})))
-	}));
+	};
+	
+	let flags = *rt.memory.machine_state().print_defaults().flags();
+	
+	let flags_enabled = flags.contains(PrintDefaultsFlags::ENABLE);
+	let state = PrintState {
+		advance_x: 0,
+		advance_x_wide: 0,
+		advance_y: 0,
+		background_color: None,
+		padding:     flags_enabled && flags.contains(PrintDefaultsFlags::PADDING),
+		wide:        flags_enabled && flags.contains(PrintDefaultsFlags::WIDE),
+		tall:        flags_enabled && flags.contains(PrintDefaultsFlags::TALL),
+		solid_bg:    flags_enabled && flags.contains(PrintDefaultsFlags::SOLID_BG),
+		invert:      flags_enabled && flags.contains(PrintDefaultsFlags::INVERT),
+		dotty:       flags_enabled && flags.contains(PrintDefaultsFlags::DOTTY),
+		custom_font: flags_enabled && flags.contains(PrintDefaultsFlags::CUSTOM_FONT),
+		pinball: false,
+		wrap: rt.memory.machine_state().misc_chipset_flags().contains(MiscChipsetFeatureFlags::PRINT_WRAP),
+	};
+	
+	if y.is_none() {
+		handle_newline(rt, NewlineRequest::MakeSpaceBeforePrint, &state, y.is_some());
+	}
+	
+	CallbackReturn::Sequence(BoxSequence::new(ctx.mutation(), PrintSeq {
+		skip_frames: 0,
+		letter_frame_skip: 0,
+		text: TextEscapeIterator::new(text),
+		next_char: None,
+		stopped: false,
+		state,
+		x_wrapped: false,
+		y_provided: y.is_some(),
+		clipping: false,
+		drawn: false,
+		max_pos: None,
+	}))
 }
 
 fn control_arg_to_number(arg: u8) -> Option<u8> {

@@ -16,6 +16,8 @@ pub struct Runtime {
 	pub memory: Memory,
 	pub cart_memory: [u8; 0x8000],
 	pub buttons: Buttons,
+	pub stopped: bool,
+	pub holdframe: bool,
 	pub target_fps: u16,
 	pub frame_no: u32,
 	#[cfg_attr(feature = "defmt", defmt(Debug2Format))]
@@ -48,9 +50,13 @@ impl Runtime {
 	
 	/// Should be called before every frame
 	pub(crate) fn start_frame(&mut self) {
-		let buttons = self.callbacks().get_buttons();
-		*self.memory.machine_state().btn_state() = buttons;
+		self.update_buttons();
 		
+		self.frame_no += if self.target_fps == 30 { 2 } else { 1 };
+	}
+	
+	/// Update buttons state
+	pub fn update_buttons(&mut self) {
 		let delay = match *self.memory.machine_state().btnp_rep_delay() {
 			BtnpRepDelay::DEFAULT => 15,
 			BtnpRepDelay::DISABLED => 0,
@@ -64,9 +70,9 @@ impl Runtime {
 		};
 		let interval = interval * self.target_fps as u32 / 30;
 		
+		let buttons = self.callbacks().get_buttons();
+		*self.memory.machine_state().btn_state() = buttons;
 		self.buttons.update(buttons, delay, interval);
-		
-		self.frame_no += if self.target_fps == 30 { 2 } else { 1 };
 	}
 	
 	/// Returns actual cursor position (memory only contains lower u8 of each coordinate)

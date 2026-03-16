@@ -16,7 +16,9 @@ struct RunnerCallback {
 impl vm::Callbacks for RunnerCallback {
 	fn printh(&mut self, text: &[u8], _filename: Option<&[u8]>, _overwrite: Option<bool>, _save_to_desktop: Option<bool>) {
 		let mut buffer = self.buffer.lock().unwrap();
-		*buffer += "INFO: ";
+		if cfg!(windows) {
+			*buffer += "INFO: ";
+		}
 		buffer.extend(p8scii::to_iter(text));
 		*buffer += "\n";
 	}

@@ -9,17 +9,17 @@ use crate::vm::memory::Memory;
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("rectfill", rectfill::callback(ctx));
-	ctx.set_global("rect", rect::callback(ctx));
-	ctx.set_global("circfill", circfill::callback(ctx));
-	ctx.set_global("circ", circ::callback(ctx));
-	ctx.set_global("ovalfill", ovalfill::callback(ctx));
-	ctx.set_global("oval", oval::callback(ctx));
-	ctx.set_global("line", line::callback(ctx));
-	ctx.set_global("spr", spr::callback(ctx));
-	ctx.set_global("sspr", sspr::callback(ctx));
-	ctx.set_global("map", map::callback(ctx));
-	ctx.set_global("mapdraw", map::callback(ctx));
+	ctx.set_global(b"rectfill", rectfill::callback(ctx));
+	ctx.set_global(b"rect", rect::callback(ctx));
+	ctx.set_global(b"circfill", circfill::callback(ctx));
+	ctx.set_global(b"circ", circ::callback(ctx));
+	ctx.set_global(b"ovalfill", ovalfill::callback(ctx));
+	ctx.set_global(b"oval", oval::callback(ctx));
+	ctx.set_global(b"line", line::callback(ctx));
+	ctx.set_global(b"spr", spr::callback(ctx));
+	ctx.set_global(b"sspr", sspr::callback(ctx));
+	ctx.set_global(b"map", map::callback(ctx));
+	ctx.set_global(b"mapdraw", map::callback(ctx));
 }
 
 #[api_callback]

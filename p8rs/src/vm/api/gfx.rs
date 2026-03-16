@@ -6,20 +6,20 @@ use crate::vm::memory::machine_state::{FillPatternFlags, FillPatternState, Palet
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("camera", camera::callback(ctx));
-	ctx.set_global("color", color::callback(ctx));
-	ctx.set_global("clip", clip::callback(ctx));
-	ctx.set_global("pal", pal::callback(ctx));
-	ctx.set_global("cls", cls::callback(ctx));
-	ctx.set_global("cursor", cursor::callback(ctx));
-	ctx.set_global("fillp", fillp::callback(ctx));
-	ctx.set_global("palt", palt::callback(ctx));
-	ctx.set_global("fset", fset::callback(ctx));
-	ctx.set_global("fget", fget::callback(ctx));
-	ctx.set_global("pset", pset::callback(ctx));
-	ctx.set_global("pget", pget::callback(ctx));
-	ctx.set_global("sset", sset::callback(ctx));
-	ctx.set_global("sget", sget::callback(ctx));
+	ctx.set_global(b"camera", camera::callback(ctx));
+	ctx.set_global(b"color", color::callback(ctx));
+	ctx.set_global(b"clip", clip::callback(ctx));
+	ctx.set_global(b"pal", pal::callback(ctx));
+	ctx.set_global(b"cls", cls::callback(ctx));
+	ctx.set_global(b"cursor", cursor::callback(ctx));
+	ctx.set_global(b"fillp", fillp::callback(ctx));
+	ctx.set_global(b"palt", palt::callback(ctx));
+	ctx.set_global(b"fset", fset::callback(ctx));
+	ctx.set_global(b"fget", fget::callback(ctx));
+	ctx.set_global(b"pset", pset::callback(ctx));
+	ctx.set_global(b"pget", pget::callback(ctx));
+	ctx.set_global(b"sset", sset::callback(ctx));
+	ctx.set_global(b"sget", sget::callback(ctx));
 }
 
 #[api_callback]

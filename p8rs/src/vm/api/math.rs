@@ -5,26 +5,26 @@ use p8rs_macros::api_callback;
 use crate::vm::P8Num;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("band", band::callback(ctx));
-	ctx.set_global("bnot", bnot::callback(ctx));
-	ctx.set_global("bor", bor::callback(ctx));
-	ctx.set_global("bxor", bxor::callback(ctx));
-	ctx.set_global("ceil", ceil::callback(ctx));
-	ctx.set_global("flr", flr::callback(ctx));
-	ctx.set_global("abs", abs::callback(ctx));
-	ctx.set_global("lshr", lshr::callback(ctx));
-	ctx.set_global("max", max::callback(ctx));
-	ctx.set_global("mid", mid::callback(ctx));
-	ctx.set_global("min", min::callback(ctx));
-	ctx.set_global("rotl", rotl::callback(ctx));
-	ctx.set_global("rotr", rotr::callback(ctx));
-	ctx.set_global("sgn", sgn::callback(ctx));
-	ctx.set_global("shl", shl::callback(ctx));
-	ctx.set_global("shr", shr::callback(ctx));
-	ctx.set_global("sin", sin::callback(ctx));
-	ctx.set_global("cos", cos::callback(ctx));
-	ctx.set_global("atan2", atan2::callback(ctx));
-	ctx.set_global("sqrt", sqrt::callback(ctx));
+	ctx.set_global(b"band", band::callback(ctx));
+	ctx.set_global(b"bnot", bnot::callback(ctx));
+	ctx.set_global(b"bor", bor::callback(ctx));
+	ctx.set_global(b"bxor", bxor::callback(ctx));
+	ctx.set_global(b"ceil", ceil::callback(ctx));
+	ctx.set_global(b"flr", flr::callback(ctx));
+	ctx.set_global(b"abs", abs::callback(ctx));
+	ctx.set_global(b"lshr", lshr::callback(ctx));
+	ctx.set_global(b"max", max::callback(ctx));
+	ctx.set_global(b"mid", mid::callback(ctx));
+	ctx.set_global(b"min", min::callback(ctx));
+	ctx.set_global(b"rotl", rotl::callback(ctx));
+	ctx.set_global(b"rotr", rotr::callback(ctx));
+	ctx.set_global(b"sgn", sgn::callback(ctx));
+	ctx.set_global(b"shl", shl::callback(ctx));
+	ctx.set_global(b"shr", shr::callback(ctx));
+	ctx.set_global(b"sin", sin::callback(ctx));
+	ctx.set_global(b"cos", cos::callback(ctx));
+	ctx.set_global(b"atan2", atan2::callback(ctx));
+	ctx.set_global(b"sqrt", sqrt::callback(ctx));
 }
 
 #[api_callback]

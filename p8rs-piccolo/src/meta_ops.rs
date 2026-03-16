@@ -7,7 +7,7 @@ use p8rs_types::p8num::P8Num;
 use crate::async_callback::{AsyncSequence, Locals};
 use crate::{async_sequence, RuntimeRef, SequenceReturn, Stack};
 use crate::{
-    table::InvalidTableKey, Callback, CallbackReturn, Context, Function, IntoValue, Table, Value,
+    table::InvalidTableKey, Callback, CallbackReturn, Context, Function, IntoValue, Table, Value, String,
 };
 
 /// An enum of every possible Lua metamethod.
@@ -242,6 +242,17 @@ pub fn index<'gc>(
             }
 
             idx
+        }
+        Value::String(str) => {
+            if let Some(index) = key.to_number() {
+                let index = index.to_integer().wrapping_sub(1) as u16 as usize;
+                
+                if let Some(&char) = str.as_bytes().get(index) {
+                    return Ok(MetaResult::Value(String::from_slice(&ctx, &[char]).into()))
+                }
+            }
+            
+            return Ok(MetaResult::Value(Value::Nil))
         }
         _ => {
             return Err(MetaOperatorError::Unary(

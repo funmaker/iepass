@@ -4,8 +4,8 @@ use p8rs_piccolo::{Context, Value};
 use crate::vm::Runtime;
 
 pub fn load(ctx: Context) {
-	ctx.set_global("btn", btn::callback(ctx));
-	ctx.set_global("btnp", btnp::callback(ctx));
+	ctx.set_global(b"btn", btn::callback(ctx));
+	ctx.set_global(b"btnp", btnp::callback(ctx));
 }
 
 #[api_callback]

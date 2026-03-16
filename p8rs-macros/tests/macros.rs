@@ -50,18 +50,18 @@ fn test_num() {
 	assert_eq!(p8!(0.5), P8Num::new_f64(0.5));
 	assert_eq!(p8!(-4.25), P8Num::new_f64(-4.25));
 	
-	assert_eq!(p8!(hex ABC), P8Num::from_raw(0x0ABC_0000));
-	assert_eq!(p8!(hex 1234.5678), P8Num::from_raw(0x1234_5678));
-	assert_eq!(p8!(hex ABC.ABCD), P8Num::from_raw(0x0ABC_ABCD));
-	assert_eq!(p8!(hex -1234.5678), P8Num::from_raw(-0x1234_5678));
-	assert_eq!(p8!(hex -0.0), P8Num::from_raw(0x0000_0000));
-	assert_eq!(p8!(hex 7FFF.FFFF), P8Num::from_raw(0x7FFF_FFFF));
-	assert_eq!(p8!(hex -8000.0000), P8Num::from_raw(-0x8000_0000));
-	assert_eq!(p8!(hex 8000.0000), P8Num::from_raw(-0x8000_0000));
-	assert_eq!(p8!(hex 100123.0), P8Num::from_raw(0x0123_0000));
+	assert_eq!(p8!("ABC"hex), P8Num::from_raw(0x0ABC_0000));
+	assert_eq!(p8!("1234.5678"hex), P8Num::from_raw(0x1234_5678));
+	assert_eq!(p8!("ABC.ABCD"hex), P8Num::from_raw(0x0ABC_ABCD));
+	assert_eq!(p8!("-1234.5678"hex), P8Num::from_raw(-0x1234_5678));
+	assert_eq!(p8!("-0.0"hex), P8Num::from_raw(0x0000_0000));
+	assert_eq!(p8!("7FFF.FFFF"hex), P8Num::from_raw(0x7FFF_FFFF));
+	assert_eq!(p8!("-8000.0000"hex), P8Num::from_raw(-0x8000_0000));
+	assert_eq!(p8!("8000.0000"hex), P8Num::from_raw(-0x8000_0000));
+	assert_eq!(p8!("100123.0"hex), P8Num::from_raw(0x0123_0000));
 	
-	assert_eq!(p8!(bin 1010), P8Num::from_raw(0x000A_0000));
-	assert_eq!(p8!(bin 1010.0101), P8Num::from_raw(0x000A_5000));
-	assert_eq!(p8!(bin 1111000011100000.1101000011000000), P8Num::from_raw(0b1111000011100000_1101000011000000_u32.cast_signed()));
-	assert_eq!(p8!(bin -0111000011100000.1101000011000000), P8Num::from_raw(-0b111000011100000_1101000011000000));
+	assert_eq!(p8!("1010"bin), P8Num::from_raw(0x000A_0000));
+	assert_eq!(p8!("1010.0101"bin), P8Num::from_raw(0x000A_5000));
+	assert_eq!(p8!("1111000011100000.1101000011000000"bin), P8Num::from_raw(0b1111000011100000_1101000011000000_u32.cast_signed()));
+	assert_eq!(p8!("-0111000011100000.1101000011000000"bin), P8Num::from_raw(-0b111000011100000_1101000011000000));
 }

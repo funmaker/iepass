@@ -1095,8 +1095,8 @@ end"
                 3.1415
             "#,
             &[
-                Token::Number(p8!(hex dead.beef)),
-                Token::Number(p8!(hex beef.0000)),
+                Token::Number(p8!("dead.beef"hex)),
+                Token::Number(p8!("beef.0000"hex)),
                 Token::Number(p8!(12345)),
                 Token::Number(p8!(12345)),
                 Token::Number(p8!(3.1415)),

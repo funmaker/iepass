@@ -6,7 +6,7 @@ use core::{
 
 use gc_arena::{lock::RefLock, Collect, Gc, Mutation};
 
-use crate::{Context, FromValue, IntoValue, TypeError, Value};
+use crate::{Context, FromValue, IntoValue, TypeError, Value, String};
 
 use super::raw::{InvalidTableKey, NextValue, RawTable};
 
@@ -109,10 +109,10 @@ impl<'gc> Table<'gc> {
     pub fn set_field<V: IntoValue<'gc>>(
         self,
         ctx: Context<'gc>,
-        key: &'static str,
+        key: &'static [u8],
         value: V,
     ) -> Value<'gc> {
-        self.set(ctx, key, value).unwrap()
+        self.set(ctx, String::from_static(&ctx, key), value).unwrap()
     }
 
     /// Get a value from this table without any automatic type conversion.
