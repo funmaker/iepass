@@ -27,60 +27,70 @@ fn main() {
 }
 
 fn traverse(dir: ReadDir, output: &mut impl Write, depth: usize) {
-	let mut first = true;
-	for entry in dir {
-		let entry = match entry {
-			Ok(entry) => entry,
-			Err(err) => {
-				warn!("Cannot access dir content: {err}");
-				continue;
-			}
-		};
-		
-		let filetype = match entry.file_type() {
-			Ok(filetype) => filetype,
-			Err(err) => {
-				warn!("Cannot retrieve filetype of {}: {err}", entry.path().display());
-				continue;
-			},
-		};
-		
-		if filetype.is_dir() {
-			println!("cargo:rerun-if-changed={}", entry.path().display());
+	let mut dir: Vec<_> =
+		dir.flat_map(|entry| {
+			let entry = match entry {
+				Ok(entry) => entry,
+				Err(err) => {
+					warn!("Cannot access dir content: {err}");
+					return None;
+				}
+			};
 			
-			let name = clean_file_name(&entry.file_name().to_string_lossy());
-			let carts_dir = match fs::read_dir(entry.path()) {
+			let filetype = match entry.file_type() {
+				Ok(filetype) => filetype,
+				Err(err) => {
+					warn!("Cannot retrieve filetype of {}: {err}", entry.path().display());
+					return None;
+				},
+			};
+			
+			Some((filetype, entry.path(), entry.file_name()))
+		}).collect();
+	
+	dir.sort_by(|(t1, p1, _), (t2, p2, _)|
+		t1.is_file()
+		  .cmp(&t2.is_file())
+		  .then_with(|| p1.cmp(p2))
+	);
+	
+	let max_width = dir.iter()
+	                   .filter(|(t, _, _)| t.is_file())
+	                   .map(|(_, _, name)| name.len())
+	                   .max()
+	                   .unwrap_or(0);
+	
+	for (file_type, path, file_name) in dir {
+		if file_type.is_dir() {
+			println!("cargo:rerun-if-changed={}", path.display());
+			
+			let name = clean_file_name(&file_name.to_string_lossy());
+			let carts_dir = match fs::read_dir(&path) {
 				Ok(dir) => dir,
 				Err(err) => {
-					warn!("Cannot access {}: {err}", entry.path().display());
+					warn!("Cannot access {}: {err}", path.display());
 					continue;
 				}
 			};
 			
-			if !first { writeln_ident!(output, depth, ""); }
 			writeln_ident!(output, depth, "mod {name} {{");
 			traverse(carts_dir, output, depth + 1);
 			writeln_ident!(output, depth, "}}");
-			first = false;
-		} else if filetype.is_file() {
-			let name = entry.file_name();
-			let name = match name.to_string_lossy().strip_suffix(".p8") {
+			writeln_ident!(output, depth, "");
+		} else if file_type.is_file() {
+			let name = match file_name.to_string_lossy().strip_suffix(".p8") {
 				Some(name) => clean_file_name(name),
 				None => {
-					warn!("Unexpected file {}, expected .p8 cartridge", entry.path().display());
+					warn!("Unexpected file {}, expected .p8 cartridge", path.display());
 					continue;
 				}
 			};
-			let cart_path = entry.path();
 			
-			if !first { writeln_ident!(output, depth, ""); }
-			writeln_ident!(output, depth, "#[test]");
-			writeln_ident!(output, depth, "fn r#{name}() {{");
-			writeln_ident!(output, depth + 1, "crate::tester::test_cartridge({cart_path:?})");
-			writeln_ident!(output, depth, "}}");
-			first = false;
+			let blank = "";
+			let padding = max_width.saturating_sub(name.len() + 3);
+			writeln_ident!(output, depth, "#[test] fn r#{name}(){blank:padding$} {{ crate::tester::test_cartridge({path:?}) }}");
 		} else {
-			warn!("Unknown filetype {:?} of {}", filetype, entry.path().display());
+			warn!("Unknown filetype {:?} of {}", file_type, path.display());
 			continue;
 		}
 	}

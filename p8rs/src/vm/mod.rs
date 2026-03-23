@@ -96,6 +96,8 @@ impl<A: Allocator + 'static> P8rs<A> {
 	pub fn run_fuel(&mut self, fuel: i32) -> Result<RunResult, ExternError> {
 		const FUEL_PER_GC: i32 = 4096;
 		
+		self.runtime.start_frame();
+		
 		let Some(executor) = self.executor.as_mut() else {
 			return Err(RuntimeError::new(anyhow!("No cartridge loaded")).into())
 		};
@@ -134,7 +136,7 @@ impl<A: Allocator + 'static> P8rs<A> {
 											error!("[run_fuel] Uncaught runtime error: {}", e);
 											if let Some(traceback) = &e.traceback {
 												let entries = traceback.entries();
-												let mut str = alloc::string::String::new();
+												let mut str = String::new();
 												write_traceback_entries(&mut str, (&entries[..entries.len()-1]).iter())?;
 												error!("{}", str);
 											}

@@ -1,5 +1,5 @@
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{Context, Execution, Function, Value};
+use p8rs_piccolo::{Context, Execution, Function, Value, String};
 use p8rs_types::p8num::P8Num;
 use crate::vm::api::print::print;
 use crate::vm::Runtime;
@@ -19,12 +19,15 @@ pub fn load(ctx: Context) {
 	ctx.set_global(b"_mark_cpu", _mark_cpu::callback(ctx));
 	ctx.set_global(b"_menuitem", _menuitem::callback(ctx));
 	ctx.set_global(b"_map_display", _map_display::callback(ctx));
+	ctx.set_global(b"__type", __type::callback(ctx));
 	ctx.set_global(b"__flipped", __flipped::callback(ctx));
 	ctx.set_global(b"__dbg", __dbg::callback(ctx));
 }
 
 #[api_callback]
-pub fn set_draw_slice() {}
+pub fn set_draw_slice() {
+	// noop
+}
 
 #[api_callback]
 pub fn stop<'gc>(ctx: Context<'gc>, rt: &mut Runtime, mut exec: Execution<'gc, '_>, message: Option<Value<'gc>>, x: Option<P8Num>, y: Option<P8Num>, col: Option<P8Num>) {
@@ -43,7 +46,9 @@ pub fn flip<'gc>(mut exec: Execution<'gc, '_>, rt: &mut Runtime) {
 }
 
 #[api_callback]
-pub fn extcmd() {}
+pub fn extcmd() {
+	// TODO: implement
+}
 
 #[api_callback]
 pub fn holdframe(rt: &mut Runtime) {
@@ -53,18 +58,28 @@ pub fn holdframe(rt: &mut Runtime) {
 pub use holdframe as _startframe;
 
 #[api_callback]
-pub fn _get_menu_item_selected() {}
-
-#[api_callback]
-pub fn _update_buttons(rt: &mut Runtime) {
-	rt.update_buttons();
+pub fn _get_menu_item_selected() {
+	// TODO: implement
 }
 
 #[api_callback]
-pub fn _update_framerate() {}
+pub fn _update_buttons(_rt: &mut Runtime) {
+	// Actually, it does not seem to update buttons at all, nor does it do anything.
+	// Buttons just update on their own whenever there is a `flip`, suppressed by `holdframe()` or not
+	// (tested in Linux)
+	
+	// rt.update_buttons();
+}
 
 #[api_callback]
-pub fn _set_mainloop_exists() {}
+pub fn _update_framerate() {
+	// TODO: implement
+}
+
+#[api_callback]
+pub fn _set_mainloop_exists() {
+	// TODO: implement
+}
 
 #[api_callback]
 pub fn _set_fps(rt: &mut Runtime, new_fps: i16) -> i16 {
@@ -81,10 +96,14 @@ pub fn _set_fps(rt: &mut Runtime, new_fps: i16) -> i16 {
 }
 
 #[api_callback]
-pub fn _mark_cpu() {}
+pub fn _mark_cpu() {
+	// TODO: implement
+}
 
 #[api_callback]
-pub fn _menuitem() {}
+pub fn _menuitem() {
+	// TODO: implement
+}
 
 #[api_callback]
 pub fn _map_display() -> bool {
@@ -92,7 +111,27 @@ pub fn _map_display() -> bool {
 }
 
 #[api_callback]
-pub fn __flipped() {}
+pub fn __type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Result<String<'gc>, Value<'gc>> {
+	if let Some(val) = val {
+		Ok(match val {
+			Value::Nil => String::from_static(&ctx, b"nil"),
+			Value::Boolean(_) => String::from_static(&ctx, b"boolean"),
+			Value::Number(_) => String::from_static(&ctx, b"number"),
+			Value::String(_) => String::from_static(&ctx, b"string"),
+			Value::Table(_) => String::from_static(&ctx, b"table"),
+			Value::Function(_) => String::from_static(&ctx, b"function"),
+			Value::Thread(_) => String::from_static(&ctx, b"thread"),
+			Value::UserData(_) => String::from_static(&ctx, b"userdata"),
+		})
+	} else {
+		Err(String::from_static(&ctx, b"bad argument #0 to '__type' (value expected)"))?
+	}
+}
+
+#[api_callback]
+pub fn __flipped() {
+	// TODO: implement
+}
 
 #[api_callback]
 pub fn __dbg(fun: Function) {

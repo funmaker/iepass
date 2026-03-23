@@ -4,7 +4,8 @@ use syn::{Result, FnArg, Error, Type, PatType, Index, ReturnType, GenericParam, 
 use syn::spanned::Spanned;
 
 pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
-	let name = func.sig.ident.clone();
+	let name = &func.sig.ident;
+	let vis = &func.vis;
 	
 	let mut free_count = 0;
 	let mut free_ty = TokenStream::new();
@@ -22,7 +23,7 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 				fn_args.extend(quote!( stack.reborrow(), ))
 			},
 			ArgKind::Free(arg) => {
-				let ty = arg.ty;
+				let ty = &arg.ty;
 				let idx = Index::from(free_count);
 				free_ty.extend(quote!( #ty, ));
 				fn_args.extend(quote!( args.#idx, ));
@@ -89,10 +90,10 @@ pub fn make_callback(func: &syn::ItemFn) -> Result<TokenStream> {
 		                        .map(|ident| quote!( #ident, ))
 		                        .collect();
 	
-	let where_clause = func.sig.generics.where_clause.clone();
+	let where_clause = &func.sig.generics.where_clause;
 	
 	Ok(quote! {
-		mod #name {
+		#vis mod #name {
 			use super::*;
 			use ::p8rs_piccolo::{Callback, Context, Execution, Stack, RuntimeRef, CallbackReturn, IntoValue};
 			use ::alloc::format;
@@ -118,17 +119,17 @@ fn generic_to_ident(param: &GenericParam) -> Option<&Ident> {
 	}
 }
 
-enum ArgKind {
+enum ArgKind<'a> {
 	Context,
 	Execution,
 	Stack,
 	RuntimeRef,
 	RuntimeDowncast,
-	Free(PatType),
+	Free(&'a PatType),
 }
 
-impl ArgKind {
-	fn classify(arg: &FnArg) -> Result<Self> {
+impl<'a> ArgKind<'a> {
+	fn classify(arg: &'a FnArg) -> Result<Self> {
 		let arg = match arg {
 			FnArg::Receiver(arg) => return Err(Error::new(arg.span(), "`self` argument is not allowed")),
 			FnArg::Typed(arg) => arg,
@@ -151,6 +152,6 @@ impl ArgKind {
 			}
 		}
 		
-		Ok(ArgKind::Free(arg.clone()))
+		Ok(ArgKind::Free(arg))
 	}
 }

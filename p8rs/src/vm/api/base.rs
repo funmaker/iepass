@@ -4,6 +4,7 @@ use bitflags::bitflags;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Error, Execution, Function, RuntimeError, Stack, String, Table, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+use crate::vm::api::internal::__type;
 use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
@@ -149,16 +150,7 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> P8Num {
 
 #[api_callback]
 pub fn r#type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Option<String<'gc>> {
-	val.map(|val| match val {
-		Value::Nil => String::from_static(&ctx, b"nil"),
-		Value::Boolean(_) => String::from_static(&ctx, b"boolean"),
-		Value::Number(_) => String::from_static(&ctx, b"number"),
-		Value::String(_) => String::from_static(&ctx, b"string"),
-		Value::Table(_) => String::from_static(&ctx, b"table"),
-		Value::Function(_) => String::from_static(&ctx, b"function"),
-		Value::Thread(_) => String::from_static(&ctx, b"thread"),
-		Value::UserData(_) => String::from_static(&ctx, b"userdata"),
-	})
+	__type(ctx, val).ok()
 }
 
 #[api_callback]

@@ -5,6 +5,8 @@ use crate::utils::str_splitn_array;
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Log {
 	TEST(String, String),
+	META(String, String),
+	ERR(String, String),
 	MEM(String, u16, Vec<u8>),
 	SCR(String, [u8; 16], #[serde(with = "pixels_ser")] Box<[[u8; 128]; 128]>),
 	OTHER(String),
@@ -24,6 +26,8 @@ impl Log {
 				    .and_then(|[kind, name, content]| {
 					    match kind {
 						    "TEST" => Some(Log::TEST(name.into(), content.into())),
+						    "META" => Some(Log::META(name.into(), content.into())),
+						    "ERR" => Some(Log::ERR(name.into(), content.into())),
 						    "MEM" => {
 							    let (offset, data) = content.split_once(" | ")?;
 							    let offset = offset.strip_prefix("0x").and_then(|offset| u16::from_str_radix(offset, 16).ok())?;
@@ -73,6 +77,8 @@ impl Log {
 	pub fn name(&self) -> Option<&str> {
 		match self {
 			Log::TEST(name, _) => Some(name),
+			Log::META(name, _) => Some(name),
+			Log::ERR(name, _) => Some(name),
 			Log::MEM(name, _, _) => Some(name),
 			Log::SCR(name, _, _) => Some(name),
 			Log::OTHER(_) => None,
@@ -82,6 +88,8 @@ impl Log {
 	pub fn kind(&self) -> &str {
 		match self {
 			Log::TEST(_, _) => "TEST",
+			Log::META(_, _) => "META",
+			Log::ERR(_, _) => "ERR",
 			Log::MEM(_, _, _) => "MEM",
 			Log::SCR(_, _, _) => "SCR",
 			Log::OTHER(_) => "OTHER",

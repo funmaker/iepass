@@ -129,6 +129,8 @@ do
 		elseif vtype == "number" then return tostr(v, true)
 		elseif vtype == "boolean" then return tostr(v)
 		elseif vtype == "table" then return stringify_table(v)
+		elseif vtype == "function" then return "[function]"
+		elseif vtype == "thread" then return "[thread]"
 		else assert(false, "Can't test for value of type " .. vtype)
 		end
 	end

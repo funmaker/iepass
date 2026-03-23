@@ -102,17 +102,34 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 			continue
 		}
 		
-		let test_name = pico8_log.and_then(|log| log.name()).unwrap_or("<unknown>");
-		let p8rs_name = p8rs_log.and_then(|log| log.name()).unwrap_or("<unknown>");
+		let pico8_name = pico8_log.and_then(|log| log.name()).unwrap_or("<unknown>");
+		let p8rs_name  =  p8rs_log.and_then(|log| log.name()).unwrap_or("<unknown>");
 		
-		if test_name != p8rs_name {
-			panic!("Test failed, log name mismatch. (pico8: {test_name}, p8rs: {p8rs_name})");
+		if pico8_name != p8rs_name {
+			if let (Some(Log::META(_, _)), Some(Log::META(_, _))) = (pico8_log, p8rs_log) {
+				panic!("Meta call failed, method mismatch. (pico8: {pico8_name}, p8rs: {p8rs_name})");
+			} else {
+				panic!("Test failed, log name mismatch. (pico8: {pico8_name}, p8rs: {p8rs_name})");
+			}
 		}
 		
+		let test_name = pico8_name;
 		match (pico8_log, p8rs_log) {
 			(
 				Some(Log::TEST(_, pico8_val)),
 				Some(Log::TEST(_, p8rs_val))
+			) => {
+				panic!("Test {test_name} failed, value mismatch. (pico8: {pico8_val}, p8rs: {p8rs_val})");
+			},
+			(
+				Some(Log::META(_, pico8_args)),
+				Some(Log::META(_, p8rs_args))
+			) => {
+				panic!("Meta call {test_name} mismatch. (pico8: {pico8_args}, p8rs: {p8rs_args})");
+			},
+			(
+				Some(Log::ERR(_, pico8_val)),
+				Some(Log::ERR(_, p8rs_val))
 			) => {
 				panic!("Test {test_name} failed, value mismatch. (pico8: {pico8_val}, p8rs: {p8rs_val})");
 			},
