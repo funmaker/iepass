@@ -31,7 +31,7 @@ pub const CONSTS: [(&[u8], P8Num); 26] = [
 	(&p8!("❎"), p8!(5)),
 ];
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	for (key, val) in CONSTS {
 		ctx.set_global(key, val);
 	}

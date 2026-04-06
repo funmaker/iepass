@@ -1,6 +1,5 @@
 use std::mem;
 use std::pin::Pin;
-use anyhow::Context as _;
 use gc_arena::Collect;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Table, Stack, String, Value, IntoValue, MetaMethod, CallbackReturn, async_sequence, meta_ops, SequenceReturn, StashedFunction, StashedTable, StashedValue, StashedError, Sequence, Execution, RuntimeRef, SequencePoll, Error, BoxSequence};
@@ -9,7 +8,7 @@ use p8rs_piccolo::meta_ops::{MetaCall, MetaResult};
 use p8rs_piccolo::table::{NextValue, RawTable};
 use crate::vm::api::base::rawequal;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"count", count::callback(ctx));
 	ctx.set_global(b"add", add::callback(ctx));
 	ctx.set_global(b"del", del::callback(ctx));
@@ -19,7 +18,7 @@ pub fn load(ctx: Context) {
 	ctx.set_global(b"pairs", pairs::callback(ctx));
 	ctx.set_global(b"ipairs", ipairs::callback(ctx));
 	ctx.set_global(b"next", next::callback(ctx));
-	ctx.set_global(b"inext", next::callback(ctx));
+	ctx.set_global(b"inext", inext::callback(ctx));
 }
 
 #[api_callback]
@@ -58,7 +57,9 @@ pub fn count<'gc>(ctx: Context<'gc>, table: Table<'gc>, value: Option<Value<'gc>
 }
 
 #[api_callback]
-pub fn add<'gc>(ctx: Context<'gc>, mut stack: Stack<'gc, '_>, table: Table<'gc>, value: Value<'gc>, index: Value<'gc>) -> Result<CallbackReturn<'gc>, Value<'gc>> {
+pub fn add<'gc>(ctx: Context<'gc>, mut stack: Stack<'gc, '_>, table: Table<'gc>, value: Option<Value<'gc>>, index: Value<'gc>) -> Result<CallbackReturn<'gc>, Value<'gc>> {
+	let Some(value) = value else { return Ok(CallbackReturn::Return) };
+	
 	let index =
 		if index.is_nil() {
 			None
@@ -332,10 +333,10 @@ pub fn ipairs<'gc>(ctx: Context<'gc>, mut stack: Stack<'gc, '_>) {
 }
 
 #[api_callback]
-pub fn next<'gc>(ctx: Context<'gc>, table: Table<'gc>, index: Value<'gc>) -> Result<(Value<'gc>, Value<'gc>), Value<'gc>> {
+pub fn next<'gc>(ctx: Context<'gc>, table: Table<'gc>, index: Value<'gc>) -> Result<(Value<'gc>, Option<Value<'gc>>), Value<'gc>> {
 	match table.next(index) {
-		NextValue::Found { key, value } => Ok((key, value)),
-		NextValue::Last => Ok((Value::Nil, Value::Nil)),
+		NextValue::Found { key, value } => Ok((key, Some(value))),
+		NextValue::Last => Ok((Value::Nil, None)),
 		NextValue::NotFound => Err(String::from_static(&ctx, "invalid table key").into()),
 	}
 }

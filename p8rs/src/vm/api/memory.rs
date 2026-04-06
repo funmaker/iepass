@@ -3,56 +3,19 @@ use crate::piccolo::Stack;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, IntoValue};
 use p8rs_types::p8num::P8Num;
+use crate::utils::once;
 use crate::vm::memory::MemoryAccess;
 use crate::vm::Runtime;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"peek", peek::callback(ctx));
 	ctx.set_global(b"peek2", peek2::callback(ctx));
 	ctx.set_global(b"peek4", peek4::callback(ctx));
 	ctx.set_global(b"poke", poke::callback(ctx));
 	ctx.set_global(b"poke2", poke2::callback(ctx));
 	ctx.set_global(b"poke4", poke4::callback(ctx));
-}
-
-/// Inclusive range, end >= start.
-fn poke_mmio_range(rt: &mut Runtime, start: u16, end: u16) {
-	let handlers: [(u16, fn(&mut Runtime, u8)); _] = [
-		(0x5f24, |rt, val| rt.set_cursor_home(val as i16)),
-		(0x5f26, |rt, val| rt.set_cursor_x(val as i16)),
-		(0x5f27, |rt, val| rt.set_cursor_y(val as i16)),
-	];
-	
-	if end >= 0x5f24 && start <= 0x5f27 {
-		for (addr, handler) in handlers {
-			if addr >= start && addr <= end {
-				handler(rt, rt.memory[addr as usize]);
-			}
-		}
-	}
-}
-
-
-/// Inclusive cyclic range. If `end == start`, 1 byte is triggered. If `end == start - 1`, all memory is triggered.
-fn poke_mmio_cyclic(rt: &mut Runtime, start: u16, end: u16) {
-	if end > start {
-		poke_mmio_range(rt, start, end);
-	} else {
-		poke_mmio_range(rt, start, 0xffff);
-		poke_mmio_range(rt, 0, end);
-	}
-}
-
-fn parse_poke_args<'gc, 'a>(ctx: Context<'gc>, stack: &mut Stack<'gc, 'a>) -> Result<(u16, usize, bool), Error<'gc>> {
-	let base = stack.pop_front().ok_or_else(|| "[poke]: Addr argument required".into_value(ctx))?;
-	let base = match base {
-		Value::Number(num) => num.to_integer().cast_unsigned(),
-		_ => return Err("[poke]: Addr argument must be a number".into_value(ctx).into()),
-	};
-	
-	let count = stack.len().max(1);
-	
-	Ok((base, count, stack.is_empty()))
+	ctx.set_global(b"memcpy", memcpy::callback(ctx));
+	ctx.set_global(b"memset", memset::callback(ctx));
 }
 
 #[api_callback]
@@ -171,4 +134,54 @@ pub fn peek4(rt: &mut Runtime, mut stack: Stack, addr: u16, n: Option<u16>) {
 		  .map(P8Num::from_raw)
 		  .map(Value::from)
 	);
+}
+
+/// Inclusive range, end >= start.
+fn poke_mmio_range(rt: &mut Runtime, start: u16, end: u16) {
+	let handlers: [(u16, fn(&mut Runtime, u8)); _] = [
+		(0x5f24, |rt, val| rt.set_cursor_home(val as i16)),
+		(0x5f26, |rt, val| rt.set_cursor_x(val as i16)),
+		(0x5f27, |rt, val| rt.set_cursor_y(val as i16)),
+	];
+	
+	if end >= 0x5f24 && start <= 0x5f27 {
+		for (addr, handler) in handlers {
+			if addr >= start && addr <= end {
+				handler(rt, rt.memory[addr as usize]);
+			}
+		}
+	}
+}
+
+
+/// Inclusive cyclic range. If `end == start`, 1 byte is triggered. If `end == start - 1`, all memory is triggered.
+fn poke_mmio_cyclic(rt: &mut Runtime, start: u16, end: u16) {
+	if end > start {
+		poke_mmio_range(rt, start, end);
+	} else {
+		poke_mmio_range(rt, start, 0xffff);
+		poke_mmio_range(rt, 0, end);
+	}
+}
+
+fn parse_poke_args<'gc, 'a>(ctx: Context<'gc>, stack: &mut Stack<'gc, 'a>) -> Result<(u16, usize, bool), Error<'gc>> {
+	let base = stack.pop_front().ok_or_else(|| "[poke]: Addr argument required".into_value(ctx))?;
+	let base = match base {
+		Value::Number(num) => num.to_integer().cast_unsigned(),
+		_ => return Err("[poke]: Addr argument must be a number".into_value(ctx).into()),
+	};
+	
+	let count = stack.len().max(1);
+	
+	Ok((base, count, stack.is_empty()))
+}
+
+#[api_callback]
+pub fn memcpy() {
+	once!{ warn!("memcpy is not implemented yet!"); }
+}
+
+#[api_callback]
+pub fn memset() {
+	once!{ warn!("memset is not implemented yet!"); }
 }

@@ -1,11 +1,11 @@
 use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::{Context, Value};
 use p8rs_types::p8num::P8Num;
-
+use crate::utils::once;
 use crate::vm::memory::machine_state::{FillPatternFlags, FillPatternState, Palette};
 use crate::vm::Runtime;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"camera", camera::callback(ctx));
 	ctx.set_global(b"color", color::callback(ctx));
 	ctx.set_global(b"clip", clip::callback(ctx));
@@ -20,6 +20,8 @@ pub fn load(ctx: Context) {
 	ctx.set_global(b"pget", pget::callback(ctx));
 	ctx.set_global(b"sset", sset::callback(ctx));
 	ctx.set_global(b"sget", sget::callback(ctx));
+	ctx.set_global(b"mset", mset::callback(ctx));
+	ctx.set_global(b"mget", mget::callback(ctx));
 }
 
 #[api_callback]
@@ -268,4 +270,14 @@ pub fn sget(rt: &mut Runtime, x: Option<i16>, y: Option<i16>) -> u8 {
 	}
 	
 	rt.memory.sprites().get_pixel(&mut rt.memory, x as u8, y as u8).unwrap_or(0)
+}
+
+#[api_callback]
+pub fn mset() {
+	once!{ warn!("mset is not implemented yet!"); }
+}
+
+#[api_callback]
+pub fn mget() {
+	once!{ warn!("mget is not implemented yet!"); }
 }

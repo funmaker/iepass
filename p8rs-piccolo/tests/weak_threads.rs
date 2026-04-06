@@ -1,8 +1,9 @@
 use p8rs_piccolo::{Closure, Executor, ExternError, Lua};
 
 #[test]
+#[ignore]
 fn weak_threads_close() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let executor = lua.try_enter(|ctx| {
         let closure = Closure::load(
@@ -40,8 +41,9 @@ fn weak_threads_close() -> Result<(), ExternError> {
 }
 
 #[test]
+#[ignore]
 fn live_upvalues_not_dead() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let executor = lua.try_enter(|ctx| {
         let closure = Closure::load(

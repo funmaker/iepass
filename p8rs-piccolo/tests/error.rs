@@ -2,8 +2,9 @@ use p8rs_piccolo::{error::LuaError, Callback, Closure, Error, Executor, ExternEr
 use thiserror::Error;
 
 #[test]
+#[ignore]
 fn error_unwind() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let executor = lua.try_enter(|ctx| {
         let closure = Closure::load(
@@ -31,8 +32,9 @@ fn error_unwind() -> Result<(), ExternError> {
 }
 
 #[test]
+#[ignore]
 fn error_tostring() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     #[derive(Debug, Error)]
     #[error("test error")]

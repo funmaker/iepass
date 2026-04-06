@@ -4,13 +4,10 @@ use p8rs_types::p8num::P8Num;
 use crate::vm::api::print::print;
 use crate::vm::Runtime;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"set_draw_slice", set_draw_slice::callback(ctx));
 	ctx.set_global(b"stop", stop::callback(ctx));
-	ctx.set_global(b"flip", flip::callback(ctx));
 	ctx.set_global(b"extcmd", extcmd::callback(ctx));
-	ctx.set_global(b"holdframe", holdframe::callback(ctx));
-	ctx.set_global(b"_startframe", _startframe::callback(ctx));
 	ctx.set_global(b"_get_menu_item_selected", _get_menu_item_selected::callback(ctx));
 	ctx.set_global(b"_update_buttons", _update_buttons::callback(ctx));
 	ctx.set_global(b"_update_framerate", _update_framerate::callback(ctx));
@@ -20,8 +17,13 @@ pub fn load(ctx: Context) {
 	ctx.set_global(b"_menuitem", _menuitem::callback(ctx));
 	ctx.set_global(b"_map_display", _map_display::callback(ctx));
 	ctx.set_global(b"__type", __type::callback(ctx));
+	ctx.set_global(b"__flip", __flip::callback(ctx));
 	ctx.set_global(b"__flipped", __flipped::callback(ctx));
-	ctx.set_global(b"__dbg", __dbg::callback(ctx));
+	// ctx.set_global(b"__dbg", __dbg::callback(ctx));
+	
+	let holdframe = holdframe::callback(ctx);
+	ctx.set_global(b"holdframe", holdframe);
+	ctx.set_global(b"_startframe", holdframe);
 }
 
 #[api_callback]
@@ -40,14 +42,8 @@ pub fn stop<'gc>(ctx: Context<'gc>, rt: &mut Runtime, mut exec: Execution<'gc, '
 }
 
 #[api_callback]
-pub fn flip<'gc>(mut exec: Execution<'gc, '_>, rt: &mut Runtime) {
-	rt.holdframe = false;
-	exec.fuel().interrupt();
-}
-
-#[api_callback]
 pub fn extcmd() {
-	// TODO: implement
+	once!{ warn!("extcmd is not implemented yet!"); }
 }
 
 #[api_callback]
@@ -55,11 +51,11 @@ pub fn holdframe(rt: &mut Runtime) {
 	rt.holdframe = true;
 }
 
-pub use holdframe as _startframe;
+use crate::utils::once;
 
 #[api_callback]
 pub fn _get_menu_item_selected() {
-	// TODO: implement
+	once!{ warn!("_get_menu_item_selected is not implemented yet!"); }
 }
 
 #[api_callback]
@@ -73,12 +69,12 @@ pub fn _update_buttons(_rt: &mut Runtime) {
 
 #[api_callback]
 pub fn _update_framerate() {
-	// TODO: implement
+	once!{ warn!("_update_framerate is not implemented yet!"); }
 }
 
 #[api_callback]
 pub fn _set_mainloop_exists() {
-	// TODO: implement
+	once!{ warn!("_set_mainloop_exists is not implemented yet!"); }
 }
 
 #[api_callback]
@@ -97,12 +93,12 @@ pub fn _set_fps(rt: &mut Runtime, new_fps: i16) -> i16 {
 
 #[api_callback]
 pub fn _mark_cpu() {
-	// TODO: implement
+	once!{ warn!("_mark_cpu is not implemented yet!"); }
 }
 
 #[api_callback]
 pub fn _menuitem() {
-	// TODO: implement
+	once!{ warn!("_menuitem is not implemented yet!"); }
 }
 
 #[api_callback]
@@ -129,8 +125,14 @@ pub fn __type<'gc>(ctx: Context<'gc>, val: Option<Value<'gc>>) -> Result<String<
 }
 
 #[api_callback]
+pub fn __flip<'gc>(mut exec: Execution<'gc, '_>, rt: &mut Runtime) {
+	rt.holdframe = false;
+	exec.fuel().interrupt();
+}
+
+#[api_callback]
 pub fn __flipped() {
-	// TODO: implement
+	once!{ warn!("__flipped is not implemented yet!"); }
 }
 
 #[api_callback]

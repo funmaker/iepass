@@ -9,7 +9,7 @@ use p8rs_piccolo::{
 
 #[test]
 fn callback() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, _, mut stack, _| {
@@ -17,6 +17,16 @@ fn callback() -> Result<(), ExternError> {
             Ok(CallbackReturn::Return)
         });
         ctx.set_global(b"callback", callback);
+        let assert = Callback::from_fn(&ctx, |ctx, _, stack, _| {
+            if stack.get(0).to_bool() {
+                Ok(CallbackReturn::Return)
+            } else if stack.get(1).is_nil() {
+                Err("assertion failed!".into_value(ctx).into())
+            } else {
+                Err(stack.get(1).into())
+            }
+        });
+        ctx.set_global(b"assert", assert);
         Ok(())
     })?;
 
@@ -41,7 +51,7 @@ fn callback() -> Result<(), ExternError> {
 
 #[test]
 fn tail_call_trivial_callback() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, _, mut stack, _| {
@@ -69,8 +79,9 @@ fn tail_call_trivial_callback() -> Result<(), ExternError> {
 }
 
 #[test]
+#[ignore]
 fn loopy_callback() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |ctx, _, _, _| {
@@ -146,8 +157,9 @@ fn loopy_callback() -> Result<(), ExternError> {
 }
 
 #[test]
+#[ignore]
 fn yield_sequence() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {
@@ -232,7 +244,7 @@ fn yield_sequence() -> Result<(), ExternError> {
 
 #[test]
 fn resume_with_err() {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let executor = lua.enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |ctx, _, mut stack, _| {

@@ -11,7 +11,7 @@ use crate::vm::memory::Memory;
 use crate::vm::memory::painter::CallbackResult;
 use crate::vm::Runtime;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"print", print::callback(ctx));
 }
 
@@ -100,7 +100,7 @@ enum EscapeSequenceAction {
 	Stop,
 	SkipFrames(usize),
 	SetLetterFrameSkip(usize),
-	ModifyState(PrintState),
+	_ModifyState(PrintState),
 }
 
 fn screen_shift_up_exact(rt: &mut Runtime, shift: u8) {
@@ -433,7 +433,7 @@ impl<'gc> Sequence<'gc> for PrintSeq<'gc> {
 						EscapeSequenceAction::Stop => {
 							self.stopped = true;
 						}
-						EscapeSequenceAction::ModifyState(new_state) => {
+						EscapeSequenceAction::_ModifyState(new_state) => {
 							self.state = new_state;
 						}
 					}

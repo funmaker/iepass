@@ -22,7 +22,6 @@ pub mod opcode;
 pub mod registry;
 pub mod stack;
 pub mod stash;
-pub mod stdlib;
 pub mod string;
 pub mod table;
 pub mod thread;

@@ -7,8 +7,7 @@ use gc_arena::{
     Arena, Collect, Mutation, Rootable,
 };
 
-use crate::{finalizers::Finalizers, stash::{Fetchable, Stashable}, stdlib::{load_base, load_coroutine}, string::InternedStringSet, thread::BadThreadMode, Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError, RuntimeRef, Singleton, StashedExecutor, String, Table, TypeError, Value};
-use crate::stdlib::load_table;
+use crate::{finalizers::Finalizers, stash::{Fetchable, Stashable}, string::InternedStringSet, thread::BadThreadMode, Error, ExternError, FromMultiValue, FromValue, Fuel, IntoValue, Registry, RuntimeError, RuntimeRef, Singleton, StashedExecutor, String, Table, TypeError, Value};
 
 /// A value representing the main "execution context" of a Lua state.
 ///
@@ -29,7 +28,7 @@ use crate::stdlib::load_table;
 /// ```
 /// # use gc_arena::Gc;
 /// # use p8rs_piccolo::Lua;
-/// # let mut lua = Lua::core();
+/// # let mut lua = Lua::empty();
 /// lua.enter(|ctx| {
 ///     // Create a new `Gc<'gc, i32>` pointer using the `&Mutation` held inside `ctx`
 ///     let p = Gc::new(&ctx, 13);
@@ -129,7 +128,7 @@ pub struct Lua {
 
 impl Default for Lua {
     fn default() -> Self {
-        Lua::core()
+        Lua::empty()
     }
 }
 
@@ -139,48 +138,6 @@ impl Lua {
         Lua {
             arena: Arena::<Rootable![State<'_>]>::new(|mc| State::new(mc)),
         }
-    }
-
-    /// Create a new `Lua` instance with the core stdlib loaded.
-    pub fn core() -> Self {
-        let mut lua = Self::empty();
-        lua.load_core();
-        lua
-    }
-    
-    /// Create a new `Lua` instance with all of the stdlib loaded.
-    #[cfg(feature = "std")]
-    pub fn full() -> Self {
-        let mut lua = Lua::core();
-        lua.load_io();
-        lua
-    }
-    
-    /// Load the core parts of the stdlib that do not allow performing any I/O.
-    ///
-    /// Calls:
-    ///   - `load_base`
-    ///   - `load_coroutine`
-    ///   - `load_math`
-    ///   - `load_string`
-    ///   - `load_table`
-    pub fn load_core(&mut self) {
-        self.enter(|ctx| {
-            load_base(ctx);
-            load_coroutine(ctx);
-            // load_math(ctx);
-            // load_string(ctx);
-            load_table(ctx);
-        });
-    }
-    
-    /// Load the parts of the stdlib that allow I/O.
-    #[cfg(feature = "std")]
-    pub fn load_io(&mut self) {
-        // self.enter(|ctx| {
-        //     crate::stdlib::load_io(ctx);
-        // })
-        unimplemented!()
     }
 
     /// Size of all memory used by this Lua context.

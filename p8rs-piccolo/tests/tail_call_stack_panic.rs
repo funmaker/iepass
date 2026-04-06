@@ -11,7 +11,7 @@ const SOURCE: &str = r#"
 
 #[test]
 fn tail_call_stack_panic() {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let exec = lua.enter(|ctx| ctx.stash(Executor::new(ctx)));
 

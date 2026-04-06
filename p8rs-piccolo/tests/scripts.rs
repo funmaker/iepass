@@ -6,7 +6,7 @@ use std::{
 use p8rs_piccolo::{io, Closure, Executor, ExternError, Lua};
 
 fn run_lua_code(name: &str, code: &[u8]) -> Result<(), ExternError> {
-    let mut lua = Lua::full();
+    let mut lua = Lua::empty();
 
     let exec = lua.try_enter(|ctx| {
         let closure = Closure::load(ctx, Some(name), code)?;

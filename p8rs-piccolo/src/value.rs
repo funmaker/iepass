@@ -305,10 +305,10 @@ mod tests {
 
     #[test]
     fn recursive_table_debug() {
-        let mut lua = Lua::core();
+        let mut lua = Lua::empty();
         lua.enter(|ctx| {
             let table = Table::new(&ctx);
-            table.set_field(ctx, "a", table);
+            table.set_field(ctx, b"a", table);
             println!("{:?}", table);
         
             let table2 = Table::new(&ctx);
@@ -316,7 +316,7 @@ mod tests {
             println!("{:?}", table2);
         
             let combined = Table::new(&ctx);
-            combined.set_field(ctx, "a", combined);
+            combined.set_field(ctx, b"a", combined);
             combined.set_metatable(&ctx, Some(combined));
             println!("{:?}", combined);
         

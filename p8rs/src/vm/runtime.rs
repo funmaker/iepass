@@ -14,7 +14,6 @@ use crate::vm::memory::machine_state::{BtnpRepDelay, BtnpRepInterval};
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Runtime {
 	pub memory: Memory,
-	pub cart_memory: [u8; 0x8000],
 	pub buttons: Buttons,
 	pub stopped: bool,
 	pub holdframe: bool,

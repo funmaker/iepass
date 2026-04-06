@@ -25,3 +25,16 @@ impl NonZeroNibble {
 		self.0.get()
 	}
 }
+
+macro_rules! once {
+	() => {};
+	($( $tokens:tt )*) => {{
+		use core::sync::atomic::{AtomicBool, Ordering};
+		static CALLED: AtomicBool = AtomicBool::new(false);
+		if !CALLED.swap(true, Ordering::AcqRel) {
+			$( $tokens )*
+		}
+	}};
+}
+
+pub(crate) use once;

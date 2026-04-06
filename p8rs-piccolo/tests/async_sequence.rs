@@ -5,7 +5,7 @@ use p8rs_piccolo::{
 
 #[test]
 fn async_sequence_works() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |ctx, _, _, _| {

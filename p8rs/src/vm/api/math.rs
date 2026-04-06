@@ -4,7 +4,7 @@ use p8rs_macros::api_callback;
 
 use crate::vm::P8Num;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"band", band::callback(ctx));
 	ctx.set_global(b"bnot", bnot::callback(ctx));
 	ctx.set_global(b"bor", bor::callback(ctx));

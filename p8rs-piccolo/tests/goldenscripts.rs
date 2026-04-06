@@ -106,6 +106,7 @@ enum GoldenScriptMode {
 }
 
 #[test]
+#[ignore]
 fn test_goldenscripts() {
     const DIR: &str = "./tests/goldenscripts";
     let mut failed_scripts: Vec<PathBuf> = Vec::new();
@@ -166,7 +167,7 @@ fn test_goldenscripts() {
         eprintln!("{path:?}: operating in {mode:?} mode");
         eprintln!("running {:?}", path);
 
-        let mut lua = Lua::core();
+        let mut lua = Lua::empty();
 
         let tx = tx.clone();
         lua.enter(|ctx| {

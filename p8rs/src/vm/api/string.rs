@@ -1,20 +1,23 @@
 use p8rs_macros::api_callback;
-use p8rs_piccolo::{String, Context, RuntimeError, Stack, Value};
+use p8rs_piccolo::{String, Context, Stack, Value};
+use crate::utils::once;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"sub", sub::callback(ctx));
 	ctx.set_global(b"ord", ord::callback(ctx));
+	ctx.set_global(b"chr", chr::callback(ctx));
+	ctx.set_global(b"split", split::callback(ctx));
 }
 
 #[api_callback]
-pub fn sub<'gc>(ctx: Context<'gc>, str: String, start: i16, end: Option<i16>) -> Result<String<'gc>, RuntimeError<'gc>> {
+pub fn sub<'gc>(ctx: Context<'gc>, str: String, start: i16, end: Option<i16>) -> String<'gc> {
 	let len = str.len();
 	let start = get_string_offset(len, start);
 	let end = end.map(|e| get_string_offset(len, e)).unwrap_or(len - 1);
 	if end < start {
-		Ok(String::from_static(&ctx, &[]))
+		String::from_static(&ctx, &[])
 	} else {
-		Ok(String::from_slice(&ctx, &str[start..=end]))
+		String::from_slice(&ctx, &str[start..=end])
 	}
 }
 
@@ -30,6 +33,26 @@ pub fn ord(mut stack: Stack, str: String, index: Option<i16>, count: Option<i16>
 			stack.push_back(str[i as usize - 1].into());
 		}
 	}
+}
+
+#[api_callback]
+pub fn chr<'gc>(ctx: Context<'gc>, mut stack: Stack<'gc, '_>) -> Option<String<'gc>> {
+	let mut output = Vec::with_capacity(stack.len());
+	
+	for value in stack.drain(..) {
+		if let Some(number) = value.to_number() {
+			output.push(number.to_integer() as u8)
+		} else {
+			return None;
+		}
+	}
+	
+	Some(String::from_buffer(&ctx, output.into_boxed_slice()))
+}
+
+#[api_callback]
+pub fn split() {
+	once!{ warn!("split is not implemented yet!"); }
 }
 
 fn get_string_offset(len: usize, offset: i16) -> usize {

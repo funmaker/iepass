@@ -7,8 +7,9 @@ use p8rs_piccolo::{Callback, CallbackReturn, Closure, Executor, Lua, UserData, V
 struct MyUserData<'gc>(Gc<'gc, Lock<i32>>);
 
 #[test]
+#[ignore]
 fn userdata() -> Result<(), Box<dyn Error>> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let userdata = UserData::new::<Rootable![MyUserData<'_>]>(

@@ -2,7 +2,7 @@ use p8rs_piccolo::{Callback, CallbackReturn, Closure, Executor, ExecutorMode, Ex
 
 #[test]
 fn test_interrupt() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.try_enter(|ctx| {
         let callback = Callback::from_fn(&ctx, |_, mut exec, _, _| {

@@ -3,23 +3,28 @@
 use p8rs_macros::{api_callback, p8};
 use p8rs_piccolo::Context;
 use p8rs_types::p8num::P8Num;
-
+use crate::utils::once;
 use crate::vm::memory::machine_state::MiscChipsetFeatureFlags;
 use crate::vm::memory::Memory;
 use crate::vm::Runtime;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"rectfill", rectfill::callback(ctx));
 	ctx.set_global(b"rect", rect::callback(ctx));
 	ctx.set_global(b"circfill", circfill::callback(ctx));
 	ctx.set_global(b"circ", circ::callback(ctx));
 	ctx.set_global(b"ovalfill", ovalfill::callback(ctx));
 	ctx.set_global(b"oval", oval::callback(ctx));
+	ctx.set_global(b"rrectfill", rrectfill::callback(ctx));
+	ctx.set_global(b"rrect", rrect::callback(ctx));
 	ctx.set_global(b"line", line::callback(ctx));
+	ctx.set_global(b"tline", tline::callback(ctx));
 	ctx.set_global(b"spr", spr::callback(ctx));
 	ctx.set_global(b"sspr", sspr::callback(ctx));
-	ctx.set_global(b"map", map::callback(ctx));
-	ctx.set_global(b"mapdraw", map::callback(ctx));
+	
+	let map = map::callback(ctx);
+	ctx.set_global(b"map", map);
+	ctx.set_global(b"mapdraw", map);
 }
 
 #[api_callback]
@@ -260,6 +265,16 @@ pub fn oval(rt: &mut Runtime, x0: Option<i16>, y0: Option<i16>, x1: Option<i16>,
 }
 
 #[api_callback]
+pub fn rrect() {
+	once!{ warn!("rrect is not implemented yet!"); }
+}
+
+#[api_callback]
+pub fn rrectfill() {
+	once!{ warn!("rrectfill is not implemented yet!"); }
+}
+
+#[api_callback]
 pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P8Num>, p4: Option<P8Num>, p5: Option<P8Num>) {
 	let (mut x0, mut y0, mut x1, mut y1) = match (p1, p2, p3, p4, p5) {
 		(Some(x0), Some(y0), Some(x1), Some(y1), col) => {
@@ -331,6 +346,11 @@ pub fn line(rt: &mut Runtime, p1: Option<P8Num>, p2: Option<P8Num>, p3: Option<P
 			err -= dx * 2;
 		}
 	}
+}
+
+#[api_callback]
+pub fn tline() {
+	once!{ warn!("tline is not implemented yet!"); }
 }
 
 #[api_callback]

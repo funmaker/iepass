@@ -4,7 +4,7 @@ use p8rs_macros::api_callback;
 use p8rs_piccolo::{meta_ops, BoxSequence, CallbackReturn, Context, Error, Execution, RuntimeRef, Sequence, SequencePoll, Stack, Thread, ThreadMode, Value};
 use p8rs_piccolo::meta_ops::MetaCallError;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"cocreate", cocreate::callback(ctx));
 	ctx.set_global(b"coresume", coresume::callback(ctx));
 	ctx.set_global(b"costatus", costatus::callback(ctx));
@@ -68,7 +68,12 @@ impl<'gc> Sequence<'gc> for PCall {
 		mut stack: Stack<'gc, '_>,
 		_rt: RuntimeRef<'_>,
 	) -> Result<SequencePoll<'gc>, Error<'gc>> {
-		stack.replace(ctx, (false, error));
+		println!("{:?}", error);
+		match error {
+			Error::Lua(error) => stack.replace(ctx, (false, error.0)),
+			Error::Runtime(error) => stack.replace(ctx, (false, error.to_string())),
+		}
+		
 		Ok(SequencePoll::Return)
 	}
 }

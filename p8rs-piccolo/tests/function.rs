@@ -2,7 +2,7 @@ use p8rs_piccolo::{Callback, CallbackReturn, Executor, ExternError, Function, Lu
 
 #[test]
 fn function_compose_bind() -> Result<(), ExternError> {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     let executor = lua.try_enter(|ctx| {
         let composed_functions = Function::compose(

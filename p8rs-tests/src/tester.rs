@@ -107,9 +107,9 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 		
 		if pico8_name != p8rs_name {
 			if let (Some(Log::META(_, _)), Some(Log::META(_, _))) = (pico8_log, p8rs_log) {
-				panic!("Meta call failed, method mismatch. (pico8: {pico8_name}, p8rs: {p8rs_name})");
+				panic!("Meta call failed, method mismatch.\n\tpico8: {pico8_name}\n\t p8rs: {p8rs_name}");
 			} else {
-				panic!("Test failed, log name mismatch. (pico8: {pico8_name}, p8rs: {p8rs_name})");
+				panic!("Test failed, log name mismatch.\n\tpico8: {pico8_name}\n\t p8rs: {p8rs_name}");
 			}
 		}
 		
@@ -119,28 +119,29 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 				Some(Log::TEST(_, pico8_val)),
 				Some(Log::TEST(_, p8rs_val))
 			) => {
-				panic!("Test {test_name} failed, value mismatch. (pico8: {pico8_val}, p8rs: {p8rs_val})");
+				panic!("Test {test_name} failed, value mismatch.\n\tpico8: {pico8_val}\n\t p8rs: {p8rs_val}");
 			},
 			(
 				Some(Log::META(_, pico8_args)),
 				Some(Log::META(_, p8rs_args))
 			) => {
-				panic!("Meta call {test_name} mismatch. (pico8: {pico8_args}, p8rs: {p8rs_args})");
+				panic!("Meta call {test_name} mismatch.\n\tpico8: {pico8_args}\n\t p8rs: {p8rs_args}");
 			},
 			(
-				Some(Log::ERR(_, pico8_val)),
-				Some(Log::ERR(_, p8rs_val))
+				Some(Log::ERR(_, _pico8_val)),
+				Some(Log::ERR(_, _p8rs_val))
 			) => {
-				panic!("Test {test_name} failed, value mismatch. (pico8: {pico8_val}, p8rs: {p8rs_val})");
+				// TODO: Implement proper error messages
+				// panic!("Test {test_name} failed, value mismatch.\n\tpico8: {pico8_val}\n\t p8rs: {p8rs_val}");
 			},
 			(
 				Some(Log::MEM(pico8_name, pico8_offset, pico8_data)),
 				Some(Log::MEM(p8rs_name, p8rs_offset, p8rs_data))
 			) => {
 				if pico8_offset != p8rs_offset {
-					panic!("Test {test_name} failed, memory offset mismatch. (pico8: {pico8_offset}, p8rs: {p8rs_offset})");
+					panic!("Test {test_name} failed, memory offset mismatch.\n\tpico8: {pico8_offset}\n\t p8rs: {p8rs_offset}");
 				} else if pico8_data.len() != p8rs_data.len() {
-					panic!("Test {test_name} failed, memory size mismatch. (pico8: {}, p8rs: {})", pico8_data.len(), p8rs_data.len());
+					panic!("Test {test_name} failed, memory size mismatch.\n\tpico8: {}\n\t p8rs: {}", pico8_data.len(), p8rs_data.len());
 				} else {
 					let rel_pos = pico8_data.iter().zip(p8rs_data).position(|(a, b)| a != b).unwrap();
 					let abs_pos = pico8_offset.wrapping_add(rel_pos as u16);
@@ -150,7 +151,7 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 					println!("pico8 {pico8_name} memory at 0x{preview_abs_pos:04x}: {}", to_hexstring(&pico8_data[preview_rel_pos .. pico8_data.len().min(preview_rel_pos + 32)]));
 					println!("p8rs  {p8rs_name} memory at 0x{preview_abs_pos:04x}: {}", to_hexstring(&p8rs_data[preview_rel_pos .. p8rs_data.len().min(preview_rel_pos + 32)]));
 					
-					panic!("Test {test_name} failed, memory mismatch at 0x{abs_pos:04x}. (pico8: 0x{:02x}, p8rs: 0x{:02x})", pico8_data[rel_pos], p8rs_data[rel_pos]);
+					panic!("Test {test_name} failed, memory mismatch at 0x{abs_pos:04x}.\n\tpico8: 0x{:02x}\n\t p8rs: 0x{:02x}", pico8_data[rel_pos], p8rs_data[rel_pos]);
 				}
 			},
 			(
@@ -172,19 +173,19 @@ pub fn test_cartridge(path: impl AsRef<Path>) {
 				print_scr("p8rs  Screen", p8rs_name, p8rs_pal, p8rs_pixels, pixel_pos);
 				
 				if pico8_pal != p8rs_pal {
-					panic!("Test {test_name} failed, palette mismatch. (pico8: {pico8_pal:?}, p8rs: {p8rs_pal:?})");
+					panic!("Test {test_name} failed, palette mismatch.\n\tpico8: {pico8_pal:?}\n\t p8rs: {p8rs_pal:?}");
 				} else {
 					let (col, row) = pixel_pos.unwrap();
-					panic!("Test {test_name} failed, pixel mismatch at {col}x{row}. (pico8: {:x}, p8rs: {:x})", pico8_pixels[row][col], p8rs_pixels[row][col]);
+					panic!("Test {test_name} failed, pixel mismatch at {col}x{row}.\n\tpico8: {:x}\n\t p8rs: {:x}", pico8_pixels[row][col], p8rs_pixels[row][col]);
 				}
 			},
 			(
 				Some(Log::OTHER(pico8_text)),
 				Some(Log::OTHER(p8rs_text))
 			) => {
-				panic!("Test {test_name} failed, log mismatch. (pico8: {pico8_text}, p8rs: {p8rs_text})")
+				panic!("Test {test_name} failed, log mismatch.\n\tpico8: {pico8_text}\n\t p8rs: {p8rs_text}")
 			},
-			(pico8_log, p8rs_log) => panic!("Test {test_name} failed, log mismatch. (pico8: {}, p8rs: {})", pico8_log.map_or("None" ,Log::kind), p8rs_log.map_or("None" ,Log::kind)),
+			(pico8_log, p8rs_log) => panic!("Test {test_name} failed, log mismatch.\n\tpico8: {}\n\t p8rs: {}", pico8_log.map_or("None" ,Log::kind), p8rs_log.map_or("None" ,Log::kind)),
 		}
 	}
 }

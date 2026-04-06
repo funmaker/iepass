@@ -3,7 +3,6 @@ do
     local _load = load
     local _coresume = coresume
     local _extcmd = extcmd
-    local _flip = flip
     local _flipped = __flipped
 	local _last_menuitem_index = 0
 	local _last_menuitem_callback = function() end
@@ -101,7 +100,7 @@ do
 			end
 		until not continue_menu
 
-		_flip()
+		__flip()
 	end
 end
 

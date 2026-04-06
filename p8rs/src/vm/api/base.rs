@@ -4,11 +4,12 @@ use bitflags::bitflags;
 use p8rs_macros::api_callback;
 use p8rs_piccolo::{Context, Error, Execution, Function, RuntimeError, Stack, String, Table, Value};
 use p8rs_types::p8num::{P8Num, P8NumStringConversionFlags};
+use crate::utils::once;
 use crate::vm::api::internal::__type;
 use crate::vm::Runtime;
 use crate::vm::traceback::write_traceback_entries;
 
-pub fn load(ctx: Context) {
+pub fn install(ctx: Context) {
 	ctx.set_global(b"assert", assert::callback(ctx));
 	ctx.set_global(b"select", select::callback(ctx));
 	ctx.set_global(b"rawget", rawget::callback(ctx));
@@ -19,13 +20,20 @@ pub fn load(ctx: Context) {
 	ctx.set_global(b"setmetatable", setmetatable::callback(ctx));
 	ctx.set_global(b"trace", trace::callback(ctx));
 	ctx.set_global(b"stat", stat::callback(ctx));
+	ctx.set_global(b"serial", serial::callback(ctx));
 	ctx.set_global(b"type", r#type::callback(ctx));
 	ctx.set_global(b"tostring", tostring::callback(ctx));
 	ctx.set_global(b"tostr", tostr::callback(ctx));
 	ctx.set_global(b"tonum", tonum::callback(ctx));
 	ctx.set_global(b"printh", printh::callback(ctx));
-	ctx.set_global(b"time", time::callback(ctx));
-	ctx.set_global(b"t", time::callback(ctx));
+	
+	let time = time::callback(ctx);
+	ctx.set_global(b"time", time);
+	ctx.set_global(b"t", time);
+	
+	let trace = trace::callback(ctx);
+	ctx.set_global(b"trace", trace);
+	ctx.set_global(b"__trace", trace);
 }
 
 #[api_callback]
@@ -146,6 +154,11 @@ pub fn stat<'gc>(rt: &mut Runtime, stat_cmd: i16) -> P8Num {
 			P8Num::ZERO
 		}
 	}
+}
+
+#[api_callback]
+pub fn serial() {
+	once!{ warn!("serial is not implemented yet!"); }
 }
 
 #[api_callback]

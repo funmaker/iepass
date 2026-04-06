@@ -4,7 +4,7 @@ use p8rs_piccolo::{Lua, Table, Value};
 
 #[test]
 fn test_table_iter() {
-    let mut lua = Lua::core();
+    let mut lua = Lua::empty();
 
     lua.enter(|ctx| {
         let table = Table::new(&ctx);
